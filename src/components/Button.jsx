@@ -1,7 +1,7 @@
 import React from 'react'
 
 const Button = ({ 
-  children, 
+  children,
   onClick, 
   type = 'button', 
   variant = 'primary', 
