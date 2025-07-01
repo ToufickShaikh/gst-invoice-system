@@ -18,7 +18,8 @@ const Layout = ({ children }) => {
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/customers', label: 'Customers' },
     { path: '/items', label: 'Items' },
-    { path: '/billing', label: 'Billing' }
+    { path: '/billing', label: 'Billing' },
+    { path: '/invoices', label: 'Invoices' }
   ]
 
   return (
@@ -73,8 +74,8 @@ const Layout = ({ children }) => {
                 to={item.path}
                 onClick={() => setIsMenuOpen(false)} // Close menu on link click
                 className={`block py-3 md:py-4 px-3 text-center md:text-left border-b-2 transition-colors ${location.pathname === item.path
-                    ? 'border-white bg-gray-700'
-                    : 'border-transparent hover:border-gray-300 hover:bg-gray-700'
+                  ? 'border-white bg-gray-700'
+                  : 'border-transparent hover:border-gray-300 hover:bg-gray-700'
                   }`}
               >
                 {item.label}

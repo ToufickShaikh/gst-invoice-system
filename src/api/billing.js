@@ -3,8 +3,9 @@ const API_BASE_URL = 'http://localhost:3000/api';
 
 // Example billing API functions
 export const billingAPI = {
-  getAll: async () => {
-    const res = await axios.get(`${API_BASE_URL}/billing`);
+  getAll: async (billingType) => {
+    const url = billingType ? `${API_BASE_URL}/billing?billingType=${billingType}` : `${API_BASE_URL}/billing`;
+    const res = await axios.get(url);
     return res.data;
   },
   getById: async (id) => {
@@ -12,7 +13,11 @@ export const billingAPI = {
     return res.data;
   },
   create: async (data) => {
-    const res = await axios.post(`${API_BASE_URL}/billing`, data);
+    const res = await axios.post(`${API_BASE_URL}/billing/invoices`, data);
+    return res.data;
+  },
+  getDashboardStats: async (dateRange) => {
+    const res = await axios.post(`${API_BASE_URL}/billing/dashboard-stats`, dateRange);
     return res.data;
   },
   update: async (id, data) => {

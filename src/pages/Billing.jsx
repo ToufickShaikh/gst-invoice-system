@@ -17,8 +17,10 @@ const Billing = () => {
   const [items, setItems] = useState([])
   const [selectedCustomer, setSelectedCustomer] = useState('')
   const [billItems, setBillItems] = useState([])
-  const [discount, setDiscount] = useState(0)
+  const [discountAmt, setDiscountAmt] = useState(0)
+  const [shippingCharges, setShippingCharges] = useState(0)
   const [paidAmount, setPaidAmount] = useState(0)
+  const [paymentMethod, setPaymentMethod] = useState('UPI')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -31,7 +33,7 @@ const Billing = () => {
         customersAPI.getAll(),
         itemsAPI.getAll()
       ])
-      setCustomers(customersRes.data.filter(c => c.type === billingType))
+      setCustomers(customersRes.data.filter(c => c.customerType === billingType))
       setItems(itemsRes.data)
     } catch (error) {
       toast.error('Failed to fetch data')
@@ -45,7 +47,7 @@ const Billing = () => {
   const handleItemChange = (index, field, value) => {
     const updatedItems = [...billItems]
     if (field === 'itemId') {
-      const selectedItem = items.find(i => i.id === parseInt(value))
+      const selectedItem = items.find(i => i._id === value)
       updatedItems[index] = { ...updatedItems[index], itemId: value, item: selectedItem }
     } else {
       updatedItems[index][field] = value
@@ -58,22 +60,29 @@ const Billing = () => {
   }
 
   const getCustomerDetails = () => {
-    const customer = customers.find(c => c.id === parseInt(selectedCustomer))
+    const customer = customers.find(c => c._id === selectedCustomer)
     return customer
   }
 
   const getBillItemsWithTax = () => {
     const customer = getCustomerDetails()
-    const isInterState = billingType === 'B2B' && customer?.address && 
-                        !customer.address.toLowerCase().includes('maharashtra')
+    const isInterState = billingType === 'B2B' && customer?.firmAddress &&
+      !customer.firmAddress.toLowerCase().includes('maharashtra')
 
+    // Calculate total before discount for all items
+    const totalBeforeDiscount = billItems.reduce((sum, billItem) => {
+      if (!billItem.item) return sum
+      return sum + billItem.item.price * billItem.quantity
+    }, 0)
+
+    // Distribute discount amount proportionally to each item
     return billItems.map(billItem => {
       if (!billItem.item) return null
       const itemTotal = billItem.item.price * billItem.quantity
-      const discountAmount = (itemTotal * discount) / 100
+      const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * discountAmt : 0
       const taxableAmount = itemTotal - discountAmount
       const tax = calculateTax(taxableAmount, billItem.item.taxSlab, isInterState)
-      
+
       return {
         ...billItem,
         itemTotal,
@@ -85,13 +94,12 @@ const Billing = () => {
     }).filter(Boolean)
   }
 
-  const totals = calculateTotal(
-    billItems.filter(item => item.item).map(item => ({
-      ...item.item,
-      quantity: item.quantity
-    })),
-    discount
-  )
+  // Calculate totals
+  const billItemsWithTax = getBillItemsWithTax()
+  const totalBeforeTax = billItemsWithTax.reduce((sum, item) => sum + (item ? item.taxableAmount : 0), 0)
+  const totalTax = billItemsWithTax.reduce((sum, item) => sum + (item ? item.tax.total : 0), 0)
+  const grandTotal = totalBeforeTax + totalTax + Number(shippingCharges)
+  const balance = grandTotal - paidAmount
 
   const handleGenerateInvoice = async () => {
     if (!selectedCustomer) {
@@ -105,25 +113,43 @@ const Billing = () => {
 
     setLoading(true)
     try {
+      // Prepare items for backend (include snapshot details)
+      const itemsForBackend = billItemsWithTax.map(billItem => ({
+        item: billItem.itemId,
+        name: billItem.item.name,
+        hsnCode: billItem.item.hsnCode,
+        price: billItem.item.price,
+        taxSlab: billItem.item.taxSlab,
+        quantity: billItem.quantity,
+        itemTotal: billItem.itemTotal,
+        discountAmount: billItem.discountAmount,
+        taxableAmount: billItem.taxableAmount,
+        tax: billItem.tax,
+        totalWithTax: billItem.totalWithTax
+      }))
+
       const invoiceData = {
-        customerId: selectedCustomer,
-        customer: getCustomerDetails(),
-        items: getBillItemsWithTax(),
-        discount,
-        totals,
-        paidAmount,
-        balance: totals.grandTotal - paidAmount,
+        customer: selectedCustomer,
+        items: itemsForBackend,
+        discount: Number(discountAmt),
+        shippingCharges: Number(shippingCharges),
+        totalBeforeTax: Number(totalBeforeTax),
+        totalTax: Number(totalTax),
+        grandTotal: Number(grandTotal),
+        paidAmount: Number(paidAmount),
+        balance: Number(balance),
+        paymentMethod,
         billingType
       }
 
-      const response = await billingAPI.createInvoice(invoiceData)
+      const response = await billingAPI.create(invoiceData)
       toast.success('Invoice generated successfully!')
-      navigate('/invoice-success', { 
-        state: { 
-          invoiceId: response.data.invoiceId,
-          pdfUrl: response.data.pdfUrl,
-          upiQr: response.data.upiQr,
-          balance: invoiceData.balance
+      navigate('/invoice-success', {
+        state: {
+          invoiceId: response.invoice?._id || response.invoiceId,
+          pdfUrl: response.pdfPath || response.pdfUrl,
+          upiQr: response.upiQr,
+          balance: Number(grandTotal) - Number(paidAmount)
         }
       })
     } catch (error) {
@@ -143,21 +169,19 @@ const Billing = () => {
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => setBillingType('B2B')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                billingType === 'B2B'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${billingType === 'B2B'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
             >
               B2B Invoice
             </button>
             <button
               onClick={() => setBillingType('B2C')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                billingType === 'B2C'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${billingType === 'B2C'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
             >
               B2C Invoice
             </button>
@@ -177,7 +201,7 @@ const Billing = () => {
             >
               <option value="">Select a customer</option>
               {customers.map(customer => (
-                <option key={customer.id} value={customer.id}>
+                <option key={customer._id} value={customer._id}>
                   {billingType === 'B2B' ? customer.firmName : customer.name} - {customer.contact}
                 </option>
               ))}
@@ -210,7 +234,7 @@ const Billing = () => {
                       >
                         <option value="">Select an item</option>
                         {items.map(item => (
-                          <option key={item.id} value={item.id}>
+                          <option key={item._id} value={item._id}>
                             {item.name} - {formatCurrency(item.price)} - {item.taxSlab}% GST
                           </option>
                         ))}
@@ -238,23 +262,41 @@ const Billing = () => {
             )}
           </div>
 
-          {/* Discount and Payment */}
+          {/* Discount, Shipping, and Payment */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <InputField
-              label="Discount (%)"
+              label="Discount (₹)"
               type="number"
-              value={discount}
-              onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+              value={discountAmt}
+              onChange={(e) => setDiscountAmt(parseFloat(e.target.value) || 0)}
               min="0"
-              max="100"
             />
             <InputField
-              label="Paid Amount"
+              label="Shipping Charges (₹)"
+              type="number"
+              value={shippingCharges}
+              onChange={(e) => setShippingCharges(parseFloat(e.target.value) || 0)}
+              min="0"
+            />
+            <InputField
+              label="Paid Amount (₹)"
               type="number"
               value={paidAmount}
               onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
               min="0"
             />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+              <select
+                value={paymentMethod}
+                onChange={e => setPaymentMethod(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="UPI">UPI</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cash">Cash</option>
+              </select>
+            </div>
           </div>
 
           {/* Summary */}
@@ -263,24 +305,24 @@ const Billing = () => {
               <h3 className="text-lg font-medium mb-4">Summary</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(totals.subtotal)}</span>
+                  <span>Total Before Tax:</span>
+                  <span>{formatCurrency(totalBeforeTax)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Discount:</span>
-                  <span>- {formatCurrency(totals.discount)}</span>
+                  <span>- {formatCurrency(discountAmt)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Taxable Amount:</span>
-                  <span>{formatCurrency(totals.taxableAmount)}</span>
+                  <span>Shipping Charges:</span>
+                  <span>{formatCurrency(shippingCharges)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Total Tax:</span>
-                  <span>{formatCurrency(totals.totalTax)}</span>
+                  <span>Tax Amount:</span>
+                  <span>{formatCurrency(totalTax)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg border-t pt-2">
-                  <span>Grand Total:</span>
-                  <span>{formatCurrency(totals.grandTotal)}</span>
+                  <span>Total After Tax:</span>
+                  <span>{formatCurrency(grandTotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Paid Amount:</span>
@@ -288,7 +330,11 @@ const Billing = () => {
                 </div>
                 <div className="flex justify-between font-medium">
                   <span>Balance:</span>
-                  <span>{formatCurrency(totals.grandTotal - paidAmount)}</span>
+                  <span>{formatCurrency(balance)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Payment Method:</span>
+                  <span>{paymentMethod}</span>
                 </div>
               </div>
             </div>

@@ -23,8 +23,17 @@ const Dashboard = () => {
     setLoading(true)
     try {
       const response = await billingAPI.getDashboardStats(dateRange)
-      setStats(response.data)
+      // Accept both {totalSales, ...} and {data: {totalSales, ...}}
+      const data = response && typeof response === 'object' && 'totalSales' in response
+        ? response
+        : (response && response.data ? response.data : {});
+      setStats({
+        totalSales: data.totalSales || 0,
+        totalPayable: data.totalPayable || 0,
+        totalReceivable: data.totalReceivable || 0
+      })
     } catch (error) {
+      setStats({ totalSales: 0, totalPayable: 0, totalReceivable: 0 })
       toast.error('Failed to fetch stats')
     } finally {
       setLoading(false)
@@ -47,7 +56,7 @@ const Dashboard = () => {
     <Layout>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        
+
         {/* Date Filter */}
         <div className="bg-white p-4 rounded-lg shadow">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
