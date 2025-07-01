@@ -25,7 +25,7 @@ const Customers = () => {
   const b2bColumns = [
     { key: 'firmName', label: 'Firm Name' },
     { key: 'gstNo', label: 'GST No.' },
-    { key: 'address', label: 'Address' },
+    { key: 'firmAddress', label: 'Address' },
     { key: 'contact', label: 'Contact' }
   ]
 
