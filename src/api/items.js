@@ -1,7 +1,7 @@
 // frontend/src/api/items.js
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api'; // The base URL for your backend
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'; // The base URL for your backend
 
 export const itemsAPI = {
   getAll: async () => {

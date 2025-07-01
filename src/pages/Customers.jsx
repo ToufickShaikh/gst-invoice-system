@@ -37,7 +37,7 @@ const Customers = () => {
   const fetchCustomers = async () => {
     setLoading(true)
     try {
-      const response = await customersAPI.getAll()
+      const response = await customersAPI.getAll(activeTab)
       setCustomers(response.data)
     } catch (error) {
       toast.error('Failed to fetch customers')
@@ -48,7 +48,7 @@ const Customers = () => {
 
   useEffect(() => {
     fetchCustomers()
-  }, [])
+  }, [activeTab])
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
