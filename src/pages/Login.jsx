@@ -22,10 +22,10 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    
+
     try {
       const response = await authAPI.login(formData)
-      login(response.data.user)
+      login(response.user)
       toast.success('Login successful!')
       navigate('/dashboard')
     } catch (error) {
@@ -40,17 +40,16 @@ const Login = () => {
       <div className="max-w-md w-full">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h2 className="text-2xl font-bold text-center mb-8">GST Billing System</h2>
-          
           <form onSubmit={handleSubmit}>
             <InputField
               label="Username"
               name="username"
+              type="text"
               value={formData.username}
               onChange={handleChange}
               placeholder="Enter username"
               required
             />
-            
             <InputField
               label="Password"
               type="password"
@@ -60,7 +59,6 @@ const Login = () => {
               placeholder="Enter password"
               required
             />
-            
             <Button
               type="submit"
               variant="primary"
@@ -70,9 +68,8 @@ const Login = () => {
               {loading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
-          
           <p className="text-sm text-gray-600 text-center mt-4">
-            Demo: username: admin, password: admin123
+            Demo: username: hokage, password: admin
           </p>
         </div>
       </div>

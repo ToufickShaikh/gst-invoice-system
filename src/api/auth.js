@@ -4,7 +4,9 @@ const API_BASE_URL = 'http://localhost:3000/api';
 // Example auth API functions
 export const authAPI = {
   login: async (credentials) => {
-    const res = await axios.post(`${API_BASE_URL}/auth/login`, credentials);
+    // Map username to email for backend compatibility if needed
+    const payload = credentials.username ? { username: credentials.username, password: credentials.password } : credentials;
+    const res = await axios.post(`${API_BASE_URL}/auth/login`, payload);
     return res.data;
   },
   register: async (data) => {

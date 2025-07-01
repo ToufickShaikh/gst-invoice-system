@@ -1,15 +1,15 @@
-import User from '../models/User.js';
 
-export const login = async (req, res) => {
-    const { email, password } = req.body;
-    try {
-        const user = await User.findOne({ email });
-        if (user && user.password === password) {
-            res.json({ message: 'Login successful' });
-        } else {
-            res.status(401).json({ message: 'Invalid credentials' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+export const login = (req, res) => {
+    // Accept username only
+    const { username, password } = req.body;
+    console.log('Login attempt:', { username, password, body: req.body });
+    // Hardcoded credentials
+    const adminUsername = 'hokage';
+    const adminPassword = 'admin';
+    if (username === adminUsername && password === adminPassword) {
+        res.json({ message: 'Login successful', user: { username: adminUsername } });
+    } else {
+        console.error('Invalid login attempt:', { receivedUsername: username, receivedPassword: password, expectedUsername: adminUsername, expectedPassword: adminPassword, body: req.body });
+        res.status(401).json({ message: 'Invalid credentials' });
     }
 };
