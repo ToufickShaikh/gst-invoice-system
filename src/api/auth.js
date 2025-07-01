@@ -1,13 +1,22 @@
-import axios from 'axios'
+import axios from 'axios';
+const API_BASE_URL = 'http://localhost:3000/api';
 
-const API_URL = 'http://localhost:3000/api'
-
+// Example auth API functions
 export const authAPI = {
   login: async (credentials) => {
-    // Dummy login for now
-    if (credentials.username === 'admin' && credentials.password === 'admin123') {
-      return { data: { user: { id: 1, name: 'Admin User', username: 'admin' } } }
-    }
-    throw new Error('Invalid credentials')
-  }
-}
+    const res = await axios.post(`${API_BASE_URL}/auth/login`, credentials);
+    return res.data;
+  },
+  register: async (data) => {
+    const res = await axios.post(`${API_BASE_URL}/auth/register`, data);
+    return res.data;
+  },
+  logout: async () => {
+    const res = await axios.post(`${API_BASE_URL}/auth/logout`);
+    return res.data;
+  },
+  getProfile: async () => {
+    const res = await axios.get(`${API_BASE_URL}/auth/profile`);
+    return res.data;
+  },
+};

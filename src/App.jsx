@@ -1,7 +1,10 @@
+// src/App.jsx
+
 import React from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import AppRoutes from './routes/AppRoutes'
+// Corrected import path
+import AppRoutes from '../routes/AppRoutes.jsx'
 import { AuthProvider } from './context/AuthContext'
 
 function App() {

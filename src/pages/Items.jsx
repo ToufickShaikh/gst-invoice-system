@@ -62,7 +62,7 @@ const Items = () => {
 
     try {
       if (editingItem) {
-        await itemsAPI.update(editingItem.id, itemData)
+        await itemsAPI.update(editingItem._id, itemData)
         toast.success('Item updated successfully')
       } else {
         await itemsAPI.create(itemData)
@@ -89,7 +89,7 @@ const Items = () => {
   const handleDelete = async (item) => {
     if (window.confirm('Are you sure you want to delete this item?')) {
       try {
-        await itemsAPI.delete(item.id)
+        await itemsAPI.delete(item._id)
         toast.success('Item deleted successfully')
         fetchItems()
       } catch (error) {

@@ -1,39 +1,22 @@
-import axios from 'axios'
+// frontend/src/api/customers.js
+import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/api'
+const API_BASE_URL = 'http://localhost:3000/api';
 
 export const customersAPI = {
   getAll: async () => {
-    // Dummy data
-    return {
-      data: [
-        {
-          id: 1,
-          type: 'B2B',
-          firmName: 'ABC Corp',
-          gstNo: '27AABCU9603R1ZM',
-          address: 'Mumbai, Maharashtra',
-          contact: '9876543210'
-        },
-        {
-          id: 2,
-          type: 'B2C',
-          name: 'John Doe',
-          contact: '9876543211'
-        }
-      ]
-    }
+    return await axios.get(`${API_BASE_URL}/customers`);
   },
 
   create: async (customer) => {
-    return { data: { ...customer, id: Date.now() } }
+    return await axios.post(`${API_BASE_URL}/customers`, customer);
   },
 
   update: async (id, customer) => {
-    return { data: { ...customer, id } }
+    return await axios.put(`${API_BASE_URL}/customers/${id}`, customer);
   },
 
   delete: async (id) => {
-    return { data: { success: true } }
+    return await axios.delete(`${API_BASE_URL}/customers/${id}`);
   }
-}
+};
