@@ -14,10 +14,10 @@ const Customers = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
   const [formData, setFormData] = useState({
-    type: 'B2B',
+    customerType: 'B2B',
     firmName: '',
     gstNo: '',
-    address: '',
+    firmAddress: '',
     contact: '',
     name: ''
   })
@@ -57,11 +57,12 @@ const Customers = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      const payload = { ...formData, customerType: activeTab };
       if (editingCustomer) {
-        await customersAPI.update(editingCustomer.id, { ...formData, type: activeTab })
+        await customersAPI.update(editingCustomer._id, payload)
         toast.success('Customer updated successfully')
       } else {
-        await customersAPI.create({ ...formData, type: activeTab })
+        await customersAPI.create(payload)
         toast.success('Customer added successfully')
       }
       fetchCustomers()
@@ -73,14 +74,21 @@ const Customers = () => {
 
   const handleEdit = (customer) => {
     setEditingCustomer(customer)
-    setFormData(customer)
+    setFormData({
+      customerType: customer.customerType,
+      firmName: customer.firmName || '',
+      gstNo: customer.gstNo || '',
+      firmAddress: customer.firmAddress || '',
+      contact: customer.contact || '',
+      name: customer.name || ''
+    })
     setIsModalOpen(true)
   }
 
   const handleDelete = async (customer) => {
     if (window.confirm('Are you sure you want to delete this customer?')) {
       try {
-        await customersAPI.delete(customer.id)
+        await customersAPI.delete(customer._id)
         toast.success('Customer deleted successfully')
         fetchCustomers()
       } catch (error) {
@@ -93,16 +101,16 @@ const Customers = () => {
     setIsModalOpen(false)
     setEditingCustomer(null)
     setFormData({
-      type: activeTab,
+      customerType: activeTab,
       firmName: '',
       gstNo: '',
-      address: '',
+      firmAddress: '',
       contact: '',
       name: ''
     })
   }
 
-  const filteredCustomers = customers.filter(c => c.type === activeTab)
+  const filteredCustomers = customers.filter(c => c.customerType === activeTab)
 
   return (
     <Layout>
@@ -119,21 +127,19 @@ const Customers = () => {
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => setActiveTab('B2B')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'B2B'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'B2B'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
             >
               B2B Customers
             </button>
             <button
               onClick={() => setActiveTab('B2C')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'B2C'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'B2C'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
             >
               B2C Customers
             </button>
@@ -179,8 +185,8 @@ const Customers = () => {
                 />
                 <InputField
                   label="Address"
-                  name="address"
-                  value={formData.address}
+                  name="firmAddress"
+                  value={formData.firmAddress}
                   onChange={handleChange}
                   required
                 />
@@ -218,5 +224,4 @@ const Customers = () => {
 
 export default Customers
 
- 
- 
+
