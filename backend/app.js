@@ -1,13 +1,13 @@
 // backend/app.js
 // Main Express app setup for GST Invoice System backend
-import express from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser';
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 // Import route handlers
-import authRoutes from './routes/authRoutes.js';
-import customerRoutes from './routes/customerRoutes.js';
-import itemRoutes from './routes/itemRoutes.js';
-import billingRoutes from './routes/billingRoutes.js';
+const authRoutes = require('./routes/authRoutes.js');
+const customerRoutes = require('./routes/customerRoutes.js');
+const itemRoutes = require('./routes/itemRoutes.js');
+const billingRoutes = require('./routes/billingRoutes.js');
 
 const app = express(); // Create Express app instance
 
@@ -36,4 +36,4 @@ app.use('/api/billing', billingRoutes); // Billing/invoice routes
 // Serve generated invoices as static files
 app.use('/invoices', express.static('invoices'));
 
-export default app;
+module.exports = app;

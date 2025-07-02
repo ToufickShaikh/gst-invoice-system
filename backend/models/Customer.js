@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const customerSchema = new mongoose.Schema({
     customerType: { type: String, enum: ['B2B', 'B2C'], required: true },
@@ -7,8 +7,8 @@ const customerSchema = new mongoose.Schema({
     firmAddress: { type: String },
     name: { type: String },
     contact: { type: String },
+    state: { type: String, required: true }, // Added state for tax calculation
 });
 
-// The only change is on this line
 const Customer = mongoose.model('Customer', customerSchema);
-export default Customer;
+module.exports = Customer;

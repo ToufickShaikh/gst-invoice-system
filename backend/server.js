@@ -1,8 +1,8 @@
 // backend/server.js
 // Entry point for starting the backend server
-import app from './app.js';
-import connectDB from './config/db.js';
-import dotenv from 'dotenv';
+const app = require('./app.js');
+const connectDB = require('./config/db.js');
+const dotenv = require('dotenv');
 
 dotenv.config(); // Load environment variables from .env file
 

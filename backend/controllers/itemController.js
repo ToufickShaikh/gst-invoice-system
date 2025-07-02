@@ -1,8 +1,8 @@
 // Controller for item CRUD operations
-import Item from '../models/Item.js';
+const Item = require('../models/Item.js');
 
 // Get all items
-export const getItems = async (req, res) => {
+const getItems = async (req, res) => {
     try {
         const items = await Item.find();
         res.json(items);
@@ -12,7 +12,7 @@ export const getItems = async (req, res) => {
 };
 
 // Create a new item
-export const createItem = async (req, res) => {
+const createItem = async (req, res) => {
     try {
         const item = new Item(req.body);
         await item.save();
@@ -23,7 +23,7 @@ export const createItem = async (req, res) => {
 };
 
 // Update an existing item by ID
-export const updateItem = async (req, res) => {
+const updateItem = async (req, res) => {
     try {
         const item = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.json(item);
@@ -33,11 +33,18 @@ export const updateItem = async (req, res) => {
 };
 
 // Delete an item by ID
-export const deleteItem = async (req, res) => {
+const deleteItem = async (req, res) => {
     try {
         await Item.findByIdAndDelete(req.params.id);
         res.json({ message: 'Item deleted' });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }
+};
+
+module.exports = {
+    getItems,
+    createItem,
+    updateItem,
+    deleteItem,
 };

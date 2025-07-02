@@ -1,8 +1,8 @@
 // Controller for authentication logic
-import User from '../models/User.js';
+const User = require('../models/User.js');
 
 // Login handler: accepts username and password, checks hardcoded admin or DB user
-export const login = async (req, res) => {
+const login = async (req, res) => {
     const { username, password } = req.body;
     console.log('Login attempt:', { username, password, body: req.body });
 
@@ -33,3 +33,5 @@ export const login = async (req, res) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 };
+
+module.exports = { login };
