@@ -38,8 +38,16 @@ const Customers = () => {
     setLoading(true)
     try {
       const response = await customersAPI.getAll(activeTab)
-      setCustomers(response.data)
+      // Defensive: always set to array
+      if (Array.isArray(response.data)) {
+        setCustomers(response.data)
+      } else if (Array.isArray(response)) {
+        setCustomers(response)
+      } else {
+        setCustomers([])
+      }
     } catch (error) {
+      setCustomers([])
       toast.error('Failed to fetch customers')
     } finally {
       setLoading(false)
