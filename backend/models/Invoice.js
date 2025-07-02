@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const invoiceSchema = new mongoose.Schema({
     invoiceNumber: { type: String, required: true, unique: true },
@@ -8,29 +8,24 @@ const invoiceSchema = new mongoose.Schema({
             item: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
             name: String,
             hsnCode: String,
-            price: Number,
+            rate: Number, // Changed from price to rate
             taxSlab: Number,
             quantity: { type: Number, required: true },
-            itemTotal: Number,
-            discountAmount: Number,
-            taxableAmount: Number,
-            tax: mongoose.Schema.Types.Mixed,
-            totalWithTax: Number
+            // The following fields will be calculated and are not stored directly
+            // They can be populated at runtime if needed
         },
     ],
-    discount: { type: Number, default: 0 },
+    subTotal: { type: Number, required: true },
+    cgst: { type: Number, default: 0 },
+    sgst: { type: Number, default: 0 },
+    igst: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true },
     paidAmount: { type: Number, default: 0 },
     invoiceDate: { type: Date, default: Date.now },
     shippingCharges: { type: Number, default: 0 },
-    totalBeforeTax: { type: Number, default: 0 },
-    totalTax: { type: Number, default: 0 },
-    grandTotal: { type: Number, default: 0 },
-    balance: { type: Number, default: 0 },
     paymentMethod: { type: String },
-    billingType: { type: String },
+    // Removed redundant/calculable fields like grandTotal, balance, etc.
 });
 
-// The only change is on this line
 const Invoice = mongoose.model('Invoice', invoiceSchema);
-export default Invoice;
+module.exports = Invoice;
