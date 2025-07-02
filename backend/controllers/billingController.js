@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { generatePdf } from '../utils/pdfGenerator.js';
 import { calculateTax } from '../utils/taxHelpers.js'; // Helper for tax calculation
 import { generateUpiQr } from '../utils/upiHelper.js';
+import { calculateTotals } from '../utils/taxHelpers.js'; // Added this line back
 
 // Recalculate invoice totals based on items, discount, and shipping
 const recalculateInvoiceTotals = async (invoiceData) => {
