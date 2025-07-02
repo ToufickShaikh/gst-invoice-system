@@ -15,6 +15,7 @@ const EditInvoice = () => {
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [customers, setCustomers] = useState([]);
     const [items, setItems] = useState([]);
     const [invoiceData, setInvoiceData] = useState(null);
@@ -33,8 +34,11 @@ const EditInvoice = () => {
     useEffect(() => {
         if (!invoiceData || !customers.length) return;
 
+        // Find the full customer object to determine if the sale is inter-state
         const customer = customers.find(c => c._id === invoiceData.customer);
-        const isInterState = customer?.firmAddress && !customer.firmAddress.toLowerCase().includes('maharashtra');
+        if (!customer) return; // Don't calculate if customer not found yet
+
+        const isInterState = customer.firmAddress && !customer.firmAddress.toLowerCase().includes('maharashtra');
 
         const totalBeforeDiscount = (invoiceData.items || []).reduce((sum, item) => {
             const price = item.price || item.item?.price || 0;
@@ -65,26 +69,23 @@ const EditInvoice = () => {
 
     const fetchInitialData = async () => {
         setLoading(true);
+        setError(null); // Reset error state on new fetch
         try {
-            // Fetch all required data first
             const [customersRes, itemsRes, invoiceRes] = await Promise.all([
                 customersAPI.getAll(),
                 itemsAPI.getAll(),
                 billingAPI.getInvoiceById(id),
             ]);
 
-            // Ensure all data is valid before proceeding
-            const customersList = customersRes.data || [];
-            const itemsList = itemsRes.data || [];
-            const fetchedInvoice = invoiceRes.data || invoiceRes;
+            // The API wrappers return the data object directly
+            const customersList = customersRes || [];
+            const itemsList = itemsRes || [];
+            const fetchedInvoice = invoiceRes;
 
             if (!fetchedInvoice || !fetchedInvoice.customer || !customersList.length || !itemsList.length) {
-                toast.error('Failed to load necessary data. Please try again.');
-                navigate('/invoices');
-                return;
+                throw new Error('One or more data sources (invoice, customers, items) are missing or empty.');
             }
 
-            // Now that we have all data, set state together
             setCustomers(customersList);
             setItems(itemsList);
             setInvoiceData({
@@ -92,14 +93,14 @@ const EditInvoice = () => {
                 customer: fetchedInvoice.customer._id,
                 items: (fetchedInvoice.items || []).map(item => ({
                     ...item,
-                    itemId: item.item?._id || '',
+                    itemId: item.item?._id || ''
                 })),
             });
 
-        } catch (error) {
-            console.error("Error fetching initial data:", error);
-            toast.error('Failed to fetch invoice data. Redirecting...');
-            navigate('/invoices');
+        } catch (err) {
+            console.error("Error fetching initial data:", err);
+            setError('Failed to load necessary data. Please check your connection and try again.');
+            toast.error('Failed to load invoice data.');
         } finally {
             setLoading(false);
         }
@@ -157,8 +158,16 @@ const EditInvoice = () => {
         }
     };
 
-    if (loading || !invoiceData) {
+    if (loading) {
         return <Layout><div>Loading...</div></Layout>;
+    }
+
+    if (error) {
+        return <Layout><div className="text-red-500 text-center p-4">{error}</div></Layout>;
+    }
+
+    if (!invoiceData) {
+        return <Layout><div>No invoice data available.</div></Layout>;
     }
 
     // Render a form similar to Billing.jsx but for editing
