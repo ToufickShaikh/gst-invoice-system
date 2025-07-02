@@ -14,7 +14,7 @@ export const billingAPI = {
     return res.data;
   },
   getInvoices: async (billingType) => {
-    const res = await axios.get(`${API_BASE_URL}/billing/invoices`, { params: { billingType } });
+    const res = await axios.get(`${API_BASE_URL}/billing`, { params: { billingType } });
     return res.data;
   },
   getInvoiceById: async (id) => {

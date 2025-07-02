@@ -162,7 +162,14 @@ const Billing = () => {
         }
       })
     } catch (error) {
-      toast.error('Failed to generate invoice')
+      // Log error details for debugging
+      if (error.response) {
+        console.error('Invoice generation error:', error.response.data);
+        toast.error(`Failed to generate invoice: ${error.response.data.message || 'Server error'}`);
+      } else {
+        console.error('Invoice generation error:', error);
+        toast.error('Failed to generate invoice');
+      }
     } finally {
       setLoading(false)
     }
