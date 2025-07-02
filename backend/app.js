@@ -12,7 +12,14 @@ import billingRoutes from './routes/billingRoutes.js';
 const app = express(); // Create Express app instance
 
 // Middleware setup
-app.use(cors()); // Enable CORS for all routes
+app.use(cors({
+    origin: [
+        'https://shaikhgst.netlify.app',
+        'http://localhost:5173',
+        'http://localhost:3000'
+    ],
+    credentials: true
+})); // Enable CORS for Netlify, local dev, etc.
 app.use(bodyParser.json()); // Parse JSON request bodies
 
 // Health check route
