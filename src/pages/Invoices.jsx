@@ -13,12 +13,12 @@ const Invoices = () => {
     const fetchInvoices = async (billingType) => {
         setLoading(true);
         try {
-            const res = await billingAPI.getAll(billingType);
             // Defensive: always use array
-            if (Array.isArray(res.data)) {
-                setInvoices(res.data);
-            } else if (Array.isArray(res)) {
+            const res = await billingAPI.getInvoices(billingType);
+            if (Array.isArray(res)) {
                 setInvoices(res);
+            } else if (Array.isArray(res?.data)) {
+                setInvoices(res.data);
             } else {
                 setInvoices([]);
             }

@@ -33,9 +33,18 @@ const Billing = () => {
         customersAPI.getAll(),
         itemsAPI.getAll()
       ])
-      setCustomers(customersRes.data.filter(c => c.customerType === billingType))
-      setItems(itemsRes.data)
+      // Defensive: always use array
+      const customersArr = Array.isArray(customersRes.data)
+        ? customersRes.data
+        : (Array.isArray(customersRes) ? customersRes : [])
+      const itemsArr = Array.isArray(itemsRes.data)
+        ? itemsRes.data
+        : (Array.isArray(itemsRes) ? itemsRes : [])
+      setCustomers(customersArr.filter(c => c.customerType === billingType))
+      setItems(itemsArr)
     } catch (error) {
+      setCustomers([])
+      setItems([])
       toast.error('Failed to fetch data')
     }
   }
