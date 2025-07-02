@@ -1,11 +1,10 @@
-import { updateInvoice } from '../controllers/billingController.js';
-// Update invoice by ID
-router.put('/invoices/:id', updateInvoice);
 import express from 'express';
-import { createInvoice, getDashboardStats } from '../controllers/billingController.js';
+import { createInvoice, getDashboardStats, getInvoices, updateInvoice, reprintInvoice, getInvoiceById } from '../controllers/billingController.js';
 
 const router = express.Router();
 
+// Update invoice by ID
+router.put('/invoices/:id', updateInvoice);
 router.post('/invoices', createInvoice);
 // List all invoices
 import Invoice from '../models/Invoice.js';
@@ -24,5 +23,9 @@ router.get('/', async (req, res) => {
 // Support both GET and POST for dashboard stats for flexibility
 router.get('/dashboard-stats', getDashboardStats);
 router.post('/dashboard-stats', getDashboardStats);
+// Route to reprint an invoice
+router.post('/invoices/:id/reprint', reprintInvoice);
+// Route to get a single invoice by ID
+router.get('/invoices/:id', getInvoiceById);
 
 export default router;

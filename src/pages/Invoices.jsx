@@ -2,18 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { billingAPI } from '../api/billing';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
-import Modal from '../components/Modal';
-import InputField from '../components/InputField';
 import { formatCurrency } from '../utils/dateHelpers';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { toast } from 'react-hot-toast';
 
 const Invoices = () => {
-
+    const navigate = useNavigate(); // Initialize navigate
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(false);
     const [tab, setTab] = useState('B2B');
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editingInvoice, setEditingInvoice] = useState(null);
-    const [editForm, setEditForm] = useState({ paidAmount: '', paymentMethod: '' });
 
     const fetchInvoices = async (billingType) => {
         setLoading(true);
@@ -49,35 +46,26 @@ const Invoices = () => {
         }
     };
 
-    // Open edit modal and prefill form
-    const handleEdit = (invoice) => {
-        setEditingInvoice(invoice);
-        setEditForm({
-            paidAmount: invoice.paidAmount || '',
-            paymentMethod: invoice.paymentMethod || ''
-        });
-        setIsEditModalOpen(true);
+    // Navigate to the edit page
+    const handleEdit = (invoiceId) => {
+        navigate(`/edit-invoice/${invoiceId}`);
     };
 
-    // Handle edit form change
-    const handleEditFormChange = (e) => {
-        setEditForm({ ...editForm, [e.target.name]: e.target.value });
-    };
-
-    // Submit edit
-    const handleEditSubmit = async (e) => {
-        e.preventDefault();
-        if (!editingInvoice) return;
+    // Handle reprinting the invoice
+    const handleReprint = async (invoiceId) => {
         setLoading(true);
         try {
-            const updated = await billingAPI.updateInvoice(editingInvoice._id, {
-                paidAmount: Number(editForm.paidAmount),
-                paymentMethod: editForm.paymentMethod
-            });
-            setInvoices(invoices.map(inv => inv._id === updated._id ? updated : inv));
-            setIsEditModalOpen(false);
+            const res = await billingAPI.reprintInvoice(invoiceId);
+            if (res.pdfPath) {
+                // Construct the full URL to the PDF
+                const pdfUrl = `${import.meta.env.VITE_API_BASE_URL.replace('/api', '')}/${res.pdfPath}`;
+                window.open(pdfUrl, '_blank');
+                toast.success('Invoice reprinted successfully!');
+            } else {
+                toast.error(res.message || 'Could not find PDF to reprint.');
+            }
         } catch (err) {
-            alert('Failed to update invoice');
+            toast.error('Failed to reprint invoice');
         } finally {
             setLoading(false);
         }
@@ -116,9 +104,9 @@ const Invoices = () => {
                                     <td className="border px-2 py-1">{formatCurrency(inv.grandTotal || inv.totalAmount)}</td>
                                     <td className="border px-2 py-1">{formatCurrency(inv.paidAmount)}</td>
                                     <td className="border px-2 py-1">{formatCurrency((inv.grandTotal || inv.totalAmount) - (inv.paidAmount || 0))}</td>
-                                    <td className="border px-2 py-1">
-                                        <Button size="sm" onClick={() => alert(JSON.stringify(inv, null, 2))}>View</Button>
-                                        <Button size="sm" variant="secondary" onClick={() => handleEdit(inv)}>Edit</Button>
+                                    <td className="border px-2 py-1 space-x-2">
+                                        <Button size="sm" variant="secondary" onClick={() => handleEdit(inv._id)}>Edit</Button>
+                                        <Button size="sm" onClick={() => handleReprint(inv._id)}>Reprint</Button>
                                         <Button size="sm" variant="danger" onClick={() => handleDelete(inv._id)}>Delete</Button>
                                     </td>
                                 </tr>
@@ -126,33 +114,6 @@ const Invoices = () => {
                         </tbody>
                     </table>
                 </div>
-                {/* Edit Invoice Modal */}
-                <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Invoice">
-                    <form onSubmit={handleEditSubmit}>
-                        <InputField
-                            label="Paid Amount"
-                            type="number"
-                            name="paidAmount"
-                            value={editForm.paidAmount}
-                            onChange={handleEditFormChange}
-                            min="0"
-                        />
-                        <InputField
-                            label="Payment Method"
-                            name="paymentMethod"
-                            value={editForm.paymentMethod}
-                            onChange={handleEditFormChange}
-                        />
-                        <div className="flex justify-end space-x-2 mt-4">
-                            <Button type="button" variant="secondary" onClick={() => setIsEditModalOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button type="submit" variant="primary" disabled={loading}>
-                                {loading ? 'Saving...' : 'Save'}
-                            </Button>
-                        </div>
-                    </form>
-                </Modal>
             </div>
         </Layout>
     );
