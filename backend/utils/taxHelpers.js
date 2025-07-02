@@ -1,16 +1,48 @@
-export const calculateTax = (items, customerState, billingState) => {
-    return items.map(item => {
-        const taxableAmount = item.price * item.quantity;
-        const taxRate = item.taxSlab;
-        const isInterState = customerState !== billingState;
+const GST_RATES = { // SGST+CGST
+    0: 0,
+    3: 3,
+    5: 5,
+    12: 12,
+    18: 18,
+    28: 28,
+};
+
+const calculateTotals = (items, customerState, billingState = 'MH') => {
+    let subTotal = 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalIgst = 0;
+
+    const isInterState = customerState !== billingState;
+
+    items.forEach((item) => {
+        const itemTotal = (item.rate || item.price) * item.quantity;
+        subTotal += itemTotal;
+
+        const taxRate = item.taxSlab || 0;
+        if (GST_RATES[taxRate] === undefined) {
+            throw new Error(`Invalid tax slab: ${taxRate}`);
+        }
+
+        const tax = (itemTotal * taxRate) / 100;
 
         if (isInterState) {
-            const igst = (taxableAmount * taxRate) / 100;
-            return { ...item, igst, cgst: 0, sgst: 0 };
+            totalIgst += tax;
         } else {
-            const cgst = (taxableAmount * taxRate) / 200;
-            const sgst = (taxableAmount * taxRate) / 200;
-            return { ...item, igst: 0, cgst, sgst };
+            totalCgst += tax / 2;
+            totalSgst += tax / 2;
         }
     });
+
+    const taxAmount = {
+        cgst: totalCgst,
+        sgst: totalSgst,
+        igst: totalIgst,
+    };
+
+    const totalAmount = subTotal + totalCgst + totalSgst + totalIgst;
+
+    return { subTotal, taxAmount, totalAmount };
 };
+
+module.exports = { calculateTotals };
