@@ -1,78 +1,12 @@
-import Invoice from '../models/Invoice.js';
-import Customer from '../models/Customer.js'; // Import Customer model
-import Item from '../models/Item.js'; // Import Item model
-import { v4 as uuidv4 } from 'uuid';
-import { generatePdf } from '../utils/pdfGenerator.js';
-import { calculateTax } from '../utils/taxHelpers.js'; // Helper for tax calculation
-import { generateUpiQr } from '../utils/upiHelper.js';
+const Invoice = require('../models/Invoice');
+const Item = require('../models/Item');
+const pdfGenerator = require('../utils/pdfGenerator');
 const { calculateTotals } = require('../utils/taxHelpers');
 
-// Recalculate invoice totals based on items, discount, and shipping
-const recalculateInvoiceTotals = async (invoiceData) => {
-    const customer = await Customer.findById(invoiceData.customer);
-    if (!customer) {
-        throw new Error('Customer not found');
-    }
-
-    // Ensure all items have full details before calculating
-    const populatedItems = await Promise.all(
-        (invoiceData.items || []).map(async (item) => {
-            if (item.price && item.taxSlab !== undefined) {
-                return item; // Item already has details
-            }
-            // If details are missing, fetch them from the DB
-            const dbItem = await Item.findById(item.item || item.itemId);
-            if (!dbItem) throw new Error(`Item with ID ${item.item || item.itemId} not found.`);
-            return {
-                ...item,
-                price: dbItem.price,
-                taxSlab: dbItem.taxSlab,
-                name: dbItem.name,
-                hsnCode: dbItem.hsnCode,
-            };
-        })
-    );
-
-    const isInterState = customer.firmAddress && !customer.firmAddress.toLowerCase().includes('maharashtra');
-
-    const totalBeforeDiscount = populatedItems.reduce((sum, item) => {
-        return sum + (item.price * item.quantity);
-    }, 0);
-
-    const itemsWithTax = populatedItems.map(item => {
-        const itemTotal = item.price * item.quantity;
-        const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * (invoiceData.discount || 0) : 0;
-        const taxableAmount = itemTotal - discountAmount;
-        const tax = calculateTax(taxableAmount, item.taxSlab, isInterState);
-
-        return {
-            ...item,
-            itemTotal,
-            discountAmount,
-            taxableAmount,
-            tax,
-            totalWithTax: taxableAmount + tax.total,
-        };
-    });
-
-    const totalBeforeTax = itemsWithTax.reduce((sum, item) => sum + item.taxableAmount, 0);
-    const totalTax = itemsWithTax.reduce((sum, item) => sum + item.tax.total, 0);
-    const grandTotal = totalBeforeTax + totalTax + (invoiceData.shippingCharges || 0);
-    const balance = grandTotal - (invoiceData.paidAmount || 0);
-
-    return {
-        ...invoiceData,
-        items: itemsWithTax,
-        totalBeforeTax,
-        totalTax,
-        grandTotal,
-        totalAmount: grandTotal, // totalAmount is used for reporting
-        balance,
-    };
-};
-
-// Create a new invoice
-export const createInvoice = async (req, res) => {
+// @desc    Create a new invoice
+// @route   POST /api/billing/invoices
+// @access  Private
+const createInvoice = async (req, res) => {
     try {
         const {
             customer,
@@ -127,7 +61,7 @@ export const createInvoice = async (req, res) => {
 // @desc    Update an invoice
 // @route   PUT /api/billing/invoices/:id
 // @access  Private
-export const updateInvoice = async (req, res) => {
+const updateInvoice = async (req, res) => {
     console.log('--- Starting Invoice Update Process ---');
     try {
         const { id } = req.params;
@@ -208,7 +142,7 @@ export const updateInvoice = async (req, res) => {
 };
 
 // Regenerate PDF for an existing invoice
-export const reprintInvoice = async (req, res) => {
+const reprintInvoice = async (req, res) => {
     try {
         const invoiceId = req.params.id;
         const invoice = await Invoice.findById(invoiceId).populate('customer').populate('items.item');
@@ -225,7 +159,7 @@ export const reprintInvoice = async (req, res) => {
 };
 
 // Dashboard stats endpoint
-export const getDashboardStats = async (req, res) => {
+const getDashboardStats = async (req, res) => {
     try {
         const { startDate, endDate } = req.body;
         const filter = {};
@@ -252,7 +186,7 @@ export const getDashboardStats = async (req, res) => {
 };
 
 // Generate UPI QR code for payment
-export const generatePaymentQr = async (req, res) => {
+const generatePaymentQr = async (req, res) => {
     try {
         const invoiceId = req.params.id;
         const invoice = await Invoice.findById(invoiceId);
@@ -278,7 +212,7 @@ export const generatePaymentQr = async (req, res) => {
 };
 
 // Get a single invoice by ID
-export const getInvoiceById = async (req, res) => {
+const getInvoiceById = async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id).populate('customer').populate('items.item');
         if (!invoice) {
@@ -291,11 +225,21 @@ export const getInvoiceById = async (req, res) => {
 };
 
 // Get all invoices
-export const getInvoices = async (req, res) => {
+const getInvoices = async (req, res) => {
     try {
         const invoices = await Invoice.find().populate('customer').populate('items.item');
         res.json(invoices);
     } catch (error) {
         res.status(500).json({ message: error.message || 'Server error' });
     }
+};
+
+module.exports = {
+    createInvoice,
+    updateInvoice,
+    reprintInvoice,
+    getDashboardStats,
+    generatePaymentQr,
+    getInvoiceById,
+    getInvoices,
 };
