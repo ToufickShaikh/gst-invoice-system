@@ -9,7 +9,7 @@ import billingRoutes from './routes/billingRoutes.js';
 
 const app = express();
 
-app.use(cors());
+app.use(cors()); // Enable CORS for all routes
 app.use(bodyParser.json());
 
 app.get('/', (req, res) => {
