@@ -1,5 +1,6 @@
 import Invoice from '../models/Invoice.js';
 import Customer from '../models/Customer.js'; // Import Customer model
+import Item from '../models/Item.js'; // Import Item model
 import { v4 as uuidv4 } from 'uuid';
 import { generatePdf } from '../utils/pdfGenerator.js';
 import { calculateTax } from '../utils/taxHelpers.js'; // Helper for tax calculation
@@ -12,13 +13,32 @@ const recalculateInvoiceTotals = async (invoiceData) => {
         throw new Error('Customer not found');
     }
 
+    // Ensure all items have full details before calculating
+    const populatedItems = await Promise.all(
+        (invoiceData.items || []).map(async (item) => {
+            if (item.price && item.taxSlab !== undefined) {
+                return item; // Item already has details
+            }
+            // If details are missing, fetch them from the DB
+            const dbItem = await Item.findById(item.item || item.itemId);
+            if (!dbItem) throw new Error(`Item with ID ${item.item || item.itemId} not found.`);
+            return {
+                ...item,
+                price: dbItem.price,
+                taxSlab: dbItem.taxSlab,
+                name: dbItem.name,
+                hsnCode: dbItem.hsnCode,
+            };
+        })
+    );
+
     const isInterState = customer.firmAddress && !customer.firmAddress.toLowerCase().includes('maharashtra');
 
-    const totalBeforeDiscount = invoiceData.items.reduce((sum, item) => {
+    const totalBeforeDiscount = populatedItems.reduce((sum, item) => {
         return sum + (item.price * item.quantity);
     }, 0);
 
-    const itemsWithTax = invoiceData.items.map(item => {
+    const itemsWithTax = populatedItems.map(item => {
         const itemTotal = item.price * item.quantity;
         const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * (invoiceData.discount || 0) : 0;
         const taxableAmount = itemTotal - discountAmount;
