@@ -236,10 +236,10 @@ const getInvoices = async (req, res) => {
 
 module.exports = {
     createInvoice,
+    getInvoices,
+    getInvoiceById,
     updateInvoice,
     reprintInvoice,
     getDashboardStats,
     generatePaymentQr,
-    getInvoiceById,
-    getInvoices,
 };
