@@ -1,3 +1,19 @@
+// Update an existing invoice by ID
+export const updateInvoice = async (req, res) => {
+    try {
+        const invoiceId = req.params.id;
+        const updateData = req.body;
+        // Prevent invoiceNumber from being changed
+        if (updateData.invoiceNumber) delete updateData.invoiceNumber;
+        const updatedInvoice = await Invoice.findByIdAndUpdate(invoiceId, updateData, { new: true });
+        if (!updatedInvoice) {
+            return res.status(404).json({ message: 'Invoice not found' });
+        }
+        res.json(updatedInvoice);
+    } catch (error) {
+        res.status(500).json({ message: error.message || 'Server error' });
+    }
+};
 // Dashboard stats endpoint
 export const getDashboardStats = async (req, res) => {
     try {

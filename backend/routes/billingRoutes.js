@@ -1,3 +1,6 @@
+import { updateInvoice } from '../controllers/billingController.js';
+// Update invoice by ID
+router.put('/invoices/:id', updateInvoice);
 import express from 'express';
 import { createInvoice, getDashboardStats } from '../controllers/billingController.js';
 
