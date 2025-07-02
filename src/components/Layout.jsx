@@ -1,19 +1,23 @@
-import React, { useState } from 'react' // 1. Import useState
+// Layout component wraps all pages with header and navigation
+import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Button from './Button'
 
+// Layout provides navigation, header, and logout functionality
 const Layout = ({ children }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [isMenuOpen, setIsMenuOpen] = useState(false) // 2. Add state for the menu
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
+  // Handle user logout
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
+  // Navigation menu items
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/customers', label: 'Customers' },
@@ -24,19 +28,20 @@ const Layout = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header with app title and user info */}
       <header className="bg-white shadow">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center h-16">
             <h1 className="text-xl font-semibold">GST Billing System</h1>
             <div className="flex items-center space-x-4">
-              <div className="hidden md:block"> {/* Hide user info on small screens, show on medium+ */}
+              {/* User info and logout button (hidden on small screens) */}
+              <div className="hidden md:block">
                 <span className="text-gray-600">Welcome, {user?.name}</span>
                 <Button onClick={handleLogout} variant="secondary" size="sm" className="ml-4">
                   Logout
                 </Button>
               </div>
-              {/* 3. Hamburger Menu Button - visible only on medium screens and below */}
+              {/* Hamburger menu for mobile navigation */}
               <div className="md:hidden">
                 <button
                   onClick={() => setIsMenuOpen(!isMenuOpen)}

@@ -1,5 +1,9 @@
+// Reusable Table component for displaying tabular data
 import React from 'react'
 
+// columns: array of { key, label }
+// data: array of objects
+// onEdit, onDelete: optional row action handlers
 const Table = ({ columns, data, onEdit, onDelete }) => {
   return (
     <div className="overflow-x-auto">
@@ -22,6 +26,7 @@ const Table = ({ columns, data, onEdit, onDelete }) => {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
+          {/* Show message if no data */}
           {data.length === 0 ? (
             <tr>
               <td

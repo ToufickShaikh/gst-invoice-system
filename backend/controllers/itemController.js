@@ -1,5 +1,7 @@
+// Controller for item CRUD operations
 import Item from '../models/Item.js';
 
+// Get all items
 export const getItems = async (req, res) => {
     try {
         const items = await Item.find();
@@ -9,6 +11,7 @@ export const getItems = async (req, res) => {
     }
 };
 
+// Create a new item
 export const createItem = async (req, res) => {
     try {
         const item = new Item(req.body);
@@ -19,6 +22,7 @@ export const createItem = async (req, res) => {
     }
 };
 
+// Update an existing item by ID
 export const updateItem = async (req, res) => {
     try {
         const item = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -28,6 +32,7 @@ export const updateItem = async (req, res) => {
     }
 };
 
+// Delete an item by ID
 export const deleteItem = async (req, res) => {
     try {
         await Item.findByIdAndDelete(req.params.id);

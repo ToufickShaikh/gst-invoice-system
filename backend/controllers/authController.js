@@ -1,14 +1,16 @@
+// Controller for authentication logic
 import User from '../models/User.js';
 
+// Login handler: accepts username and password, checks hardcoded admin or DB user
 export const login = async (req, res) => {
-    // Accept username only
     const { username, password } = req.body;
     console.log('Login attempt:', { username, password, body: req.body });
 
-    // Hardcoded credentials
+    // Hardcoded admin credentials (for demo/testing)
     const adminUsername = 'hokage';
     const adminPassword = 'admin';
 
+    // Check hardcoded admin
     if (username === adminUsername && password === adminPassword) {
         return res.json({ message: 'Login successful', user: { username: adminUsername } });
     }
@@ -16,7 +18,8 @@ export const login = async (req, res) => {
     // Check for user in MongoDB
     try {
         const user = await User.findOne({ username });
-        if (user && user.password === password) { // Plain text password check
+        // NOTE: Passwords should be hashed in production!
+        if (user && user.password === password) {
             console.log('DB user login successful for:', username);
             return res.json({ message: 'Login successful', user: { username: user.username } });
         }
