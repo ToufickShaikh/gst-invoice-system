@@ -18,6 +18,8 @@ router.get('/', async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 });
+// Support both GET and POST for dashboard stats for flexibility
+router.get('/dashboard-stats', getDashboardStats);
 router.post('/dashboard-stats', getDashboardStats);
 
 export default router;
