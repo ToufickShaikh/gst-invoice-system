@@ -31,13 +31,18 @@ const Items = () => {
     setLoading(true)
     try {
       const response = await itemsAPI.getAll()
-      const formattedItems = response.data.map(item => ({
+      // Defensive: always use array
+      const itemsArr = Array.isArray(response.data)
+        ? response.data
+        : (Array.isArray(response) ? response : [])
+      const formattedItems = itemsArr.map(item => ({
         ...item,
         formattedPrice: formatCurrency(item.price),
         taxSlabDisplay: `${item.taxSlab}%`
       }))
       setItems(formattedItems)
     } catch (error) {
+      setItems([])
       toast.error('Failed to fetch items')
     } finally {
       setLoading(false)
