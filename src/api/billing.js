@@ -29,5 +29,10 @@ export const billingAPI = {
   reprintInvoice: async (id) => {
     const res = await axios.post(`${API_BASE_URL}/billing/invoices/${id}/reprint`);
     return res.data;
+  },
+  // Generate payment QR code
+  generatePaymentQr: async (id) => {
+    const res = await axios.get(`${API_BASE_URL}/billing/invoices/${id}/payment-qr`);
+    return res.data;
   }
 };

@@ -1,8 +1,16 @@
 import express from 'express';
-import { createInvoice, getDashboardStats, getInvoices, updateInvoice, reprintInvoice, getInvoiceById } from '../controllers/billingController.js';
+import { createInvoice, getDashboardStats, getInvoices, updateInvoice, reprintInvoice, getInvoiceById, generatePaymentQr } from '../controllers/billingController.js';
 
 const router = express.Router();
 
+// Route to update an invoice
+router.put('/invoices/:id', updateInvoice);
+
+// Route to generate payment QR code
+router.get('/invoices/:id/payment-qr', generatePaymentQr);
+
+// Route to reprint an invoice
+router.post('/invoices/:id/reprint', reprintInvoice);
 // Update invoice by ID
 router.put('/invoices/:id', updateInvoice);
 router.post('/invoices', createInvoice);

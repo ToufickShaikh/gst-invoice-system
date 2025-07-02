@@ -3,6 +3,7 @@ import Customer from '../models/Customer.js'; // Import Customer model
 import { v4 as uuidv4 } from 'uuid';
 import { generatePdf } from '../utils/pdfGenerator.js';
 import { calculateTax } from '../utils/taxHelpers.js'; // Helper for tax calculation
+import { generateUpiQr } from '../utils/upiHelper.js';
 
 // Recalculate invoice totals based on items, discount, and shipping
 const recalculateInvoiceTotals = async (invoiceData) => {
@@ -178,6 +179,32 @@ export const getDashboardStats = async (req, res) => {
             else totalPayable += Math.abs(balance);
         });
         res.json({ totalSales, totalPayable, totalReceivable });
+    } catch (error) {
+        res.status(500).json({ message: error.message || 'Server error' });
+    }
+};
+
+// Generate UPI QR code for payment
+export const generatePaymentQr = async (req, res) => {
+    try {
+        const invoiceId = req.params.id;
+        const invoice = await Invoice.findById(invoiceId);
+
+        if (!invoice) {
+            return res.status(404).json({ message: 'Invoice not found' });
+        }
+
+        const balance = (invoice.grandTotal || 0) - (invoice.paidAmount || 0);
+
+        if (balance <= 0) {
+            return res.status(400).json({ message: 'Invoice is already fully paid' });
+        }
+
+        const upiId = 'shaikhtool@ibl'; // Hardcoded UPI ID
+        const { qrCodeImage } = await generateUpiQr(upiId, balance.toFixed(2));
+
+        res.json({ qrCodeImage });
+
     } catch (error) {
         res.status(500).json({ message: error.message || 'Server error' });
     }

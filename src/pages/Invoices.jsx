@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { billingAPI } from '../api/billing';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
+import Modal from '../components/Modal'; // Import Modal
 import { formatCurrency } from '../utils/dateHelpers';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { toast } from 'react-hot-toast';
@@ -11,6 +12,8 @@ const Invoices = () => {
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(false);
     const [tab, setTab] = useState('B2B');
+    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+    const [qrCodeImage, setQrCodeImage] = useState('');
 
     const fetchInvoices = async (billingType) => {
         setLoading(true);
@@ -71,6 +74,30 @@ const Invoices = () => {
         }
     };
 
+    // Handle generating and showing the payment QR code
+    const handlePay = async (invoice) => {
+        const balance = (invoice.grandTotal || 0) - (invoice.paidAmount || 0);
+        if (balance <= 0) {
+            toast.error('This invoice is already paid in full.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await billingAPI.generatePaymentQr(invoice._id);
+            if (res.qrCodeImage) {
+                setQrCodeImage(res.qrCodeImage);
+                setIsQrModalOpen(true);
+            } else {
+                toast.error('Could not generate QR code.');
+            }
+        } catch (err) {
+            toast.error('Failed to generate QR code.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <Layout>
             <div className="space-y-6">
@@ -107,6 +134,9 @@ const Invoices = () => {
                                     <td className="border px-2 py-1 space-x-2">
                                         <Button size="sm" variant="secondary" onClick={() => handleEdit(inv._id)}>Edit</Button>
                                         <Button size="sm" onClick={() => handleReprint(inv._id)}>Reprint</Button>
+                                        {((inv.grandTotal || 0) - (inv.paidAmount || 0)) > 0 && (
+                                            <Button size="sm" variant="success" onClick={() => handlePay(inv)}>Pay</Button>
+                                        )}
                                         <Button size="sm" variant="danger" onClick={() => handleDelete(inv._id)}>Delete</Button>
                                     </td>
                                 </tr>
@@ -115,6 +145,16 @@ const Invoices = () => {
                     </table>
                 </div>
             </div>
+
+            {/* QR Code Modal */}
+            <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="Scan to Pay">
+                {qrCodeImage && (
+                    <div className="flex flex-col items-center">
+                        <img src={qrCodeImage} alt="UPI QR Code" />
+                        <p className="mt-2 text-sm text-gray-600">Scan this code with any UPI app to pay the balance.</p>
+                    </div>
+                )}
+            </Modal>
         </Layout>
     );
 };
