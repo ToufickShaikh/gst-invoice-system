@@ -18,36 +18,87 @@ const EditInvoice = () => {
     const [customers, setCustomers] = useState([]);
     const [items, setItems] = useState([]);
     const [invoiceData, setInvoiceData] = useState(null);
+    const [summary, setSummary] = useState({
+        totalBeforeTax: 0,
+        totalTax: 0,
+        grandTotal: 0,
+        balance: 0
+    });
 
     useEffect(() => {
         fetchInitialData();
     }, [id]);
 
+    // Recalculate summary whenever invoice data changes
+    useEffect(() => {
+        if (!invoiceData || !customers.length) return;
+
+        const customer = customers.find(c => c._id === invoiceData.customer);
+        const isInterState = customer?.firmAddress && !customer.firmAddress.toLowerCase().includes('maharashtra');
+
+        const totalBeforeDiscount = (invoiceData.items || []).reduce((sum, item) => {
+            const price = item.price || item.item?.price || 0;
+            return sum + (price * item.quantity);
+        }, 0);
+
+        const itemsWithTax = (invoiceData.items || []).map(billItem => {
+            if (!billItem.item && !billItem.price) return null;
+            const price = billItem.price || billItem.item?.price || 0;
+            const taxSlab = billItem.taxSlab || billItem.item?.taxSlab || 0;
+
+            const itemTotal = price * billItem.quantity;
+            const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * (invoiceData.discount || 0) : 0;
+            const taxableAmount = itemTotal - discountAmount;
+            const tax = calculateTax(taxableAmount, taxSlab, isInterState);
+
+            return { ...billItem, taxableAmount, tax };
+        }).filter(Boolean);
+
+        const totalBeforeTax = itemsWithTax.reduce((sum, item) => sum + item.taxableAmount, 0);
+        const totalTax = itemsWithTax.reduce((sum, item) => sum + item.tax.total, 0);
+        const grandTotal = totalBeforeTax + totalTax + (invoiceData.shippingCharges || 0);
+        const balance = grandTotal - (invoiceData.paidAmount || 0);
+
+        setSummary({ totalBeforeTax, totalTax, grandTotal, balance });
+
+    }, [invoiceData, customers]);
+
     const fetchInitialData = async () => {
         setLoading(true);
         try {
+            // Fetch all required data first
             const [customersRes, itemsRes, invoiceRes] = await Promise.all([
                 customersAPI.getAll(),
                 itemsAPI.getAll(),
-                billingAPI.getInvoiceById(id) // Assuming you have this API function
+                billingAPI.getInvoiceById(id),
             ]);
 
-            setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
-            setItems(Array.isArray(itemsRes.data) ? itemsRes.data : []);
-
-            // Set up the form with existing invoice data
+            // Ensure all data is valid before proceeding
+            const customersList = customersRes.data || [];
+            const itemsList = itemsRes.data || [];
             const fetchedInvoice = invoiceRes.data || invoiceRes;
+
+            if (!fetchedInvoice || !fetchedInvoice.customer || !customersList.length || !itemsList.length) {
+                toast.error('Failed to load necessary data. Please try again.');
+                navigate('/invoices');
+                return;
+            }
+
+            // Now that we have all data, set state together
+            setCustomers(customersList);
+            setItems(itemsList);
             setInvoiceData({
                 ...fetchedInvoice,
-                customer: fetchedInvoice.customer._id, // Use just the ID
-                items: fetchedInvoice.items.map(item => ({
+                customer: fetchedInvoice.customer._id,
+                items: (fetchedInvoice.items || []).map(item => ({
                     ...item,
-                    itemId: item.item._id, // Use itemId for the select field
-                }))
+                    itemId: item.item?._id || '',
+                })),
             });
 
         } catch (error) {
-            toast.error('Failed to fetch invoice data');
+            console.error("Error fetching initial data:", error);
+            toast.error('Failed to fetch invoice data. Redirecting...');
             navigate('/invoices');
         } finally {
             setLoading(false);
@@ -197,6 +248,41 @@ const EditInvoice = () => {
                                 <option value="Bank Transfer">Bank Transfer</option>
                                 <option value="Cash">Cash</option>
                             </select>
+                        </div>
+                    </div>
+
+                    {/* Summary Section */}
+                    <div className="border-t pt-4">
+                        <h3 className="text-lg font-medium mb-4">Summary</h3>
+                        <div className="space-y-2">
+                            <div className="flex justify-between">
+                                <span>Total Before Tax:</span>
+                                <span>{formatCurrency(summary.totalBeforeTax)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Discount:</span>
+                                <span>- {formatCurrency(invoiceData.discount || 0)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Shipping Charges:</span>
+                                <span>{formatCurrency(invoiceData.shippingCharges || 0)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Tax Amount:</span>
+                                <span>{formatCurrency(summary.totalTax)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-lg border-t pt-2">
+                                <span>Grand Total:</span>
+                                <span>{formatCurrency(summary.grandTotal)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Paid Amount:</span>
+                                <span>{formatCurrency(invoiceData.paidAmount || 0)}</span>
+                            </div>
+                            <div className="flex justify-between font-medium">
+                                <span>Balance:</span>
+                                <span>{formatCurrency(summary.balance)}</span>
+                            </div>
                         </div>
                     </div>
 

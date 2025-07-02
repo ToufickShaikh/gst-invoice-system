@@ -21,6 +21,7 @@ export const billingAPI = {
     const res = await axios.get(`${API_BASE_URL}/billing`, { params: { billingType } });
     return res.data;
   },
+  // Get a single invoice by ID
   getInvoiceById: async (id) => {
     const res = await axios.get(`${API_BASE_URL}/billing/invoices/${id}`);
     return res.data;
