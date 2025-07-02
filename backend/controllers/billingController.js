@@ -123,40 +123,86 @@ export const createInvoice = async (req, res) => {
 };
 
 // Update an existing invoice by ID
+// @desc    Update an invoice
+// @route   PUT /api/billing/invoices/:id
+// @access  Private
 export const updateInvoice = async (req, res) => {
+    console.log('--- Starting Invoice Update Process ---');
     try {
-        const invoiceId = req.params.id;
-        const updateData = req.body;
+        const { id } = req.params;
+        const updatedData = req.body;
+        console.log(`[1/6] Received request to update invoice ${id}`);
+        console.log('[2/6] Request body:', JSON.stringify(updatedData, null, 2));
 
-        // Prevent invoiceNumber from being changed
-        if (updateData.invoiceNumber) {
-            delete updateData.invoiceNumber;
-        }
+        // Ensure items have all necessary data for recalculation
+        console.log('[3/6] Populating item data for recalculation...');
+        const populatedItems = await Promise.all(
+            updatedData.items.map(async (item) => {
+                // The item object from the frontend might just have item._id and quantity
+                if (item.rate && item.quantity && item.name) {
+                    return item; // Item has what we need
+                }
+                // If data is missing, fetch the full item details from DB
+                const itemDetails = await Item.findById(item.item || item._id);
+                if (!itemDetails) {
+                    // Throw an error if an item ID is invalid
+                    throw new Error(`Item with ID ${item.item || item._id} not found.`);
+                }
+                return {
+                    item: itemDetails._id,
+                    name: itemDetails.name,
+                    rate: itemDetails.rate,
+                    quantity: item.quantity, // Quantity from the frontend
+                };
+            })
+        );
+        console.log('[3/6] Item data populated successfully.');
 
-        // Recalculate all totals if items, discount or shipping charges are changed
-        const recalculatedData = await recalculateInvoiceTotals(updateData);
+        updatedData.items = populatedItems;
 
-        const updatedInvoice = await Invoice.findByIdAndUpdate(
-            invoiceId,
-            recalculatedData,
-            { new: true }
-        ).populate('customer').populate('items.item');
+        // Recalculate totals based on updated items
+        console.log('[4/6] Recalculating invoice totals...');
+        const { subTotal, taxAmount, totalAmount } = calculateTotals(
+            updatedData.items,
+            updatedData.customer.state // Pass customer state for tax calculation
+        );
+
+        updatedData.subTotal = subTotal;
+        updatedData.cgst = taxAmount.cgst;
+        updatedData.sgst = taxAmount.sgst;
+        updatedData.igst = taxAmount.igst;
+        updatedData.totalAmount = totalAmount;
+        console.log('[4/6] Invoice totals recalculated.');
+        console.log('Recalculated Totals:', { subTotal, taxAmount, totalAmount });
+
+
+        // Perform the update in the database
+        console.log(`[5/6] Updating invoice ${id} in the database...`);
+        const updatedInvoice = await Invoice.findByIdAndUpdate(id, updatedData, {
+            new: true,
+            runValidators: true,
+        })
+            .populate('customer')
+            .populate('items.item');
 
         if (!updatedInvoice) {
+            console.error(`[ERROR] Invoice with ID ${id} not found for update.`);
             return res.status(404).json({ message: 'Invoice not found' });
         }
+        console.log(`[5/6] Invoice ${id} updated successfully in DB.`);
 
-        // Optionally regenerate the PDF
-        let pdfPath = null;
-        try {
-            pdfPath = await generatePdf(updatedInvoice);
-        } catch (e) {
-            console.error('PDF regeneration failed during update:', e); // Log error
-        }
+        // After successful update, regenerate the PDF
+        console.log(`[6/6] Regenerating PDF for invoice ${id}...`);
+        await pdfGenerator.generateInvoicePDF(updatedInvoice);
+        console.log(`[6/6] PDF for invoice ${id} regenerated.`);
+        console.log('--- Invoice Update Process Finished ---');
 
-        res.json({ invoice: updatedInvoice, pdfPath });
+
+        res.json(updatedInvoice);
     } catch (error) {
-        res.status(500).json({ message: error.message || 'Server error' });
+        console.error('--- [ERROR] Invoice Update Process Failed ---');
+        console.error('Error details:', error);
+        res.status(500).json({ message: 'Failed to update invoice', error: error.message });
     }
 };
 
