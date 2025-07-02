@@ -151,7 +151,7 @@ const Billing = () => {
         billingType
       }
 
-      const response = await billingAPI.create(invoiceData)
+      const response = await billingAPI.createInvoice(invoiceData)
       toast.success('Invoice generated successfully!')
       navigate('/invoice-success', {
         state: {
