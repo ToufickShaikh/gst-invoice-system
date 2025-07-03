@@ -165,18 +165,29 @@ const updateInvoice = async (req, res) => {
 
         // Recalculate totals based on updated items
         console.log('[4/6] Recalculating invoice totals...');
-        const { subTotal, taxAmount, totalAmount } = calculateTotals(
+        const customerDetails = await Customer.findById(updatedData.customer._id || updatedData.customer);
+        if (!customerDetails) {
+            return res.status(404).json({ message: 'Customer for invoice not found' });
+        }
+
+        const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(
             updatedData.items,
-            updatedData.customer.state // Pass customer state for tax calculation
+            customerDetails.state
         );
+        const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
+        const balance = grandTotal - (updatedData.paidAmount || 0);
 
         updatedData.subTotal = subTotal;
         updatedData.cgst = taxAmount.cgst;
         updatedData.sgst = taxAmount.sgst;
         updatedData.igst = taxAmount.igst;
-        updatedData.totalAmount = totalAmount;
+        updatedData.totalTax = totalTax;
+        updatedData.grandTotal = grandTotal;
+        updatedData.balance = balance;
+        updatedData.totalAmount = grandTotal; // For reporting consistency
+
         console.log('[4/6] Invoice totals recalculated.');
-        console.log('Recalculated Totals:', { subTotal, taxAmount, totalAmount });
+        console.log('Recalculated Totals:', { subTotal, taxAmount, grandTotal, balance });
 
 
         // Perform the update in the database
