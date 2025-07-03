@@ -4,6 +4,7 @@ const Customer = require('../models/Customer'); // Import Customer model
 const pdfGenerator = require('../utils/pdfGenerator');
 const { calculateTotals } = require('../utils/taxHelpers');
 const { v4: uuidv4 } = require('uuid');
+const { generateUpiQr } = require('../utils/upiHelper'); // Import UPI QR generator
 
 // @desc    Get all invoices, optionally filtered by billingType
 // @route   GET /api/billing/invoices
@@ -53,52 +54,72 @@ const getInvoiceById = async (req, res) => {
 // @route   POST /api/billing/invoices
 // @access  Private
 const createInvoice = async (req, res) => {
+    console.log('--- Starting Invoice Creation ---');
     try {
         const {
             customer,
             items,
             discount = 0,
             shippingCharges = 0,
-            totalBeforeTax = 0,
-            totalTax = 0,
-            grandTotal = 0,
             paidAmount = 0,
-            balance = 0,
             paymentMethod = '',
             billingType = ''
         } = req.body;
-        const invoiceNumber = `INV-${uuidv4()}`;
 
-        // Calculate totalAmount as grandTotal (for reporting)
-        const totalAmount = grandTotal;
+        console.log('[1/4] Received data for new invoice:', JSON.stringify(req.body, null, 2));
+
+        // Ensure customer data is populated for tax calculation
+        const customerDetails = await Customer.findById(customer);
+        if (!customerDetails) {
+            console.error('[ERROR] Customer not found for ID:', customer);
+            return res.status(400).json({ message: 'Customer not found' });
+        }
+
+        // Recalculate totals on the backend to ensure data integrity
+        console.log('[2/4] Calculating totals based on items...');
+        const { subTotal, taxAmount, grandTotal } = calculateTotals(items, customerDetails.state);
+        const balance = grandTotal - paidAmount;
+        console.log('[2/4] Totals calculated:', { subTotal, taxAmount, grandTotal, balance });
+
+        const invoiceNumber = `INV-${uuidv4()}`;
 
         const invoice = new Invoice({
             invoiceNumber,
             customer,
             items,
+            subTotal, // Use calculated subTotal
+            cgst: taxAmount.cgst,
+            sgst: taxAmount.sgst,
+            igst: taxAmount.igst,
+            totalTax: taxAmount.total,
+            grandTotal, // Use calculated grandTotal
             discount,
             shippingCharges,
-            totalBeforeTax,
-            totalTax,
-            grandTotal,
-            totalAmount,
             paidAmount,
             balance,
             paymentMethod,
-            billingType
+            billingType,
+            totalAmount: grandTotal, // For reporting consistency
         });
+
+        console.log('[3/4] Saving new invoice to database...');
         await invoice.save();
+        console.log('[3/4] Invoice saved successfully.');
 
         // Optionally, generate PDF and return its path
         let pdfPath = null;
         try {
-            pdfPath = await generatePdf(invoice);
+            console.log('[4/4] Generating PDF...');
+            pdfPath = await pdfGenerator.generateInvoicePDF(invoice);
+            console.log('[4/4] PDF generated at:', pdfPath);
         } catch (e) {
-            console.error('PDF generation failed during creation:', e); // Log error
-            // PDF generation failed, but invoice is saved
+            console.error('PDF generation failed during creation:', e);
         }
+
+        console.log('--- Invoice Creation Finished ---');
         res.status(201).json({ invoice, pdfPath });
     } catch (error) {
+        console.error('--- [ERROR] Invoice Creation Failed ---', error);
         res.status(500).json({ message: error.message || 'Server error' });
     }
 };
@@ -273,7 +294,8 @@ const generatePaymentQr = async (req, res) => {
             return res.status(400).json({ message: 'Invoice is already fully paid' });
         }
 
-        const upiId = 'shaikhtool@ibl'; // Hardcoded UPI ID
+        // Use environment variable for UPI ID, with a fallback
+        const upiId = process.env.UPI_ID || 'shaikhtool@ibl';
         const { qrCodeImage } = await generateUpiQr(upiId, balance.toFixed(2));
 
         res.json({ qrCodeImage });
