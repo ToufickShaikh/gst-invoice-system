@@ -1,5 +1,6 @@
 const Invoice = require('../models/Invoice');
 const Item = require('../models/Item');
+const Customer = require('../models/Customer'); // Import Customer model
 const pdfGenerator = require('../utils/pdfGenerator');
 const { calculateTotals } = require('../utils/taxHelpers');
 
