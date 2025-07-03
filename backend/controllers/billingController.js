@@ -160,32 +160,41 @@ const reprintInvoice = async (req, res) => {
 
 // Dashboard stats endpoint
 const getDashboardStats = async (req, res) => {
+    console.log('Fetching dashboard stats...');
     try {
-        const { startDate, endDate } = req.body;
-        const filter = {};
-        if (startDate) filter.invoiceDate = { $gte: new Date(startDate) };
-        if (endDate) {
-            filter.invoiceDate = filter.invoiceDate || {};
-            filter.invoiceDate.$lte = new Date(endDate);
-        }
+        const totalInvoices = await Invoice.countDocuments();
+        const totalCustomers = await Customer.countDocuments();
 
-        const invoices = await Invoice.find(filter);
-        let totalSales = 0;
-        let totalPayable = 0;
-        let totalReceivable = 0;
-        invoices.forEach(inv => {
-            totalSales += inv.totalAmount || 0;
-            const balance = (inv.totalAmount || 0) - (inv.paidAmount || 0);
-            if (balance > 0) totalReceivable += balance;
-            else totalPayable += Math.abs(balance);
-        });
-        res.json({ totalSales, totalPayable, totalReceivable });
+        const invoiceData = await Invoice.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    totalRevenue: { $sum: '$totalAmount' },
+                    totalPaid: { $sum: '$paidAmount' },
+                },
+            },
+        ]);
+
+        const stats = {
+            totalInvoices,
+            totalCustomers,
+            totalRevenue: invoiceData[0]?.totalRevenue || 0,
+            totalPaid: invoiceData[0]?.totalPaid || 0,
+            balanceDue: (invoiceData[0]?.totalRevenue || 0) - (invoiceData[0]?.totalPaid || 0),
+        };
+        console.log('Dashboard stats fetched successfully:', stats);
+        res.json(stats);
     } catch (error) {
-        res.status(500).json({ message: error.message || 'Server error' });
+        console.error('[ERROR] Failed to fetch dashboard stats:', error);
+        res.status(500).json({ message: 'Failed to fetch dashboard stats', error: error.message });
     }
 };
 
-// Generate UPI QR code for payment
+/**
+ * @desc    Generate QR code for payment
+ * @route   GET /api/billing/invoices/:id/payment-qr
+ * @access  Private
+ */
 const generatePaymentQr = async (req, res) => {
     try {
         const invoiceId = req.params.id;

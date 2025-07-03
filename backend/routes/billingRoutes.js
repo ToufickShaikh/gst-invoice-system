@@ -2,13 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { createInvoice, getInvoices, getInvoiceById, updateInvoice, reprintInvoice, getDashboardStats, generatePaymentQr } = require('../controllers/billingController.js');
 
-// All routes are protected
-// router.use(authMiddleware); // This middleware does not exist, removing for now
-
-router.route('/').post(createInvoice).get(getInvoices);
-router.route('/stats').get(getDashboardStats);
-router.route('/:id').get(getInvoiceById).put(updateInvoice);
-router.route('/:id/reprint').post(reprintInvoice);
-router.route('/:id/generate-qr').post(generatePaymentQr);
+// Corrected routes to match frontend API calls
+router.route('/invoices').post(createInvoice).get(getInvoices);
+router.route('/dashboard-stats').get(getDashboardStats);
+router.route('/invoices/:id').get(getInvoiceById).put(updateInvoice);
+router.route('/invoices/:id/reprint').post(reprintInvoice);
+router.route('/invoices/:id/generate-qr').post(generatePaymentQr);
 
 module.exports = router;
