@@ -7,6 +7,7 @@ router.route('/invoices').post(createInvoice).get(getInvoices);
 router.route('/dashboard-stats').get(getDashboardStats);
 router.route('/invoices/:id').get(getInvoiceById).put(updateInvoice);
 router.route('/invoices/:id/reprint').post(reprintInvoice);
-router.route('/invoices/:id/generate-qr').post(generatePaymentQr);
+// Corrected route to match frontend API call for generating QR code
+router.route('/invoices/:id/payment-qr').get(generatePaymentQr);
 
 module.exports = router;

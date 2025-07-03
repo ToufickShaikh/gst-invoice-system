@@ -3,6 +3,51 @@ const Item = require('../models/Item');
 const Customer = require('../models/Customer'); // Import Customer model
 const pdfGenerator = require('../utils/pdfGenerator');
 const { calculateTotals } = require('../utils/taxHelpers');
+const { v4: uuidv4 } = require('uuid');
+
+// @desc    Get all invoices, optionally filtered by billingType
+// @route   GET /api/billing/invoices
+// @access  Private
+const getInvoices = async (req, res) => {
+    console.log('Fetching invoices with query:', req.query);
+    try {
+        const { billingType } = req.query;
+        const query = {};
+
+        if (billingType && ['B2B', 'B2C'].includes(billingType.toUpperCase())) {
+            query.billingType = billingType.toUpperCase();
+            console.log(`Filtering invoices for billing type: ${query.billingType}`);
+        } else {
+            console.log('No valid billingType filter applied.');
+        }
+
+        const invoices = await Invoice.find(query).populate('customer').sort({ createdAt: -1 });
+        console.log(`Found ${invoices.length} invoices.`);
+        res.json(invoices);
+    } catch (error) {
+        console.error('[ERROR] Failed to get invoices:', error);
+        res.status(500).json({ message: 'Failed to get invoices', error: error.message });
+    }
+};
+
+// @desc    Get invoice by ID
+// @route   GET /api/billing/invoices/:id
+// @access  Private
+const getInvoiceById = async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id)
+            .populate('customer')
+            .populate('items.item');
+
+        if (!invoice) {
+            return res.status(404).json({ message: 'Invoice not found' });
+        }
+
+        res.json(invoice);
+    } catch (error) {
+        res.status(500).json({ message: error.message || 'Server error' });
+    }
+};
 
 // @desc    Create a new invoice
 // @route   POST /api/billing/invoices
@@ -161,16 +206,33 @@ const reprintInvoice = async (req, res) => {
 
 // Dashboard stats endpoint
 const getDashboardStats = async (req, res) => {
-    console.log('Fetching dashboard stats...');
+    console.log('Fetching dashboard stats with query:', req.query);
     try {
-        const totalInvoices = await Invoice.countDocuments();
+        const { startDate, endDate } = req.query;
+
+        // Build the date range query for aggregations
+        const dateQuery = {};
+        if (startDate) {
+            dateQuery.createdAt = { ...dateQuery.createdAt, $gte: new Date(startDate) };
+        }
+        if (endDate) {
+            const end = new Date(endDate);
+            end.setUTCHours(23, 59, 59, 999); // Set to the end of the day
+            dateQuery.createdAt = { ...dateQuery.createdAt, $lte: end };
+        }
+
+        console.log('Constructed date query for invoices:', JSON.stringify(dateQuery));
+
+        const totalInvoices = await Invoice.countDocuments(dateQuery);
+        // Customer count is not typically filtered by invoice date range, so we count all customers.
         const totalCustomers = await Customer.countDocuments();
 
         const invoiceData = await Invoice.aggregate([
+            { $match: dateQuery }, // Apply date filter
             {
                 $group: {
                     _id: null,
-                    totalRevenue: { $sum: '$totalAmount' },
+                    totalRevenue: { $sum: '$grandTotal' }, // Use grandTotal for revenue
                     totalPaid: { $sum: '$paidAmount' },
                 },
             },
@@ -221,35 +283,12 @@ const generatePaymentQr = async (req, res) => {
     }
 };
 
-// Get a single invoice by ID
-const getInvoiceById = async (req, res) => {
-    try {
-        const invoice = await Invoice.findById(req.params.id).populate('customer').populate('items.item');
-        if (!invoice) {
-            return res.status(404).json({ message: 'Invoice not found' });
-        }
-        res.json(invoice);
-    } catch (error) {
-        res.status(500).json({ message: error.message || 'Server error' });
-    }
-};
-
-// Get all invoices
-const getInvoices = async (req, res) => {
-    try {
-        const invoices = await Invoice.find().populate('customer').populate('items.item');
-        res.json(invoices);
-    } catch (error) {
-        res.status(500).json({ message: error.message || 'Server error' });
-    }
-};
-
 module.exports = {
     createInvoice,
-    getInvoices,
-    getInvoiceById,
     updateInvoice,
     reprintInvoice,
     getDashboardStats,
     generatePaymentQr,
+    getInvoices,
+    getInvoiceById,
 };

@@ -27,17 +27,21 @@ export const billingAPI = {
     const res = await api.put(`/billing/invoices/${id}`, invoiceData);
     return res.data;
   },
-  getDashboardStats: async () => {
-    const res = await api.get(`/billing/dashboard-stats`);
+  getDashboardStats: async (dateRange) => {
+    const res = await api.get(`/billing/dashboard-stats`, { params: dateRange });
     return res.data;
   },
   createInvoice: async (invoiceData) => {
     const res = await api.post(`/billing/invoices`, invoiceData);
     return res.data;
   },
+  // Function to fetch all invoices, with an optional filter for billing type (B2B/B2C)
   getInvoices: async (billingType) => {
-    const res = await api.get(`/billing`, { params: { billingType } });
-    return res.data;
+    console.log('Fetching invoices with type:', billingType);
+    const response = await api.get(`/billing/invoices`, {
+      params: { billingType },
+    });
+    return response.data;
   },
   // Get a single invoice by ID
   getInvoiceById: async (id) => {
