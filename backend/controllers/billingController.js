@@ -280,27 +280,38 @@ const getDashboardStats = async (req, res) => {
  * @access  Private
  */
 const generatePaymentQr = async (req, res) => {
+    console.log(`--- Generating Payment QR for Invoice ID: ${req.params.id} --`);
     try {
         const invoiceId = req.params.id;
         const invoice = await Invoice.findById(invoiceId);
 
         if (!invoice) {
+            console.error(`[ERROR] Invoice not found for ID: ${invoiceId}`);
             return res.status(404).json({ message: 'Invoice not found' });
         }
 
-        const balance = (invoice.grandTotal || 0) - (invoice.paidAmount || 0);
+        const grandTotal = invoice.grandTotal || 0;
+        const paidAmount = invoice.paidAmount || 0;
+        const balance = grandTotal - paidAmount;
+
+        console.log(`[INFO] Invoice Found. Details: Grand Total=${grandTotal}, Paid Amount=${paidAmount}, Calculated Balance=${balance}`);
 
         if (balance <= 0) {
+            console.warn(`[WARN] Request denied: Invoice is already fully paid or has zero balance.`);
             return res.status(400).json({ message: 'Invoice is already fully paid' });
         }
 
         // Use environment variable for UPI ID, with a fallback
         const upiId = process.env.UPI_ID || 'shaikhtool@ibl';
+        console.log(`[INFO] Generating QR with UPI ID: ${upiId} for amount: ${balance.toFixed(2)}`);
+
         const { qrCodeImage } = await generateUpiQr(upiId, balance.toFixed(2));
 
+        console.log(`[SUCCESS] QR code generated successfully.`);
         res.json({ qrCodeImage });
 
     } catch (error) {
+        console.error(`[FATAL] An unexpected error occurred:`, error);
         res.status(500).json({ message: error.message || 'Server error' });
     }
 };
