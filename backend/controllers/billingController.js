@@ -77,7 +77,7 @@ const createInvoice = async (req, res) => {
 
         // Recalculate totals on the backend to ensure data integrity
         console.log('[2/4] Calculating totals based on items...');
-        const { subTotal, taxAmount, grandTotal } = calculateTotals(items, customerDetails.state);
+        const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(items, customerDetails.state);
         const balance = grandTotal - paidAmount;
         console.log('[2/4] Totals calculated:', { subTotal, taxAmount, grandTotal, balance });
 
