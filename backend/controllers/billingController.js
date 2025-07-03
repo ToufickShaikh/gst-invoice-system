@@ -79,7 +79,8 @@ const createInvoice = async (req, res) => {
         console.log('[2/4] Calculating totals based on items...');
         const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(items, customerDetails.state);
         const balance = grandTotal - paidAmount;
-        console.log('[2/4] Totals calculated:', { subTotal, taxAmount, grandTotal, balance });
+        const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
+        console.log('[2/4] Totals calculated:', { subTotal, taxAmount, totalTax, grandTotal, balance });
 
         const invoiceNumber = `INV-${uuidv4()}`;
 
@@ -91,7 +92,7 @@ const createInvoice = async (req, res) => {
             cgst: taxAmount.cgst,
             sgst: taxAmount.sgst,
             igst: taxAmount.igst,
-            totalTax: taxAmount.total,
+            totalTax, // Use calculated totalTax
             grandTotal, // Use calculated grandTotal
             discount,
             shippingCharges,
