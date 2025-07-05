@@ -5,12 +5,12 @@ const { verifyAndAutoFillGST, validateGSTIN, determineTaxType } = require('../ut
 
 /**
  * @desc    Verify GSTIN and get auto-fill data
- * @route   POST /api/gst/verify
+ * @route   GET /api/gst/verify/:gstin
  * @access  Public
  */
 const verifyGSTIN = async (req, res) => {
     try {
-        const { gstin } = req.body;
+        const { gstin } = req.params;
 
         console.log('[GST API] Verification request for GSTIN:', gstin);
 
@@ -25,11 +25,30 @@ const verifyGSTIN = async (req, res) => {
         const result = await verifyAndAutoFillGST(gstin);
 
         if (!result.success) {
-            return res.status(400).json(result);
+            return res.status(400).json({
+                verified: false,
+                error: result.error
+            });
         }
 
-        console.log('[GST API] Verification successful for:', result.autoFillFields.firmName);
-        res.json(result);
+        // Format response to match frontend expectations
+        const response = {
+            verified: true,
+            companyDetails: {
+                gstin: result.gstin,
+                legalName: result.autoFillFields.firmName,
+                tradeName: result.autoFillFields.tradeName,
+                principalPlaceOfBusiness: result.autoFillFields.firmAddress,
+                state: `${result.autoFillFields.stateCode}-${result.autoFillFields.state}`,
+                stateCode: result.autoFillFields.stateCode,
+                registrationDate: result.companyDetails?.registrationDate || new Date().toISOString().split('T')[0],
+                status: 'Active'
+            },
+            taxType: result.taxInfo.type
+        };
+
+        console.log('[GST API] Verification successful for:', response.companyDetails.legalName);
+        res.json(response);
 
     } catch (error) {
         console.error('[GST API] Error:', error);
@@ -42,12 +61,12 @@ const verifyGSTIN = async (req, res) => {
 
 /**
  * @desc    Quick GSTIN format validation
- * @route   POST /api/gst/validate
+ * @route   GET /api/gst/validate/:gstin
  * @access  Public
  */
 const quickValidateGSTIN = async (req, res) => {
     try {
-        const { gstin } = req.body;
+        const { gstin } = req.params;
 
         const validation = validateGSTIN(gstin);
 
@@ -73,8 +92,41 @@ const quickValidateGSTIN = async (req, res) => {
     }
 };
 
+/**
+ * @desc    Get tax type based on state codes
+ * @route   GET /api/gst/tax-type
+ * @access  Public
+ */
+const getTaxType = async (req, res) => {
+    try {
+        const { companyStateCode, customerStateCode } = req.query;
+
+        if (!companyStateCode || !customerStateCode) {
+            return res.status(400).json({
+                error: 'Both companyStateCode and customerStateCode are required'
+            });
+        }
+
+        const taxType = companyStateCode === customerStateCode ? 'CGST_SGST' : 'IGST';
+        
+        res.json({
+            taxType,
+            companyStateCode,
+            customerStateCode,
+            isInterState: taxType === 'IGST'
+        });
+
+    } catch (error) {
+        console.error('[GST API] Tax type error:', error);
+        res.status(500).json({
+            error: 'Tax type determination error'
+        });
+    }
+};
+
 // Define routes
-router.post('/verify', verifyGSTIN);
-router.post('/validate', quickValidateGSTIN);
+router.get('/verify/:gstin', verifyGSTIN);
+router.get('/validate/:gstin', quickValidateGSTIN);
+router.get('/tax-type', getTaxType);
 
 module.exports = router;

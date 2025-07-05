@@ -113,7 +113,18 @@ const Customers = () => {
       }
     } catch (error) {
       setGstinValid(false)
-      toast.error('GSTIN validation failed. Please check and try again.')
+      console.error('GSTIN validation error:', error)
+      
+      // More specific error messages
+      if (error.response?.status === 404) {
+        toast.error('GST verification service is not available. Please enter details manually.')
+      } else if (error.response?.status === 500) {
+        toast.error('GST verification service error. Please try again later.')
+      } else if (error.message?.includes('Network Error')) {
+        toast.error('Network error. Please check your connection and try again.')
+      } else {
+        toast.error('GSTIN validation failed. Please enter details manually.')
+      }
     } finally {
       setGstinValidating(false)
     }
