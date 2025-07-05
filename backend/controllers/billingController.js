@@ -252,20 +252,27 @@ const deleteInvoice = async (req, res) => {
 const reprintInvoice = async (req, res) => {
     try {
         const invoiceId = req.params.id;
+        console.log(`[INFO] Starting reprint for invoice: ${invoiceId}`);
+
         const invoice = await Invoice.findById(invoiceId).populate('customer').populate('items.item');
 
         if (!invoice) {
+            console.error(`[ERROR] Invoice not found: ${invoiceId}`);
             return res.status(404).json({ message: 'Invoice not found' });
         }
+
+        console.log(`[INFO] Found invoice: ${invoice.invoiceNumber}`);
 
         // If grandTotal is 0 or null, it's likely a legacy invoice. Let's recalculate.
         if (!invoice.grandTotal || invoice.grandTotal <= 0) {
             console.warn(`[WARN] Reprinting legacy invoice ${invoiceId} with invalid grandTotal. Attempting to recalculate.`);
 
             if (!invoice.customer) {
+                console.error(`[ERROR] Cannot recalculate for reprint: Customer data is missing for invoice ${invoiceId}`);
                 return res.status(400).json({ message: 'Cannot recalculate for reprint: Customer data is missing.' });
             }
             if (!invoice.items || invoice.items.length === 0 || invoice.items.some(i => !i.item)) {
+                console.error(`[ERROR] Cannot recalculate for reprint: Item data is missing for invoice ${invoiceId}`);
                 return res.status(400).json({ message: 'Cannot recalculate for reprint: Item data is missing or not fully populated.' });
             }
 
@@ -298,14 +305,21 @@ const reprintInvoice = async (req, res) => {
             console.log(`[SUCCESS] Legacy invoice ${invoiceId} has been updated during reprint.`);
         }
 
-
+        console.log(`[INFO] Generating PDF for invoice: ${invoice.invoiceNumber}`);
         const pdfPath = await pdfGenerator.generateInvoicePDF(invoice);
         invoice.pdfPath = pdfPath;
         await invoice.save();
+
+        console.log(`[SUCCESS] PDF generated successfully: ${pdfPath}`);
         res.json({ pdfPath, message: 'Invoice reprinted successfully' });
     } catch (error) {
         console.error('[ERROR] Failed to reprint invoice:', error);
-        res.status(500).json({ message: error.message || 'Server error' });
+        console.error('[ERROR] Stack trace:', error.stack);
+        res.status(500).json({
+            message: 'Failed to generate PDF',
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 

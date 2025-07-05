@@ -3,9 +3,13 @@ const fs = require('fs/promises');
 const path = require('path');
 
 async function generateInvoicePDF(invoiceData) {
+    console.log(`[PDF] Starting PDF generation for invoice: ${invoiceData.invoiceNumber}`);
     try {
         const templatePath = path.resolve(__dirname, '../templates/invoiceTemplate.html');
+        console.log(`[PDF] Reading template from: ${templatePath}`);
+
         let html = await fs.readFile(templatePath, 'utf-8');
+        console.log(`[PDF] Template loaded, size: ${html.length} characters`);
 
         // Company details
         html = html.replace(/{{companyName}}/g, 'Shaikh Tools And Dies');
@@ -29,6 +33,8 @@ async function generateInvoicePDF(invoiceData) {
         html = html.replace(/{{invoiceDate}}/g, new Date(invoiceData.invoiceDate || Date.now()).toLocaleDateString('en-GB'));
         html = html.replace(/{{placeOfSupply}}/g, customer?.state || '33-Tamil Nadu');
 
+        console.log(`[PDF] Basic placeholders replaced`);
+
         // Calculate totals and prepare items data
         let totalQuantity = 0;
         let totalGST = 0;
@@ -36,6 +42,7 @@ async function generateInvoicePDF(invoiceData) {
         const taxSummary = {};
 
         if (invoiceData.items && invoiceData.items.length > 0) {
+            console.log(`[PDF] Processing ${invoiceData.items.length} items`);
             invoiceData.items.forEach((item, index) => {
                 const itemName = item.name || item.item?.name || '';
                 const hsnCode = item.hsnCode || item.item?.hsnCode || '';
@@ -79,6 +86,8 @@ async function generateInvoicePDF(invoiceData) {
                 </tr>`;
             });
         }
+
+        console.log(`[PDF] Items processed, total GST: ${totalGST}`);
 
         // Replace items table
         html = html.replace(/{{itemsTable}}/g, itemsHtml);
@@ -133,30 +142,60 @@ async function generateInvoicePDF(invoiceData) {
         html = html.replace(/{{upiQrImage}}/g, ''); // Add QR image path if available
         html = html.replace(/{{signatureImage}}/g, ''); // Add signature image path if available
 
+        console.log(`[PDF] All placeholders replaced, launching browser...`);
+
         const browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            headless: 'new',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu'
+            ]
         });
+
+        console.log(`[PDF] Browser launched successfully`);
+
         const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+
+        // Set a smaller viewport for faster processing
+        await page.setViewport({ width: 1024, height: 768 });
+
+        console.log(`[PDF] Setting page content...`);
+
+        // Set content with a timeout
+        await page.setContent(html, {
+            waitUntil: 'domcontentloaded',
+            timeout: 30000
+        });
+
+        console.log(`[PDF] Page content set, creating PDF directory...`);
 
         const pdfDir = path.resolve(__dirname, '../invoices');
         await fs.mkdir(pdfDir, { recursive: true });
         const pdfPath = path.join(pdfDir, `invoice-${invoiceData.invoiceNumber}.pdf`);
 
+        console.log(`[PDF] Generating PDF at: ${pdfPath}`);
+
         await page.pdf({
             path: pdfPath,
             format: 'A4',
             printBackground: true,
-            margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' }
+            margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+            timeout: 30000
         });
 
         await browser.close();
-        console.log(`[SUCCESS] PDF generated for invoice ${invoiceData.invoiceNumber} at ${pdfPath}`);
+        console.log(`[PDF] PDF generation completed successfully`);
         return `/invoices/invoice-${invoiceData.invoiceNumber}.pdf`;
     } catch (error) {
-        console.error(`[ERROR] Failed to generate PDF for invoice ${invoiceData.invoiceNumber}:`, error);
-        throw new Error('PDF generation failed.');
+        console.error(`[PDF] Failed to generate PDF for invoice ${invoiceData.invoiceNumber}:`, error);
+        console.error(`[PDF] Error stack:`, error.stack);
+        throw new Error(`PDF generation failed: ${error.message}`);
     }
 }
 
