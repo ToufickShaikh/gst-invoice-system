@@ -1,5 +1,6 @@
 // Controller for customer CRUD operations
 const Customer = require('../models/Customer.js');
+const Invoice = require('../models/Invoice.js');
 
 // Get all customers (optionally filtered by query)
 const getCustomers = async (req, res) => {
@@ -35,10 +36,15 @@ const updateCustomer = async (req, res) => {
 // Delete a customer by ID
 const deleteCustomer = async (req, res) => {
     try {
-        await Customer.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Customer deleted' });
+        const customerId = req.params.id;
+        // First, delete all invoices associated with this customer
+        await Invoice.deleteMany({ customer: customerId });
+        // Then, delete the customer
+        await Customer.findByIdAndDelete(customerId);
+        res.json({ message: 'Customer and associated invoices deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error("Error deleting customer and invoices:", error);
+        res.status(500).json({ message: 'Server error while deleting customer' });
     }
 };
 

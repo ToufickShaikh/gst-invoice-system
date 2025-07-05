@@ -94,13 +94,13 @@ const Customers = () => {
   }
 
   const handleDelete = async (customer) => {
-    if (window.confirm('Are you sure you want to delete this customer?')) {
+    if (window.confirm('Are you sure you want to delete this customer? This will also delete all of their invoices.')) {
       try {
         await customersAPI.delete(customer._id)
-        toast.success('Customer deleted successfully')
+        toast.success('Customer and all associated invoices deleted.')
         fetchCustomers()
       } catch (error) {
-        toast.error('Failed to delete customer')
+        toast.error('Failed to delete customer.')
       }
     }
   }

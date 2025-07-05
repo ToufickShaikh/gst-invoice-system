@@ -77,20 +77,21 @@ const EditInvoice = () => {
                 billingAPI.getInvoiceById(id),
             ]);
 
-            // The API wrappers return the data object directly
             const customersList = customersRes || [];
             const itemsList = itemsRes || [];
             const fetchedInvoice = invoiceRes;
 
-            if (!fetchedInvoice || !fetchedInvoice.customer || !customersList.length || !itemsList.length) {
-                throw new Error('One or more data sources (invoice, customers, items) are missing or empty.');
+            // The only truly critical data is the invoice itself.
+            if (!fetchedInvoice) {
+                throw new Error('Could not load the invoice. It might have been deleted.');
             }
 
             setCustomers(customersList);
             setItems(itemsList);
             setInvoiceData({
                 ...fetchedInvoice,
-                customer: fetchedInvoice.customer._id,
+                // Handle case where customer might be null or missing from the DB
+                customer: fetchedInvoice.customer?._id || '',
                 items: (fetchedInvoice.items || []).map(item => ({
                     ...item,
                     itemId: item.item?._id || ''
