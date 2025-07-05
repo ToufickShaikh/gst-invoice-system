@@ -112,13 +112,15 @@ const createInvoice = async (req, res) => {
         try {
             console.log('[4/4] Generating PDF...');
             pdfPath = await pdfGenerator.generateInvoicePDF(invoice);
+            invoice.pdfPath = pdfPath;
+            await invoice.save();
             console.log('[4/4] PDF generated at:', pdfPath);
         } catch (e) {
             console.error('PDF generation failed during creation:', e);
         }
 
         console.log('--- Invoice Creation Finished ---');
-        res.status(201).json({ invoice, pdfPath });
+        res.status(201).json(invoice);
     } catch (error) {
         console.error('--- [ERROR] Invoice Creation Failed ---', error);
         res.status(500).json({ message: error.message || 'Server error' });
@@ -207,11 +209,16 @@ const updateInvoice = async (req, res) => {
 
         // After successful update, regenerate the PDF
         console.log(`[6/6] Regenerating PDF for invoice ${id}...`);
-        await pdfGenerator.generateInvoicePDF(updatedInvoice);
-        console.log(`[6/6] PDF for invoice ${id} regenerated.`);
+        let pdfPath = null;
+        try {
+            pdfPath = await pdfGenerator.generateInvoicePDF(updatedInvoice);
+            updatedInvoice.pdfPath = pdfPath;
+            await updatedInvoice.save();
+            console.log(`[6/6] PDF for invoice ${id} regenerated.`);
+        } catch (e) {
+            console.error(`[WARN] PDF regeneration failed for invoice ${id}:`, e);
+        }
         console.log('--- Invoice Update Process Finished ---');
-
-
         res.json(updatedInvoice);
     } catch (error) {
         console.error('--- [ERROR] Invoice Update Process Failed ---');
@@ -293,6 +300,8 @@ const reprintInvoice = async (req, res) => {
 
 
         const pdfPath = await pdfGenerator.generateInvoicePDF(invoice);
+        invoice.pdfPath = pdfPath;
+        await invoice.save();
         res.json({ pdfPath, message: 'Invoice reprinted successfully' });
     } catch (error) {
         console.error('[ERROR] Failed to reprint invoice:', error);

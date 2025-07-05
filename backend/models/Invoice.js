@@ -24,6 +24,7 @@ const invoiceSchema = new mongoose.Schema({
     invoiceDate: { type: Date, default: Date.now },
     shippingCharges: { type: Number, default: 0 },
     paymentMethod: { type: String },
+    pdfPath: { type: String }, // Path to generated PDF
     // Removed redundant/calculable fields like grandTotal, balance, etc.
 });
 
