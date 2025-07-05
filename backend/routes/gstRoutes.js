@@ -39,14 +39,15 @@ const verifyGSTIN = async (req, res) => {
                 legalName: result.autoFillFields.firmName,
                 tradeName: result.autoFillFields.tradeName,
                 principalPlaceOfBusiness: result.autoFillFields.firmAddress,
-                state: `${result.autoFillFields.stateCode}-${result.autoFillFields.state}`,
+                state: result.autoFillFields.state, // Already formatted as "XX-StateName"
                 stateCode: result.autoFillFields.stateCode,
                 registrationDate: result.companyDetails?.registrationDate || new Date().toISOString().split('T')[0],
                 status: 'Active'
             },
-            taxType: result.taxInfo.type
+            taxType: result.taxInfo?.type || result.taxInfo
         };
 
+        console.log('[GST API] Sending response to frontend:', JSON.stringify(response, null, 2));
         console.log('[GST API] Verification successful for:', response.companyDetails.legalName);
         res.json(response);
 
@@ -108,7 +109,7 @@ const getTaxType = async (req, res) => {
         }
 
         const taxType = companyStateCode === customerStateCode ? 'CGST_SGST' : 'IGST';
-        
+
         res.json({
             taxType,
             companyStateCode,

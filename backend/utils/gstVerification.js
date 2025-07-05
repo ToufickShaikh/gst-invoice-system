@@ -15,11 +15,11 @@ function makeHttpsRequest(url, options = {}) {
             }
         }, (response) => {
             let data = '';
-            
+
             response.on('data', (chunk) => {
                 data += chunk;
             });
-            
+
             response.on('end', () => {
                 try {
                     const jsonData = JSON.parse(data);
@@ -38,11 +38,11 @@ function makeHttpsRequest(url, options = {}) {
                 }
             });
         });
-        
+
         request.on('error', (error) => {
             reject(error);
         });
-        
+
         request.on('timeout', () => {
             request.destroy();
             reject(new Error('Request timeout'));
@@ -159,7 +159,7 @@ function determineTaxType(customerStateCode) {
  */
 async function verifyGSTINFromAPI(gstin) {
     console.log('[GST API] Starting verification for:', gstin);
-    
+
     // First validate the GSTIN format
     const validation = validateGSTIN(gstin);
     if (!validation.valid) {
@@ -171,7 +171,7 @@ async function verifyGSTINFromAPI(gstin) {
 
     try {
         // Try multiple GST verification APIs in order of preference
-        
+
         // Option 1: Try GST.gov.in API (if available)
         const govResult = await tryGovGSTAPI(gstin);
         if (govResult.success) {
@@ -192,7 +192,7 @@ async function verifyGSTINFromAPI(gstin) {
 
     } catch (error) {
         console.error('[GST API] All verification methods failed:', error.message);
-        
+
         // Return enhanced mock data as last resort
         return getEnhancedMockData(gstin, validation);
     }
@@ -311,10 +311,10 @@ function formatThirdPartyResponse(data, gstin) {
  */
 function getEnhancedMockData(gstin, validation) {
     // Generate more realistic company names based on GSTIN
-    const stateNames = GST_STATE_CODES[validation.stateCode];
+    const stateName = GST_STATE_CODES[validation.stateCode] || 'Unknown State';
     const companyTypes = [
         'PRIVATE LIMITED',
-        'PUBLIC LIMITED', 
+        'PUBLIC LIMITED',
         'LLP',
         'PARTNERSHIP',
         'PROPRIETORSHIP',
@@ -323,12 +323,12 @@ function getEnhancedMockData(gstin, validation) {
         'TRADING COMPANY',
         'SOLUTIONS PVT LTD'
     ];
-    
+
     const businessPrefixes = [
         'TECH', 'DIGITAL', 'GLOBAL', 'PREMIER', 'SUPREME', 'UNIVERSAL',
         'MODERN', 'ADVANCED', 'SMART', 'INNOVATIVE', 'ROYAL', 'NATIONAL'
     ];
-    
+
     const businessSectors = [
         'TECHNOLOGIES', 'SOLUTIONS', 'SYSTEMS', 'SERVICES', 'INDUSTRIES',
         'MANUFACTURING', 'TRADING', 'EXPORTS', 'TEXTILES', 'CHEMICALS'
@@ -337,7 +337,7 @@ function getEnhancedMockData(gstin, validation) {
     const prefix = businessPrefixes[Math.floor(Math.random() * businessPrefixes.length)];
     const sector = businessSectors[Math.floor(Math.random() * businessSectors.length)];
     const type = companyTypes[Math.floor(Math.random() * companyTypes.length)];
-    
+
     const companyName = `${prefix} ${sector} ${type}`;
     const tradeName = `${prefix} ${sector}`;
 
@@ -350,10 +350,10 @@ function getEnhancedMockData(gstin, validation) {
             address: {
                 buildingName: `${Math.floor(Math.random() * 999) + 1}, Business Plaza`,
                 street: `${Math.floor(Math.random() * 50) + 1}th Street`,
-                location: `${stateNames} Industrial Area`,
+                location: `${stateName} Industrial Area`,
                 city: getRandomCityForState(validation.stateCode),
                 district: getRandomDistrictForState(validation.stateCode),
-                state: stateNames,
+                state: `${validation.stateCode}-${stateName}`, // Properly formatted state
                 pincode: generateRealisticPincode(validation.stateCode)
             },
             businessType: type,
@@ -374,7 +374,7 @@ function getRandomCityForState(stateCode) {
         '06': ['Gurgaon', 'Faridabad', 'Panipat', 'Ambala', 'Karnal'],
         '07': ['New Delhi', 'Central Delhi', 'South Delhi', 'East Delhi', 'West Delhi']
     };
-    
+
     const stateCities = cities[stateCode] || ['Business City', 'Commercial Hub', 'Industrial Town'];
     return stateCities[Math.floor(Math.random() * stateCities.length)];
 }
@@ -390,7 +390,7 @@ function getRandomDistrictForState(stateCode) {
         '06': ['Gurgaon', 'Faridabad', 'Panipat', 'Ambala', 'Karnal'],
         '07': ['Central Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 'North Delhi']
     };
-    
+
     const stateDistricts = districts[stateCode] || ['Business District', 'Commercial Zone'];
     return stateDistricts[Math.floor(Math.random() * stateDistricts.length)];
 }
@@ -406,11 +406,11 @@ function generateRealisticPincode(stateCode) {
         '06': ['12', '13'], // Haryana
         '07': ['11'] // Delhi
     };
-    
+
     const ranges = pincodeRanges[stateCode] || ['50', '51'];
     const prefix = ranges[Math.floor(Math.random() * ranges.length)];
     const suffix = Math.floor(Math.random() * 9000) + 1000;
-    
+
     return `${prefix}${suffix}`;
 }
 
@@ -464,7 +464,7 @@ async function verifyAndAutoFillGST(gstin) {
                 firmAddress: `${apiResponse.data.address.buildingName}, ${apiResponse.data.address.street}, ${apiResponse.data.address.location}`,
                 city: apiResponse.data.address.city,
                 district: apiResponse.data.address.district,
-                state: apiResponse.data.address.state,
+                state: apiResponse.data.address.state, // This should already be in "XX-StateName" format
                 stateCode: validation.stateCode,
                 pincode: apiResponse.data.address.pincode,
                 businessType: apiResponse.data.businessType

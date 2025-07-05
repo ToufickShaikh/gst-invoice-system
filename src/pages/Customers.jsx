@@ -114,7 +114,7 @@ const Customers = () => {
     } catch (error) {
       setGstinValid(false)
       console.error('GSTIN validation error:', error)
-      
+
       // More specific error messages
       if (error.response?.status === 404) {
         toast.error('GST verification service is not available. Please enter details manually.')
