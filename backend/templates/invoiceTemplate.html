@@ -97,12 +97,13 @@
         }
 
         .company-logo {
-            width: 50px;
-            height: 50px;
-            margin-right: 12px;
-            border: 2px solid #DAA520;
-            border-radius: 4px;
+            width: 120px;
+            height: 120px;
+            margin-right: 20px;
+            border: 3px solid #DAA520;
+            border-radius: 6px;
             flex-shrink: 0;
+            box-shadow: 0 4px 8px rgba(218, 165, 32, 0.3);
         }
 
         .company-details h2 {
@@ -522,70 +523,31 @@
             border-radius: 2px;
         }
 
-        .amount-words {
-            background: rgba(218, 165, 32, 0.1);
-            padding: 8px;
-            border: 2px solid #DAA520;
-            border-radius: 4px;
-            margin: 6mm 0;
-            position: relative;
-        }
-
-        .amount-words::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #DAA520 0%, #B8860B 50%, #DAA520 100%);
-        }
-
-        .amount-words h4 {
-            color: #1a1a1a;
-            margin-bottom: 4px;
-            font-size: 12px;
-            text-decoration: underline;
-            font-weight: bold;
-        }
-
-        .amount-words p {
-            font-size: 11px;
-            color: #2c2c2c;
-            font-weight: bold;
-        }
-
-        .terms-section {
+        /* Developer Credit */
+        .developer-credit {
+            text-align: center;
+            margin-top: 8px;
+            padding: 6px;
             background: rgba(218, 165, 32, 0.05);
-            padding: 8px;
-            border: 2px solid #DAA520;
+            border: 1px solid #DAA520;
             border-radius: 4px;
-            margin: 6mm 0;
-            position: relative;
+            font-size: 10px;
+            color: #2c2c2c;
         }
 
-        .terms-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #DAA520 0%, #B8860B 50%, #DAA520 100%);
+        .developer-credit p {
+            margin: 0;
+            font-weight: normal;
         }
 
-        .terms-section h4 {
-            color: #1a1a1a;
-            margin-bottom: 4px;
-            font-size: 12px;
-            text-decoration: underline;
+        .developer-credit a {
+            color: #DAA520;
+            text-decoration: none;
             font-weight: bold;
         }
 
-        .terms-section p {
-            font-size: 10px;
-            margin-bottom: 2px;
-            color: #2c2c2c;
+        .developer-credit a:hover {
+            text-decoration: underline;
         }
 
         /* Print Styles */
@@ -1124,6 +1086,13 @@
                     <img src="{{signatureImage}}" class="signature-image" alt="Authorized Signature" />
                     <p><strong>Authorized Signatory</strong></p>
                 </div>
+            </div>
+
+            <!-- Developer Credit -->
+            <div class="developer-credit">
+                <p>Powered by <strong>Shaikh Tools and Dies</strong> | Developed by <a
+                        href="https://instagram.com/digital_hokage" target="_blank"
+                        style="color: #DAA520; text-decoration: none;">@Digital_hokage</a></p>
             </div>
         </div>
     </div>

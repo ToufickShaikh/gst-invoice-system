@@ -32,7 +32,15 @@ const Layout = ({ children }) => {
       <header className="bg-white shadow">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center h-16">
-            <h1 className="text-xl font-semibold">GST Billing System</h1>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">S</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-800">Shaikh Tools and Dies</h1>
+                <p className="text-xs text-gray-500">GST Billing System</p>
+              </div>
+            </div>
             <div className="flex items-center space-x-4">
               {/* User info and logout button (hidden on small screens) */}
               <div className="hidden md:block">

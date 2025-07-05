@@ -424,6 +424,24 @@ const Billing = () => {
               {loading ? 'Generating...' : 'Generate Invoice'}
             </Button>
           </div>
+
+          {/* Billing Branding Footer */}
+          <div className="mt-8 bg-gradient-to-r from-yellow-600 to-yellow-800 text-white p-4 rounded-lg shadow-lg text-center">
+            <p className="text-sm font-medium">
+              Professional Billing by <strong>Shaikh Tools and Dies</strong>
+            </p>
+            <div className="mt-2 text-xs opacity-75">
+              Developed by{' '}
+              <a
+                href="https://instagram.com/digital_hokage"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-yellow-200 hover:text-white underline font-medium"
+              >
+                @Digital_hokage
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>

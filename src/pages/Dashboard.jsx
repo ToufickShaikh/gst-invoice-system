@@ -110,6 +110,25 @@ const Dashboard = () => {
             color="yellow"
           />
         </div>
+
+        {/* Branding Section */}
+        <div className="bg-gradient-to-r from-yellow-600 to-yellow-800 text-white p-6 rounded-lg shadow-lg text-center">
+          <h2 className="text-xl font-bold mb-2">Welcome to Shaikh Tools and Dies Invoice System</h2>
+          <p className="text-sm opacity-90">
+            Premium GST invoicing solution with real-time verification and professional templates
+          </p>
+          <div className="mt-4 text-xs opacity-75">
+            Developed by{' '}
+            <a
+              href="https://instagram.com/digital_hokage"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-yellow-200 hover:text-white underline font-medium"
+            >
+              @Digital_hokage
+            </a>
+          </div>
+        </div>
       </div>
     </Layout>
   );
