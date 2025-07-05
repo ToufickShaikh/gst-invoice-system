@@ -11,10 +11,7 @@ const connectDB = async () => {
         console.log('Attempting to connect to MongoDB...');
         console.log('Using URI:', mongoUri.includes('mongodb+srv') ? 'MongoDB Atlas' : 'Local MongoDB');
 
-        await mongoose.connect(mongoUri, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true
-        });
+        await mongoose.connect(mongoUri);
         console.log('✅ MongoDB Connected successfully');
     } catch (err) {
         console.error('❌ MongoDB connection failed:', err.message);
