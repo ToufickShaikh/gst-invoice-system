@@ -15,21 +15,65 @@ const getCustomers = async (req, res) => {
 // Create a new customer
 const createCustomer = async (req, res) => {
     try {
+        console.log('[CUSTOMER] Create request received:', req.body);
+
         const customer = new Customer(req.body);
         await customer.save();
+
+        console.log('[CUSTOMER] Customer created successfully:', customer._id);
         res.status(201).json(customer);
     } catch (error) {
-        res.status(400).json({ message: 'Error creating customer' });
+        console.error('[CUSTOMER] Error creating customer:', error);
+        console.error('[CUSTOMER] Request body was:', req.body);
+
+        // Provide more specific error messages
+        if (error.name === 'ValidationError') {
+            const validationErrors = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({
+                message: 'Validation failed',
+                errors: validationErrors,
+                details: error.errors
+            });
+        }
+
+        res.status(400).json({
+            message: 'Error creating customer',
+            error: error.message
+        });
     }
 };
 
 // Update an existing customer by ID
 const updateCustomer = async (req, res) => {
     try {
+        console.log('[CUSTOMER] Update request for ID:', req.params.id);
+        console.log('[CUSTOMER] Update data:', req.body);
+
         const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true });
+
+        if (!customer) {
+            return res.status(404).json({ message: 'Customer not found' });
+        }
+
+        console.log('[CUSTOMER] Customer updated successfully:', customer._id);
         res.json(customer);
     } catch (error) {
-        res.status(400).json({ message: 'Error updating customer' });
+        console.error('[CUSTOMER] Error updating customer:', error);
+        console.error('[CUSTOMER] Request body was:', req.body);
+
+        if (error.name === 'ValidationError') {
+            const validationErrors = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({
+                message: 'Validation failed',
+                errors: validationErrors,
+                details: error.errors
+            });
+        }
+
+        res.status(400).json({
+            message: 'Error updating customer',
+            error: error.message
+        });
     }
 };
 

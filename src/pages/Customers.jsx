@@ -19,7 +19,8 @@ const Customers = () => {
     gstNo: '',
     firmAddress: '',
     contact: '',
-    name: ''
+    name: '',
+    state: '33-Tamil Nadu' // Default state
   })
 
   const b2bColumns = [
@@ -88,7 +89,8 @@ const Customers = () => {
       gstNo: customer.gstNo || '',
       firmAddress: customer.firmAddress || '',
       contact: customer.contact || '',
-      name: customer.name || ''
+      name: customer.name || '',
+      state: customer.state || '33-Tamil Nadu'
     })
     setIsModalOpen(true)
   }
@@ -114,7 +116,8 @@ const Customers = () => {
       gstNo: '',
       firmAddress: '',
       contact: '',
-      name: ''
+      name: '',
+      state: '33-Tamil Nadu'
     })
   }
 
@@ -208,6 +211,14 @@ const Customers = () => {
                 required
               />
             )}
+            <InputField
+              label="State"
+              name="state"
+              value={formData.state}
+              onChange={handleChange}
+              placeholder="e.g., 33-Tamil Nadu"
+              required
+            />
             <InputField
               label="Contact Number"
               name="contact"
