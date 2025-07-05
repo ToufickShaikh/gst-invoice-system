@@ -63,8 +63,11 @@ const Invoices = () => {
         try {
             const res = await billingAPI.reprintInvoice(invoiceId);
             if (res.pdfPath) {
-                // Construct the full URL to the PDF
-                const pdfUrl = `${import.meta.env.VITE_API_BASE_URL.replace('/api', '')}/${res.pdfPath}`;
+                // Construct the full URL to the PDF/HTML file
+                // Remove '/api' from base URL and ensure no double slashes
+                const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+                const pdfUrl = `${baseUrl}${res.pdfPath}`; // res.pdfPath already starts with '/'
+                console.log('Opening PDF URL:', pdfUrl);
                 window.open(pdfUrl, '_blank');
                 toast.success('Invoice reprinted successfully!');
             } else {

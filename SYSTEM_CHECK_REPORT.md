@@ -28,6 +28,12 @@
 - **Fix**: Added fallback from `grandTotal` to `totalAmount`
 - **Result**: ✅ Works with both new and legacy invoice data
 
+#### 5. **Critical Fix: Double Slash in PDF URL Construction**
+- **Issue**: Frontend was creating URLs like `//invoices/file.html` (double slash) causing 404 errors
+- **Location**: `src/pages/Invoices.jsx` and `src/pages/EditInvoice.jsx`
+- **Fix**: Proper URL concatenation without adding extra slash
+- **Result**: ✅ PDF/HTML files now open correctly
+
 ---
 
 ## 🧪 Comprehensive System Verification Results:
@@ -155,4 +161,10 @@ server.js → app.js → routes → controllers → models
 3. ✅ Test reprint functionality in production
 4. ✅ Monitor logs for any issues
 
-**All previously reported 500 errors should now be resolved! 🎉**
+**All previously reported 500 errors and URL access issues should now be resolved! 🎉**
+
+### Recent Fixes Applied:
+- ✅ Fixed double slash URL issue (`//invoices/` → `/invoices/`)
+- ✅ Updated both Invoices.jsx and EditInvoice.jsx  
+- ✅ Added console logging for debugging URL construction
+- ✅ Verified static file serving works correctly

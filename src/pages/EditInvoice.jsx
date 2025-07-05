@@ -147,7 +147,10 @@ const EditInvoice = () => {
             toast.success('Invoice updated successfully!');
 
             if (response.pdfPath) {
-                const pdfUrl = `${import.meta.env.VITE_API_BASE_URL.replace('/api', '')}/${response.pdfPath}`;
+                // Fix URL construction to avoid double slashes
+                const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+                const pdfUrl = `${baseUrl}${response.pdfPath}`; // response.pdfPath already starts with '/'
+                console.log('Opening PDF URL:', pdfUrl);
                 window.open(pdfUrl, '_blank');
             }
 
