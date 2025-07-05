@@ -230,9 +230,51 @@ const reprintInvoice = async (req, res) => {
             return res.status(404).json({ message: 'Invoice not found' });
         }
 
-        const pdfPath = await pdfGenerator.generateInvoicePDF(invoice); // FIX: Was generatePdf
+        // If grandTotal is 0 or null, it's likely a legacy invoice. Let's recalculate.
+        if (!invoice.grandTotal || invoice.grandTotal <= 0) {
+            console.warn(`[WARN] Reprinting legacy invoice ${invoiceId} with invalid grandTotal. Attempting to recalculate.`);
+
+            if (!invoice.customer) {
+                return res.status(400).json({ message: 'Cannot recalculate for reprint: Customer data is missing.' });
+            }
+            if (!invoice.items || invoice.items.length === 0 || invoice.items.some(i => !i.item)) {
+                return res.status(400).json({ message: 'Cannot recalculate for reprint: Item data is missing or not fully populated.' });
+            }
+
+            // Recalculate totals
+            const populatedItemsForRecalc = invoice.items.map(i => {
+                const itemData = i.item.toObject ? i.item.toObject() : i.item;
+                return { ...itemData, quantity: i.quantity };
+            });
+
+            const { subTotal, taxAmount, totalAmount: newGrandTotal } = calculateTotals(
+                populatedItemsForRecalc,
+                invoice.customer.state
+            );
+            const newTotalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
+            const newBalance = newGrandTotal - (invoice.paidAmount || 0);
+
+            console.log('[INFO] Recalculated Totals for reprint:', { newGrandTotal, newBalance });
+
+            // Update the invoice in the DB to fix legacy data
+            invoice.subTotal = subTotal;
+            invoice.cgst = taxAmount.cgst;
+            invoice.sgst = taxAmount.sgst;
+            invoice.igst = taxAmount.igst;
+            invoice.totalTax = newTotalTax;
+            invoice.grandTotal = newGrandTotal;
+            invoice.balance = newBalance;
+            invoice.totalAmount = newGrandTotal;
+
+            await invoice.save();
+            console.log(`[SUCCESS] Legacy invoice ${invoiceId} has been updated during reprint.`);
+        }
+
+
+        const pdfPath = await pdfGenerator.generateInvoicePDF(invoice);
         res.json({ pdfPath, message: 'Invoice reprinted successfully' });
     } catch (error) {
+        console.error('[ERROR] Failed to reprint invoice:', error);
         res.status(500).json({ message: error.message || 'Server error' });
     }
 };
@@ -318,13 +360,22 @@ const generatePaymentQr = async (req, res) => {
             if (!invoice.customer) {
                 return res.status(400).json({ message: 'Cannot recalculate: Customer data is missing.' });
             }
-            if (!invoice.items || invoice.items.length === 0) {
-                return res.status(400).json({ message: 'Cannot recalculate: Item data is missing.' });
+            if (!invoice.items || invoice.items.length === 0 || invoice.items.some(i => !i.item)) {
+                return res.status(400).json({ message: 'Cannot recalculate: Item data is missing or not fully populated.' });
             }
 
             // Recalculate totals
+            const populatedItemsForRecalc = invoice.items.map(i => {
+                // Ensure we have a plain object with all necessary properties for calculation
+                const itemData = i.item.toObject ? i.item.toObject() : i.item;
+                return {
+                    ...itemData,
+                    quantity: i.quantity
+                };
+            });
+
             const { subTotal, taxAmount, totalAmount: newGrandTotal } = calculateTotals(
-                invoice.items,
+                populatedItemsForRecalc,
                 invoice.customer.state
             );
             const newTotalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
