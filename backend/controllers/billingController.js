@@ -13,17 +13,31 @@ const getInvoices = async (req, res) => {
     console.log('Fetching invoices with query:', req.query);
     try {
         const { billingType } = req.query;
-        const query = {};
+        let query = {};
 
         if (billingType && ['B2B', 'B2C'].includes(billingType.toUpperCase())) {
-            query.billingType = billingType.toUpperCase();
-            console.log(`Filtering invoices for billing type: ${query.billingType}`);
+            console.log(`Filtering invoices for billing type: ${billingType.toUpperCase()}`);
+
+            // Find customers with the specified customerType
+            const customers = await Customer.find({ customerType: billingType.toUpperCase() });
+            const customerIds = customers.map(c => c._id);
+
+            // Filter invoices by customer IDs
+            query.customer = { $in: customerIds };
         } else {
-            console.log('No valid billingType filter applied.');
+            console.log('No valid billingType filter applied - returning all invoices.');
         }
 
         const invoices = await Invoice.find(query).populate('customer').sort({ createdAt: -1 });
         console.log(`Found ${invoices.length} invoices.`);
+
+        // Log invoices without customers for debugging
+        const invoicesWithoutCustomers = invoices.filter(inv => !inv.customer);
+        if (invoicesWithoutCustomers.length > 0) {
+            console.log(`⚠ Found ${invoicesWithoutCustomers.length} invoices without customers:`,
+                invoicesWithoutCustomers.map(inv => inv.invoiceNumber));
+        }
+
         res.json(invoices);
     } catch (error) {
         console.error('[ERROR] Failed to get invoices:', error);

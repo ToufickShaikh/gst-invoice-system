@@ -34,6 +34,18 @@
 - **Fix**: Proper URL concatenation without adding extra slash
 - **Result**: ✅ PDF/HTML files now open correctly
 
+#### 6. **Critical Fix: Missing Invoices Due to Wrong Filtering**
+- **Issue**: Backend filtered by non-existent `billingType` field, causing bills to disappear
+- **Location**: `backend/controllers/billingController.js`
+- **Fix**: Filter by customer's `customerType` field instead
+- **Result**: ✅ All invoices now show correctly in B2B/B2C tabs
+
+#### 7. **Enhancement: Missing Customer Data Detection**
+- **Issue**: Some invoices had no customer association, making them invisible
+- **Location**: Frontend and backend invoice handling
+- **Fix**: Added "All Invoices" tab and highlighting for orphaned invoices
+- **Result**: ✅ Users can now see and identify problematic invoices
+
 ---
 
 ## 🧪 Comprehensive System Verification Results:

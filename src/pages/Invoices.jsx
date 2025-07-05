@@ -18,8 +18,9 @@ const Invoices = () => {
     const fetchInvoices = async (billingType) => {
         setLoading(true);
         try {
-            // Defensive: always use array
-            const res = await billingAPI.getInvoices(billingType);
+            // For "ALL" tab, don't pass billingType filter
+            const filterType = billingType === 'ALL' ? null : billingType;
+            const res = await billingAPI.getInvoices(filterType);
             if (Array.isArray(res)) {
                 setInvoices(res);
             } else if (Array.isArray(res?.data)) {
@@ -111,6 +112,7 @@ const Invoices = () => {
                 <div className="flex gap-4 mb-4">
                     <Button variant={tab === 'B2B' ? 'primary' : 'secondary'} onClick={() => setTab('B2B')}>B2B Invoices</Button>
                     <Button variant={tab === 'B2C' ? 'primary' : 'secondary'} onClick={() => setTab('B2C')}>B2C Invoices</Button>
+                    <Button variant={tab === 'ALL' ? 'primary' : 'secondary'} onClick={() => setTab('ALL')}>All Invoices</Button>
                 </div>
                 {loading && <div>Loading...</div>}
                 <div className="overflow-x-auto">
@@ -129,10 +131,19 @@ const Invoices = () => {
                         </thead>
                         <tbody>
                             {invoices.map((inv, idx) => (
-                                <tr key={inv._id}>
+                                <tr key={inv._id} className={!inv.customer ? 'bg-yellow-50' : ''}>
                                     <td className="border px-2 py-1">{idx + 1}</td>
                                     <td className="border px-2 py-1">{inv.invoiceNumber}</td>
-                                    <td className="border px-2 py-1">{inv.customer?.firmName || inv.customer?.name || inv.customer}</td>
+                                    <td className="border px-2 py-1">
+                                        {inv.customer ? (
+                                            <div>
+                                                <div>{inv.customer.firmName || inv.customer.name}</div>
+                                                <small className="text-gray-500">({inv.customer.customerType})</small>
+                                            </div>
+                                        ) : (
+                                            <span className="text-red-500 font-medium">No Customer</span>
+                                        )}
+                                    </td>
                                     <td className="border px-2 py-1">{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : ''}</td>
                                     <td className="border px-2 py-1">{formatCurrency(inv.grandTotal || inv.totalAmount)}</td>
                                     <td className="border px-2 py-1">{formatCurrency(inv.paidAmount)}</td>
