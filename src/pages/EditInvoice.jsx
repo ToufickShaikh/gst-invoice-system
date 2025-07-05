@@ -92,8 +92,9 @@ const EditInvoice = () => {
                 ...fetchedInvoice,
                 // Handle case where customer might be null or missing from the DB
                 customer: fetchedInvoice.customer?._id || '',
-                items: (fetchedInvoice.items || []).map(item => ({
+                items: (fetchedInvoice.items || []).map((item, index) => ({
                     ...item,
+                    id: item.id || Date.now() + index, // Add unique ID if missing
                     itemId: item.item?._id || ''
                 })),
             });
@@ -123,7 +124,16 @@ const EditInvoice = () => {
     };
 
     const handleAddItem = () => {
-        const newItem = { itemId: '', quantity: 1, item: null, price: 0, taxSlab: 0, name: '', hsnCode: '' };
+        const newItem = {
+            id: Date.now() + Math.random(), // Unique identifier
+            itemId: '',
+            quantity: 1,
+            item: null,
+            price: 0,
+            taxSlab: 0,
+            name: '',
+            hsnCode: ''
+        };
         setInvoiceData({ ...invoiceData, items: [...invoiceData.items, newItem] });
     };
 
@@ -202,7 +212,7 @@ const EditInvoice = () => {
                         </div>
                         <div className="space-y-4">
                             {invoiceData.items.map((billItem, index) => (
-                                <div key={index} className="flex gap-4 items-end">
+                                <div key={billItem.id || `item-${index}`} className="flex gap-4 items-end">
                                     <div className="flex-1">
                                         <label>Item</label>
                                         <select

@@ -94,7 +94,13 @@ const Billing = () => {
   }
 
   const handleAddItem = () => {
-    setBillItems([...billItems, { itemId: '', quantity: 1, item: null }])
+    const newItem = {
+      id: Date.now() + Math.random(), // Unique identifier
+      itemId: '',
+      quantity: 1,
+      item: null
+    }
+    setBillItems([...billItems, newItem])
   }
 
   const handleItemChange = (index, field, value) => {
@@ -295,7 +301,7 @@ const Billing = () => {
             ) : (
               <div className="space-y-4">
                 {billItems.map((billItem, index) => (
-                  <div key={index} className="flex gap-4 items-end">
+                  <div key={billItem.id || `item-${index}`} className="flex gap-4 items-end">
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Item
@@ -423,24 +429,6 @@ const Billing = () => {
             >
               {loading ? 'Generating...' : 'Generate Invoice'}
             </Button>
-          </div>
-
-          {/* Billing Branding Footer */}
-          <div className="mt-8 bg-gradient-to-r from-yellow-600 to-yellow-800 text-white p-4 rounded-lg shadow-lg text-center">
-            <p className="text-sm font-medium">
-              Professional Billing by <strong>Shaikh Tools and Dies</strong>
-            </p>
-            <div className="mt-2 text-xs opacity-75">
-              Developed by{' '}
-              <a
-                href="https://instagram.com/digital_hokage"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-yellow-200 hover:text-white underline font-medium"
-              >
-                @Digital_hokage
-              </a>
-            </div>
           </div>
         </div>
       </div>
