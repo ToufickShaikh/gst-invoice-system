@@ -66,7 +66,25 @@ app.use('/invoices', express.static('invoices'));
 
 // Global error handler
 app.use((err, req, res, next) => {
-    console.error('Global error handler:', err);
+    console.error('Global error handler caught:', err);
+
+    // Handle specific MongoDB/Mongoose errors
+    if (err.name === 'MongoError' || err.name === 'MongooseError') {
+        return res.status(503).json({
+            message: 'Database connection error',
+            error: process.env.NODE_ENV === 'development' ? err.message : 'Service temporarily unavailable'
+        });
+    }
+
+    // Handle validation errors
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({
+            message: 'Validation error',
+            error: process.env.NODE_ENV === 'development' ? err.message : 'Invalid data provided'
+        });
+    }
+
+    // Generic error response
     res.status(500).json({
         message: 'Internal server error',
         error: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
