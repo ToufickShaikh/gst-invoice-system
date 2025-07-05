@@ -7,6 +7,7 @@ import Button from '../components/Button'
 import { customersAPI } from '../api/customers'
 import { itemsAPI } from '../api/items'
 import { billingAPI } from '../api/billing'
+import { gstAPI } from '../api/gst'
 import { calculateTax, calculateTotal } from '../utils/taxCalculations'
 import { formatCurrency } from '../utils/dateHelpers'
 
@@ -22,6 +23,8 @@ const Billing = () => {
   const [paidAmount, setPaidAmount] = useState(0)
   const [paymentMethod, setPaymentMethod] = useState('UPI')
   const [loading, setLoading] = useState(false)
+  const [taxType, setTaxType] = useState('CGST_SGST') // 'IGST' or 'CGST_SGST'
+  const [companyStateCode, setCompanyStateCode] = useState('27') // Default Maharashtra
 
   useEffect(() => {
     fetchData()
@@ -46,6 +49,47 @@ const Billing = () => {
       setCustomers([])
       setItems([])
       toast.error('Failed to fetch data')
+    }
+  }
+
+  const detectTaxType = async (customer) => {
+    if (billingType !== 'B2B' || !customer?.state) {
+      setTaxType('CGST_SGST')
+      return
+    }
+
+    try {
+      // Extract state code from customer state (format: "27-Maharashtra")
+      const customerStateCode = customer.state.split('-')[0]
+
+      const taxTypeResult = await gstAPI.getTaxType(companyStateCode, customerStateCode)
+      setTaxType(taxTypeResult.taxType)
+
+      // Show user-friendly message about tax type
+      if (taxTypeResult.taxType === 'IGST') {
+        toast.info('Inter-state transaction: IGST will be applied')
+      } else {
+        toast.info('Intra-state transaction: CGST+SGST will be applied')
+      }
+    } catch (error) {
+      console.error('Failed to detect tax type:', error)
+      // Fallback to manual detection
+      const customerStateCode = customer.state?.split('-')[0]
+      const isInterState = customerStateCode && customerStateCode !== companyStateCode
+      setTaxType(isInterState ? 'IGST' : 'CGST_SGST')
+    }
+  }
+
+  const handleCustomerChange = (customerId) => {
+    setSelectedCustomer(customerId)
+
+    if (customerId && billingType === 'B2B') {
+      const customer = customers.find(c => c._id === customerId)
+      if (customer) {
+        detectTaxType(customer)
+      }
+    } else {
+      setTaxType('CGST_SGST') // Default for B2C
     }
   }
 
@@ -75,8 +119,7 @@ const Billing = () => {
 
   const getBillItemsWithTax = () => {
     const customer = getCustomerDetails()
-    const isInterState = billingType === 'B2B' && customer?.firmAddress &&
-      !customer.firmAddress.toLowerCase().includes('maharashtra')
+    const isInterState = taxType === 'IGST'
 
     // Calculate total before discount for all items
     const totalBeforeDiscount = billItems.reduce((sum, billItem) => {
@@ -212,7 +255,7 @@ const Billing = () => {
             </label>
             <select
               value={selectedCustomer}
-              onChange={(e) => setSelectedCustomer(e.target.value)}
+              onChange={(e) => handleCustomerChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select a customer</option>
@@ -223,6 +266,20 @@ const Billing = () => {
               ))}
             </select>
           </div>
+
+          {/* Tax Type Indicator */}
+          {selectedCustomer && billingType === 'B2B' && (
+            <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm font-medium text-blue-800">
+                  Tax Type: {taxType === 'IGST' ? 'IGST (Inter-state)' : 'CGST + SGST (Intra-state)'}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Items Section */}
           <div className="mb-6">

@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes.js');
 const customerRoutes = require('./routes/customerRoutes.js');
 const itemRoutes = require('./routes/itemRoutes.js');
 const billingRoutes = require('./routes/billingRoutes.js');
+const gstRoutes = require('./routes/gstRoutes.js');
 
 const app = express(); // Create Express app instance
 
@@ -60,6 +61,7 @@ app.use('/api/auth', authRoutes); // Authentication routes
 app.use('/api/customers', customerRoutes); // Customer management routes
 app.use('/api/items', itemRoutes); // Item management routes
 app.use('/api/billing', billingRoutes); // Billing/invoice routes
+app.use('/api/gst', gstRoutes); // GST verification routes
 
 // Serve generated invoices as static files
 app.use('/invoices', express.static('invoices'));
