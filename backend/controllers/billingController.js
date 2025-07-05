@@ -220,6 +220,27 @@ const updateInvoice = async (req, res) => {
     }
 };
 
+// @desc    Delete an invoice by ID
+// @route   DELETE /api/billing/invoices/:id
+// @access  Private
+const deleteInvoice = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const invoice = await Invoice.findById(id);
+
+        if (!invoice) {
+            return res.status(404).json({ message: 'Invoice not found' });
+        }
+
+        await invoice.deleteOne(); // Use the instance method to remove
+
+        res.json({ message: 'Invoice removed successfully' });
+    } catch (error) {
+        console.error('[ERROR] Failed to delete invoice:', error);
+        res.status(500).json({ message: 'Failed to delete invoice', error: error.message });
+    }
+};
+
 // Regenerate PDF for an existing invoice
 const reprintInvoice = async (req, res) => {
     try {
@@ -430,4 +451,5 @@ module.exports = {
     generatePaymentQr,
     getInvoices,
     getInvoiceById,
+    deleteInvoice, // Export the new function
 };
