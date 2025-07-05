@@ -20,12 +20,14 @@ const invoiceSchema = new mongoose.Schema({
     sgst: { type: Number, default: 0 },
     igst: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true },
+    grandTotal: { type: Number }, // Total amount including taxes
+    totalTax: { type: Number, default: 0 }, // Total tax amount
+    balance: { type: Number, default: 0 }, // Remaining balance after payments
     paidAmount: { type: Number, default: 0 },
     invoiceDate: { type: Date, default: Date.now },
     shippingCharges: { type: Number, default: 0 },
     paymentMethod: { type: String },
     pdfPath: { type: String }, // Path to generated PDF
-    // Removed redundant/calculable fields like grandTotal, balance, etc.
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);

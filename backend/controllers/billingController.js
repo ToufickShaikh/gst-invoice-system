@@ -264,7 +264,8 @@ const reprintInvoice = async (req, res) => {
         console.log(`[INFO] Found invoice: ${invoice.invoiceNumber}`);
 
         // If grandTotal is 0 or null, it's likely a legacy invoice. Let's recalculate.
-        if (!invoice.grandTotal || invoice.grandTotal <= 0) {
+        const currentTotal = invoice.grandTotal || invoice.totalAmount || 0;
+        if (!currentTotal || currentTotal <= 0) {
             console.warn(`[WARN] Reprinting legacy invoice ${invoiceId} with invalid grandTotal. Attempting to recalculate.`);
 
             if (!invoice.customer) {

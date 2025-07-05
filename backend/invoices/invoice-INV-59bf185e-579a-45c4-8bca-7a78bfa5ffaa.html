@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Invoice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #fff;
+        }
+
+        .invoice-box {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px 30px;
+            border: 1px solid #eee;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+            background: #fff;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .flex {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .border {
+            border: 1px solid #000;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .table th,
+        .table td {
+            border: 1px solid #000;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+
+        .table th {
+            background: #f5f5f5;
+        }
+
+        .section-title {
+            background: #f5f5f5;
+            font-weight: bold;
+            padding: 4px 8px;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .small {
+            font-size: 12px;
+        }
+
+        .mt-2 {
+            margin-top: 8px;
+        }
+
+        .mt-4 {
+            margin-top: 16px;
+        }
+
+        .logo {
+            height: 60px;
+        }
+
+        .qr {
+            height: 70px;
+        }
+
+        .signature {
+            height: 40px;
+        }
+
+        .w-50 {
+            width: 50%;
+        }
+
+        .w-33 {
+            width: 33%;
+        }
+
+        .w-25 {
+            width: 25%;
+        }
+
+        .w-20 {
+            width: 20%;
+        }
+
+        .w-15 {
+            width: 15%;
+        }
+
+        .w-10 {
+            width: 10%;
+        }
+
+        .w-5 {
+            width: 5%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="invoice-box">
+        <div class="center bold" style="font-size: 20px; margin-bottom: 8px;">Tax Invoice</div>
+        <div class="flex" style="align-items: flex-start;">
+            <div style="width: 60%;">
+                <div class="flex" style="align-items: center;">
+                    <img src="" class="logo" alt="Logo" style="margin-right: 12px;" />
+                    <div>
+                        <div class="bold" style="font-size: 22px;">Shaikh Tools And Dies</div>
+                        <div class="small">NO.11/44 EDAPALLAM STREET PARK TOWN</div>
+                        <div class="small">Phone: <span class="bold">8939487096</span></div>
+                        <div class="small">GSTIN: <span class="bold">33BVRPS2849Q1ZH</span></div>
+                    </div>
+                </div>
+            </div>
+            <div style="width: 40%;">
+                <div class="small">Email: <span class="bold">shaikhtoolsanddies@yahoo.com</span></div>
+                <div class="small">State: <span class="bold">33-Tamil Nadu</span></div>
+            </div>
+        </div>
+
+        <div class="flex mt-4">
+            <div style="width: 60%;">
+                <div class="section-title">Bill To:</div>
+                <div class="small bold">arfa</div>
+                <div class="small"></div>
+                <div class="small">Contact No: <span class="bold">6381818238</span></div>
+                <div class="small">GSTIN: <span class="bold"></span></div>
+                <div class="small">State: <span class="bold">33-Tamil Nadu</span></div>
+            </div>
+            <div style="width: 40%;">
+                <div class="section-title">Invoice Details:</div>
+                <div class="small">No: <span class="bold">INV-59bf185e-579a-45c4-8bca-7a78bfa5ffaa</span></div>
+                <div class="small">Date: <span class="bold">02/07/2025</span></div>
+                <div class="small">Place Of Supply: <span class="bold">33-Tamil Nadu</span></div>
+            </div>
+        </div>
+
+        <table class="table mt-4">
+            <tr>
+                <th class="w-5">#</th>
+                <th class="w-25">Item name</th>
+                <th class="w-15">HSN/ SAC</th>
+                <th class="w-10">Quantity</th>
+                <th class="w-15">Price/ Unit(₹)</th>
+                <th class="w-15">GST(%)</th>
+                <th class="w-15">Amount(₹)</th>
+            </tr>
+            
+                <tr>
+                    <td class="center">1</td>
+                    <td>Test 1</td>
+                    <td class="center">54256</td>
+                    <td class="center">1</td>
+                    <td class="right">₹ 0.00</td>
+                    <td class="right">₹ 0.00 (12%)</td>
+                    <td class="right">₹ 0.00</td>
+                </tr>
+                <tr>
+                    <td class="center">2</td>
+                    <td>item 2</td>
+                    <td class="center">25467</td>
+                    <td class="center">1</td>
+                    <td class="right">₹ 0.00</td>
+                    <td class="right">₹ 0.00 (5%)</td>
+                    <td class="right">₹ 0.00</td>
+                </tr>
+            <tr>
+                <td colspan="3" class="right bold">Total</td>
+                <td class="center bold">2</td>
+                <td></td>
+                <td class="right bold">₹ 0.00</td>
+                <td class="right bold">₹ 4095.00</td>
+            </tr>
+        </table>
+
+        <div class="flex mt-2">
+            <div style="width: 60%;">
+                <div class="section-title">Tax Summary:</div>
+                <table class="table small">
+                    <tr>
+                        <th>HSN/ SAC</th>
+                        <th>Taxable amount (₹)</th>
+                        <th>CGST<br>Rate (%)</th>
+                        <th>CGST<br>Amt (₹)</th>
+                        <th>SGST<br>Rate (%)</th>
+                        <th>SGST<br>Amt (₹)</th>
+                        <th>Total Tax (₹)</th>
+                    </tr>
+                    
+            <tr>
+                <td>25467</td>
+                <td class="right">0.00</td>
+                <td class="center">2.5</td>
+                <td class="right">0.00</td>
+                <td class="center">2.5</td>
+                <td class="right">0.00</td>
+                <td class="right">0.00</td>
+            </tr>
+            <tr>
+                <td>54256</td>
+                <td class="right">0.00</td>
+                <td class="center">6</td>
+                <td class="right">0.00</td>
+                <td class="center">6</td>
+                <td class="right">0.00</td>
+                <td class="right">0.00</td>
+            </tr>
+                    <tr>
+                        <td class="bold">TOTAL</td>
+                        <td class="right bold">0.00</td>
+                        <td></td>
+                        <td class="right bold">0.00</td>
+                        <td></td>
+                        <td class="right bold">0.00</td>
+                        <td class="right bold">0.00</td>
+                    </tr>
+                </table>
+            </div>
+            <div style="width: 38%;">
+                <table class="table small">
+                    <tr>
+                        <td>Sub Total</td>
+                        <td class="right">: ₹ 3800.00</td>
+                    </tr>
+                    <tr>
+                        <td>Total</td>
+                        <td class="right">: ₹ 4095.00</td>
+                    </tr>
+                    <tr>
+                        <td class="bold">Invoice Amount in Words:</td>
+                        <td class="right">Four Thousand Ninety Five Rupees Only</td>
+                    </tr>
+                    <tr>
+                        <td>Received</td>
+                        <td class="right">: ₹ 4000.00</td>
+                    </tr>
+                    <tr>
+                        <td>Balance</td>
+                        <td class="right">: ₹ 95.00</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-2 section-title">Terms & Conditions:</div>
+        <div class="small">Thanks for doing business with us!</div>
+
+        <div class="flex mt-2">
+            <div style="width: 60%;">
+                <div class="section-title">Bank Details:</div>
+                <div class="small">Name : <span class="bold">INDIAN OVERSEAS BANK, B RDWAY</span></div>
+                <div class="small">Account No. : <span class="bold">130702000003546</span></div>
+                <div class="small">IFSC code : <span class="bold">IOBA0001307</span></div>
+                <div class="small">Account holder's name : <span class="bold">Shaikh Tools And Dies</span></div>
+                <img src="" class="qr" alt="UPI QR" />
+            </div>
+            <div style="width: 38%; text-align: right;">
+                <div class="section-title">For Shaikh Tools And Dies:</div>
+                <img src="" class="signature" alt="Signature" />
+                <div class="small">Authorized Signatory</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

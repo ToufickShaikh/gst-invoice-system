@@ -216,7 +216,7 @@ function convertToWords(num) {
 
     if (num === 0) return 'Zero Rupees Only';
 
-    const amount = Math.floor(num);
+    let amount = Math.floor(num);
     let words = '';
 
     function convertHundreds(n) {
