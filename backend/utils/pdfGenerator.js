@@ -171,6 +171,9 @@ async function generateInvoicePDF(invoiceData) {
         await fs.writeFile(htmlPath, html, 'utf-8');
         console.log(`[PDF] Invoice saved as HTML: ${htmlPath}`);
 
+        // Schedule HTML file deletion after 30 seconds
+        scheduleHtmlCleanup(htmlPath, invoiceData.invoiceNumber);
+
         // Try PDF generation with Puppeteer (with fallback)
         try {
             // Require puppeteer only when needed
@@ -273,6 +276,23 @@ function convertToWords(num) {
     }
 
     return words.trim() + ' Rupees Only';
+}
+
+// Helper function to schedule HTML file cleanup after 30 seconds
+function scheduleHtmlCleanup(htmlPath, invoiceNumber) {
+    setTimeout(async () => {
+        try {
+            await fs.unlink(htmlPath);
+            console.log(`[CLEANUP] Successfully deleted HTML file for invoice ${invoiceNumber} after 30 seconds`);
+        } catch (error) {
+            // File might already be deleted or not exist - this is not critical
+            if (error.code !== 'ENOENT') {
+                console.warn(`[CLEANUP] Failed to delete HTML file for invoice ${invoiceNumber}:`, error.message);
+            }
+        }
+    }, 30000); // 30 seconds = 30,000 milliseconds
+
+    console.log(`[CLEANUP] Scheduled HTML cleanup for invoice ${invoiceNumber} in 30 seconds`);
 }
 
 module.exports = { generateInvoicePDF };
