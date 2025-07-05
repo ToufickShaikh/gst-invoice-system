@@ -1,10 +1,38 @@
 const Invoice = require('../models/Invoice');
 const Item = require('../models/Item');
-const Customer = require('../models/Customer'); // Import Customer model
+const Customer = require('../models/Customer');
 const pdfGenerator = require('../utils/pdfGenerator');
 const { calculateTotals } = require('../utils/taxHelpers');
 const { v4: uuidv4 } = require('uuid');
 const { generateUpiQr } = require('../utils/upiHelper'); // Import UPI QR generator
+
+// Helper function to generate sequential invoice numbers
+async function generateInvoiceNumber(customerType) {
+    try {
+        // Get the highest invoice number for this customer type
+        const lastInvoice = await Invoice.findOne({
+            invoiceNumber: { $regex: `^${customerType}-` }
+        }).sort({ invoiceNumber: -1 });
+
+        let nextNumber = 1;
+
+        if (lastInvoice) {
+            // Extract the number part from the invoice number (e.g., "B2B-05" -> 5)
+            const match = lastInvoice.invoiceNumber.match(new RegExp(`^${customerType}-(\\d+)$`));
+            if (match) {
+                nextNumber = parseInt(match[1]) + 1;
+            }
+        }
+
+        // Format with leading zeros (e.g., 01, 02, 03...)
+        const formattedNumber = nextNumber.toString().padStart(2, '0');
+        return `${customerType}-${formattedNumber}`;
+    } catch (error) {
+        console.error('[ERROR] Failed to generate invoice number:', error);
+        // Fallback to UUID-based number if sequential generation fails
+        return `${customerType}-${uuidv4().slice(0, 8)}`;
+    }
+}
 
 // @desc    Get all invoices, optionally filtered by billingType
 // @route   GET /api/billing/invoices
@@ -80,7 +108,7 @@ const createInvoice = async (req, res) => {
             billingType = ''
         } = req.body;
 
-        console.log('[1/4] Received data for new invoice:', JSON.stringify(req.body, null, 2));
+        console.log('[1/5] Received data for new invoice:', JSON.stringify(req.body, null, 2));
 
         // Ensure customer data is populated for tax calculation
         const customerDetails = await Customer.findById(customer);
@@ -90,13 +118,17 @@ const createInvoice = async (req, res) => {
         }
 
         // Recalculate totals on the backend to ensure data integrity
-        console.log('[2/4] Calculating totals based on items...');
+        console.log('[2/5] Calculating totals based on items...');
         const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(items, customerDetails.state);
         const balance = grandTotal - paidAmount;
         const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
-        console.log('[2/4] Totals calculated:', { subTotal, taxAmount, totalTax, grandTotal, balance });
+        console.log('[2/5] Totals calculated:', { subTotal, taxAmount, totalTax, grandTotal, balance });
 
-        const invoiceNumber = `INV-${uuidv4()}`;
+        // Generate sequential invoice number based on customer type
+        console.log('[3/5] Generating invoice number...');
+        const customerType = customerDetails.customerType;
+        const invoiceNumber = await generateInvoiceNumber(customerType);
+        console.log(`[3/5] Generated invoice number: ${invoiceNumber}`);
 
         const invoice = new Invoice({
             invoiceNumber,
@@ -117,9 +149,9 @@ const createInvoice = async (req, res) => {
             totalAmount: grandTotal, // For reporting consistency
         });
 
-        console.log('[3/4] Saving new invoice to database...');
+        console.log('[4/5] Saving new invoice to database...');
         await invoice.save();
-        console.log('[3/4] Invoice saved successfully.');
+        console.log('[4/5] Invoice saved successfully.');
 
         // Optionally, generate PDF and return its path
         let pdfPath = null;

@@ -1,6 +1,7 @@
 // Only require puppeteer when needed to avoid startup issues
 const fs = require('fs/promises');
 const path = require('path');
+const { generateUpiQr } = require('./upiHelper');
 
 async function generateInvoicePDF(invoiceData) {
     console.log(`[PDF] Starting PDF generation for invoice: ${invoiceData.invoiceNumber}`);
@@ -18,7 +19,7 @@ async function generateInvoicePDF(invoiceData) {
         html = html.replace(/{{companyEmail}}/g, 'shaikhtoolsanddies@yahoo.com');
         html = html.replace(/{{companyGSTIN}}/g, '33BVRPS2849Q1ZH');
         html = html.replace(/{{companyState}}/g, '33-Tamil Nadu');
-        html = html.replace(/{{companyLogo}}/g, ''); // Add logo path if available
+        html = html.replace(/{{companyLogo}}/g, 'https://shaikhtoolsanddies.com/filesforgst/logo.png');
 
         // Customer details
         const customer = invoiceData.customer;
@@ -134,13 +135,30 @@ async function generateInvoicePDF(invoiceData) {
         html = html.replace(/{{receivedAmount}}/g, (invoiceData.paidAmount || 0).toFixed(2));
         html = html.replace(/{{balanceAmount}}/g, (invoiceData.balance || (invoiceData.totalAmount || invoiceData.grandTotal || 0) - (invoiceData.paidAmount || 0)).toFixed(2));
 
+        // Calculate balance amount for QR generation
+        const balanceAmount = invoiceData.balance || (invoiceData.totalAmount || invoiceData.grandTotal || 0) - (invoiceData.paidAmount || 0);
+
+        // Generate UPI QR code for balance amount if there's a balance
+        let upiQrDataUrl = '';
+        if (balanceAmount > 0) {
+            try {
+                const upiId = process.env.UPI_ID || 'shaikhtool@ibl';
+                console.log(`[PDF] Generating UPI QR code for balance amount: ₹${balanceAmount.toFixed(2)}`);
+                const { qrCodeImage } = await generateUpiQr(upiId, balanceAmount.toFixed(2));
+                upiQrDataUrl = qrCodeImage;
+                console.log(`[PDF] UPI QR code generated successfully`);
+            } catch (error) {
+                console.error(`[PDF] Failed to generate UPI QR code:`, error);
+            }
+        }
+
         // Bank details
         html = html.replace(/{{bankName}}/g, 'INDIAN OVERSEAS BANK, B RDWAY');
         html = html.replace(/{{bankAccount}}/g, '130702000003546');
         html = html.replace(/{{bankIFSC}}/g, 'IOBA0001307');
         html = html.replace(/{{bankHolder}}/g, 'Shaikh Tools And Dies');
-        html = html.replace(/{{upiQrImage}}/g, ''); // Add QR image path if available
-        html = html.replace(/{{signatureImage}}/g, ''); // Add signature image path if available
+        html = html.replace(/{{upiQrImage}}/g, upiQrDataUrl);
+        html = html.replace(/{{signatureImage}}/g, 'https://shaikhtoolsanddies.com/filesforgst/Sign.png');
 
         console.log(`[PDF] All placeholders replaced, attempting PDF generation...`);
 
