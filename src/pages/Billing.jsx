@@ -67,9 +67,15 @@ const Billing = () => {
 
       // Show user-friendly message about tax type
       if (taxTypeResult.taxType === 'IGST') {
-        toast.info('Inter-state transaction: IGST will be applied')
+        toast('Inter-state transaction: IGST will be applied', {
+          icon: 'ℹ️',
+          duration: 3000
+        })
       } else {
-        toast.info('Intra-state transaction: CGST+SGST will be applied')
+        toast('Intra-state transaction: CGST+SGST will be applied', {
+          icon: 'ℹ️',
+          duration: 3000
+        })
       }
     } catch (error) {
       console.error('Failed to detect tax type:', error)
