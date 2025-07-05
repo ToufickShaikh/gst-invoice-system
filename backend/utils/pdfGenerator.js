@@ -27,13 +27,16 @@ async function generateInvoicePDF(invoiceData) {
         html = html.replace(/{{customerName}}/g, customer?.firmName || customer?.name || '');
         html = html.replace(/{{customerAddress}}/g, customer?.firmAddress || '');
         html = html.replace(/{{customerPhone}}/g, customer?.contact || '');
+        html = html.replace(/{{customerEmail}}/g, customer?.email || '');
         html = html.replace(/{{customerGSTIN}}/g, customer?.gstNo || '');
         html = html.replace(/{{customerState}}/g, customer?.state || '33-Tamil Nadu');
 
         // Invoice details
         html = html.replace(/{{invoiceNumber}}/g, invoiceData.invoiceNumber || '');
         html = html.replace(/{{invoiceDate}}/g, new Date(invoiceData.invoiceDate || Date.now()).toLocaleDateString('en-GB'));
+        html = html.replace(/{{dueDate}}/g, new Date(invoiceData.dueDate || Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB'));
         html = html.replace(/{{placeOfSupply}}/g, customer?.state || '33-Tamil Nadu');
+        html = html.replace(/{{paymentStatus}}/g, invoiceData.paymentStatus || 'Pending');
 
         console.log(`[PDF] Basic placeholders replaced`);
 
@@ -105,14 +108,14 @@ async function generateInvoicePDF(invoiceData) {
 
                 itemsHtml += `
                 <tr>
-                    <td class="center">${index + 1}</td>
-                    <td>${itemName}</td>
-                    <td class="center">${hsnCode}</td>
-                    <td class="center">${quantity}</td>
-                    <td class="center">${units}</td>
-                    <td class="right">₹ ${rate.toFixed(2)}</td>
-                    <td class="right">₹ ${gstAmount.toFixed(2)} (${taxSlab}%)</td>
-                    <td class="right">₹ ${totalWithGst.toFixed(2)}</td>
+                    <td class="text-center">${index + 1}</td>
+                    <td class="text-left">${itemName}</td>
+                    <td class="text-center">${hsnCode}</td>
+                    <td class="text-center">${quantity}</td>
+                    <td class="text-center">${units}</td>
+                    <td class="text-right">₹${rate.toFixed(2)}</td>
+                    <td class="text-center">${taxSlab}%</td>
+                    <td class="text-right">₹${totalWithGst.toFixed(2)}</td>
                 </tr>`;
             });
         }
@@ -147,15 +150,15 @@ async function generateInvoicePDF(invoiceData) {
                 taxSummaryTotals.igstAmount += tax.igstAmount;
                 taxSummaryHtml += `
                 <tr>
-                    <td>${tax.hsnCode}</td>
-                    <td class="right">${tax.taxableAmount.toFixed(2)}</td>
-                    <td class="center">${tax.igstRate}%</td>
-                    <td class="right">${tax.igstAmount.toFixed(2)}</td>
-                    <td class="center">-</td>
-                    <td class="right">-</td>
-                    <td class="center">-</td>
-                    <td class="right">-</td>
-                    <td class="right">${tax.totalTax.toFixed(2)}</td>
+                    <td class="text-left">${tax.hsnCode}</td>
+                    <td class="text-right">₹${tax.taxableAmount.toFixed(2)}</td>
+                    <td class="text-center">${tax.igstRate}%</td>
+                    <td class="text-right">₹${tax.igstAmount.toFixed(2)}</td>
+                    <td class="text-center">-</td>
+                    <td class="text-right">-</td>
+                    <td class="text-center">-</td>
+                    <td class="text-right">-</td>
+                    <td class="text-right">₹${tax.totalTax.toFixed(2)}</td>
                 </tr>`;
             } else {
                 // Intra-state transaction: Show CGST + SGST
@@ -163,15 +166,15 @@ async function generateInvoicePDF(invoiceData) {
                 taxSummaryTotals.sgstAmount += tax.sgstAmount;
                 taxSummaryHtml += `
                 <tr>
-                    <td>${tax.hsnCode}</td>
-                    <td class="right">${tax.taxableAmount.toFixed(2)}</td>
-                    <td class="center">-</td>
-                    <td class="right">-</td>
-                    <td class="center">${tax.cgstRate}%</td>
-                    <td class="right">${tax.cgstAmount.toFixed(2)}</td>
-                    <td class="center">${tax.sgstRate}%</td>
-                    <td class="right">${tax.sgstAmount.toFixed(2)}</td>
-                    <td class="right">${tax.totalTax.toFixed(2)}</td>
+                    <td class="text-left">${tax.hsnCode}</td>
+                    <td class="text-right">₹${tax.taxableAmount.toFixed(2)}</td>
+                    <td class="text-center">-</td>
+                    <td class="text-right">-</td>
+                    <td class="text-center">${tax.cgstRate}%</td>
+                    <td class="text-right">₹${tax.cgstAmount.toFixed(2)}</td>
+                    <td class="text-center">${tax.sgstRate}%</td>
+                    <td class="text-right">₹${tax.sgstAmount.toFixed(2)}</td>
+                    <td class="text-right">₹${tax.totalTax.toFixed(2)}</td>
                 </tr>`;
             }
         });

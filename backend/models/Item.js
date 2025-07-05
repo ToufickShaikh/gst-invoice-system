@@ -5,12 +5,12 @@ const itemSchema = new mongoose.Schema({
     hsnCode: { type: String, required: true },
     rate: { type: Number, required: true }, // Changed from price to rate for consistency
     taxSlab: { type: Number, required: true },
-    units: { 
-        type: String, 
+    units: {
+        type: String,
         required: true,
         enum: [
             'per piece',
-            'per ft', 
+            'per ft',
             'per roll',
             'per sqft',
             'per box',

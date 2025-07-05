@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Invoice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #000;
+            background: #fff;
+        }
+
+        .invoice-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+        }
+
+        /* Header Section */
+        .header {
+            border: 2px solid #000;
+            margin-bottom: 15px;
+        }
+
+        .header-top {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #000;
+            text-align: center;
+        }
+
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .company-tagline {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+            margin-bottom: 8px;
+        }
+
+        .company-details {
+            font-size: 11px;
+            color: #333;
+            line-height: 1.3;
+        }
+
+        .invoice-title {
+            background: #000;
+            color: #fff;
+            text-align: center;
+            padding: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        /* Party Details Section */
+        .party-section {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+            gap: 15px;
+        }
+
+        .party-box {
+            border: 1px solid #000;
+            width: 48%;
+        }
+
+        .party-header {
+            background: #f0f0f0;
+            padding: 8px 12px;
+            font-weight: bold;
+            font-size: 13px;
+            border-bottom: 1px solid #000;
+        }
+
+        .party-content {
+            padding: 12px;
+            min-height: 120px;
+        }
+
+        .field-row {
+            margin-bottom: 6px;
+            display: flex;
+        }
+
+        .field-label {
+            font-weight: bold;
+            width: 80px;
+            flex-shrink: 0;
+        }
+
+        .field-value {
+            flex: 1;
+        }
+
+        /* Invoice Meta Information */
+        .invoice-meta {
+            border: 1px solid #000;
+            margin-bottom: 15px;
+        }
+
+        .meta-row {
+            display: flex;
+            border-bottom: 1px solid #000;
+        }
+
+        .meta-row:last-child {
+            border-bottom: none;
+        }
+
+        .meta-cell {
+            padding: 8px 12px;
+            border-right: 1px solid #000;
+            flex: 1;
+            font-weight: bold;
+        }
+
+        .meta-cell:last-child {
+            border-right: none;
+        }
+
+        .meta-label {
+            font-weight: normal;
+            color: #666;
+            font-size: 11px;
+        }
+
+        /* Items Table */
+        .items-section {
+            margin-bottom: 15px;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+        }
+
+        .items-table th {
+            background: #f0f0f0;
+            padding: 10px 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 11px;
+            border: 1px solid #000;
+            vertical-align: middle;
+        }
+
+        .items-table td {
+            padding: 8px;
+            border: 1px solid #000;
+            font-size: 11px;
+            vertical-align: middle;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .left {
+            text-align: left;
+        }
+
+        .total-row {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+
+        /* Tax Summary */
+        .tax-summary-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            gap: 15px;
+        }
+
+        .tax-summary {
+            border: 1px solid #000;
+            width: 60%;
+        }
+
+        .amount-summary {
+            border: 1px solid #000;
+            width: 38%;
+        }
+
+        .section-header {
+            background: #f0f0f0;
+            padding: 8px 12px;
+            font-weight: bold;
+            border-bottom: 1px solid #000;
+            font-size: 12px;
+        }
+
+        .tax-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .tax-table th,
+        .tax-table td {
+            padding: 6px 8px;
+            border: 1px solid #000;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        .tax-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .tax-total-row {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+
+        /* Amount Details */
+        .amount-content {
+            padding: 10px 12px;
+        }
+
+        .amount-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            padding: 2px 0;
+        }
+
+        .amount-row.total {
+            border-top: 1px solid #000;
+            margin-top: 8px;
+            padding-top: 6px;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        /* Amount in Words */
+        .amount-words {
+            border: 1px solid #000;
+            padding: 12px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+        }
+
+        .amount-words-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .amount-words-text {
+            text-transform: capitalize;
+            font-size: 13px;
+        }
+
+        /* Footer Section */
+        .footer-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            gap: 15px;
+        }
+
+        .footer-box {
+            border: 1px solid #000;
+            width: 48%;
+            padding: 12px;
+        }
+
+        .footer-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+            font-size: 12px;
+        }
+
+        .bank-details {
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .bank-row {
+            margin-bottom: 4px;
+        }
+
+        /* Signature Section */
+        .signature-section {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .signature-boxes {
+            display: flex;
+            justify-content: space-between;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .signature-box {
+            text-align: center;
+            width: 200px;
+        }
+
+        .signature-line {
+            border-bottom: 1px solid #000;
+            margin: 40px auto 8px;
+            width: 150px;
+        }
+
+        .signature-label {
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        /* QR Code Section */
+        .qr-section {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px dashed #ccc;
+        }
+
+        .qr-label {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        /* Terms and Conditions */
+        .terms-section {
+            border: 1px solid #000;
+            margin-top: 20px;
+            padding: 12px;
+            font-size: 10px;
+        }
+
+        .terms-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-decoration: underline;
+        }
+
+        .terms-list {
+            list-style: decimal;
+            margin-left: 20px;
+            line-height: 1.5;
+        }
+
+        .terms-list li {
+            margin-bottom: 4px;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: #fff;
+                padding: 0;
+            }
+
+            .invoice-container {
+                margin: 0;
+                padding: 10px;
+                box-shadow: none;
+            }
+        }
+
+        /* Utility Classes */
+        .bold {
+            font-weight: bold;
+        }
+
+        .underline {
+            text-decoration: underline;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 1px 3px;
+        }
+
+        .text-small {
+            font-size: 10px;
+        }
+
+        .text-large {
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="invoice-container">
+        <!-- Header Section -->
+        <div class="header">
+            <div class="header-top">
+                <div class="company-name">{{companyName}}</div>
+                <div class="company-tagline">Tools & Dies Manufacturing</div>
+                <div class="company-details">
+                    {{companyAddress}}<br>
+                    Phone: {{companyPhone}} | Email: {{companyEmail}}<br>
+                    GSTIN: {{companyGSTIN}} | State: {{companyState}}
+                </div>
+            </div>
+            <div class="invoice-title">TAX INVOICE</div>
+        </div>
+
+        <!-- Party Details -->
+        <div class="party-section">
+            <div class="party-box">
+                <div class="party-header">BILL TO</div>
+                <div class="party-content">
+                    <div class="field-row">
+                        <div class="field-label">Name:</div>
+                        <div class="field-value">{{customerName}}</div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field-label">Address:</div>
+                        <div class="field-value">{{customerAddress}}</div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field-label">Phone:</div>
+                        <div class="field-value">{{customerPhone}}</div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field-label">GSTIN:</div>
+                        <div class="field-value">{{customerGSTIN}}</div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field-label">State:</div>
+                        <div class="field-value">{{customerState}}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="party-box">
+                <div class="party-header">SHIP TO</div>
+                <div class="party-content">
+                    <div class="field-row">
+                        <div class="field-label">Name:</div>
+                        <div class="field-value">{{customerName}}</div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field-label">Address:</div>
+                        <div class="field-value">{{customerAddress}}</div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field-label">Phone:</div>
+                        <div class="field-value">{{customerPhone}}</div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field-label">State:</div>
+                        <div class="field-value">{{customerState}}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Meta Information -->
+        <div class="invoice-meta">
+            <div class="meta-row">
+                <div class="meta-cell">
+                    <div class="meta-label">Invoice Number</div>
+                    {{invoiceNumber}}
+                </div>
+                <div class="meta-cell">
+                    <div class="meta-label">Invoice Date</div>
+                    {{invoiceDate}}
+                </div>
+                <div class="meta-cell">
+                    <div class="meta-label">Place of Supply</div>
+                    {{placeOfSupply}}
+                </div>
+            </div>
+            <div class="meta-row">
+                <div class="meta-cell">
+                    <div class="meta-label">Payment Terms</div>
+                    Immediate
+                </div>
+                <div class="meta-cell">
+                    <div class="meta-label">Due Date</div>
+                    {{invoiceDate}}
+                </div>
+                <div class="meta-cell">
+                    <div class="meta-label">Reference</div>
+                    {{invoiceNumber}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="items-section">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 5%;">S.No</th>
+                        <th style="width: 25%;">Item Description</th>
+                        <th style="width: 12%;">HSN/SAC</th>
+                        <th style="width: 8%;">Qty</th>
+                        <th style="width: 10%;">Unit</th>
+                        <th style="width: 12%;">Rate</th>
+                        <th style="width: 10%;">Amount</th>
+                        <th style="width: 8%;">Tax%</th>
+                        <th style="width: 10%;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{itemsTable}}
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="3" class="right bold">TOTAL</td>
+                        <td class="center bold">{{totalQuantity}}</td>
+                        <td></td>
+                        <td></td>
+                        <td class="right bold">{{subTotal}}</td>
+                        <td class="right bold">{{totalGST}}</td>
+                        <td class="right bold">{{totalAmount}}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Tax Summary and Amount Details -->
+        <div class="tax-summary-section">
+            <div class="tax-summary">
+                <div class="section-header">TAX SUMMARY</div>
+                <table class="tax-table">
+                    <thead>
+                        <tr>
+                            <th>HSN/SAC</th>
+                            <th>Taxable</th>
+                            <th>IGST%</th>
+                            <th>IGST Amt</th>
+                            <th>CGST%</th>
+                            <th>CGST Amt</th>
+                            <th>SGST%</th>
+                            <th>SGST Amt</th>
+                            <th>Total Tax</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{taxSummaryTable}}
+                    </tbody>
+                    <tfoot>
+                        <tr class="tax-total-row">
+                            <td class="bold">TOTAL</td>
+                            <td class="right bold">{{taxSummaryTotal.taxableAmount}}</td>
+                            <td></td>
+                            <td class="right bold">{{taxSummaryTotal.igstAmount}}</td>
+                            <td></td>
+                            <td class="right bold">{{taxSummaryTotal.cgstAmount}}</td>
+                            <td></td>
+                            <td class="right bold">{{taxSummaryTotal.sgstAmount}}</td>
+                            <td class="right bold">{{taxSummaryTotal.totalTax}}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="amount-summary">
+                <div class="section-header">AMOUNT DETAILS</div>
+                <div class="amount-content">
+                    <div class="amount-row">
+                        <span>Sub Total:</span>
+                        <span>Rs. {{subTotal}}</span>
+                    </div>
+                    <div class="amount-row">
+                        <span>Total Tax:</span>
+                        <span>Rs. {{totalGST}}</span>
+                    </div>
+                    <div class="amount-row">
+                        <span>Discount:</span>
+                        <span>Rs. 0.00</span>
+                    </div>
+                    <div class="amount-row">
+                        <span>Shipping:</span>
+                        <span>Rs. 0.00</span>
+                    </div>
+                    <div class="amount-row total">
+                        <span>Grand Total:</span>
+                        <span>Rs. {{totalAmount}}</span>
+                    </div>
+                    <div class="amount-row">
+                        <span>Received:</span>
+                        <span>Rs. {{receivedAmount}}</span>
+                    </div>
+                    <div class="amount-row">
+                        <span>Balance:</span>
+                        <span>Rs. {{balanceAmount}}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Amount in Words -->
+        <div class="amount-words">
+            <div class="amount-words-label">Amount in Words:</div>
+            <div class="amount-words-text">{{amountInWords}} Only</div>
+        </div>
+
+        <!-- Footer Section -->
+        <div class="footer-section">
+            <div class="footer-box">
+                <div class="footer-header">BANK DETAILS</div>
+                <div class="bank-details">
+                    <div class="bank-row"><strong>Bank Name:</strong> {{bankName}}</div>
+                    <div class="bank-row"><strong>Account No:</strong> {{bankAccount}}</div>
+                    <div class="bank-row"><strong>IFSC Code:</strong> {{bankIFSC}}</div>
+                    <div class="bank-row"><strong>Account Holder:</strong> {{bankHolder}}</div>
+                </div>
+            </div>
+
+            <div class="footer-box">
+                <div class="footer-header">PAYMENT QR CODE</div>
+                <div class="qr-section">
+                    <div class="qr-label">Scan to Pay</div>
+                    <img src="{{upiQrImage}}" alt="UPI QR Code" style="max-width: 120px; height: auto;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Signature Section -->
+        <div class="signature-section">
+            <div class="signature-boxes">
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Customer Signature</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Authorized Signatory</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terms and Conditions -->
+        <div class="terms-section">
+            <div class="terms-header">TERMS AND CONDITIONS</div>
+            <ol class="terms-list">
+                <li>Goods once sold will not be taken back or exchanged.</li>
+                <li>All disputes are subject to Chennai jurisdiction only.</li>
+                <li>Payment should be made within the due date mentioned above.</li>
+                <li>Interest @ 24% per annum will be charged on delayed payments.</li>
+                <li>All goods remain the property of the seller until fully paid for.</li>
+            </ol>
+        </div>
+
+        <!-- Company Signature -->
+        <div style="text-align: right; margin-top: 30px; padding-right: 50px;">
+            <img src="{{signatureImage}}" alt="Signature" style="max-width: 150px; height: auto;">
+            <div style="margin-top: 10px; font-weight: bold;">For {{companyName}}</div>
+        </div>
+    </div>
+</body>
+
+</html>
