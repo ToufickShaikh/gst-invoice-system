@@ -230,7 +230,7 @@ const reprintInvoice = async (req, res) => {
             return res.status(404).json({ message: 'Invoice not found' });
         }
 
-        const pdfPath = await generatePdf(invoice);
+        const pdfPath = await pdfGenerator.generateInvoicePDF(invoice); // FIX: Was generatePdf
         res.json({ pdfPath, message: 'Invoice reprinted successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message || 'Server error' });
@@ -295,21 +295,64 @@ const generatePaymentQr = async (req, res) => {
     console.log(`--- Generating Payment QR for Invoice ID: ${req.params.id} --`);
     try {
         const invoiceId = req.params.id;
-        const invoice = await Invoice.findById(invoiceId);
+        // Populate all related data in case a recalculation is needed
+        const invoice = await Invoice.findById(invoiceId)
+            .populate('customer')
+            .populate('items.item');
 
         if (!invoice) {
             console.error(`[ERROR] Invoice not found for ID: ${invoiceId}`);
             return res.status(404).json({ message: 'Invoice not found' });
         }
 
-        const grandTotal = invoice.grandTotal || 0;
-        const paidAmount = invoice.paidAmount || 0;
-        const balance = grandTotal - paidAmount;
+        let grandTotal = invoice.grandTotal || 0;
+        let paidAmount = invoice.paidAmount || 0;
+        let balance = grandTotal - paidAmount;
 
-        console.log(`[INFO] Invoice Found. Details: Grand Total=${grandTotal}, Paid Amount=${paidAmount}, Calculated Balance=${balance}`);
+        console.log(`[INFO] Initial Details: Grand Total=${grandTotal}, Paid Amount=${paidAmount}, Balance=${balance}`);
+
+        // If grandTotal is 0, it's likely a legacy invoice. Let's recalculate.
+        if (grandTotal <= 0) {
+            console.warn(`[WARN] grandTotal is ${grandTotal}. Attempting to recalculate for legacy invoice.`);
+
+            if (!invoice.customer) {
+                return res.status(400).json({ message: 'Cannot recalculate: Customer data is missing.' });
+            }
+            if (!invoice.items || invoice.items.length === 0) {
+                return res.status(400).json({ message: 'Cannot recalculate: Item data is missing.' });
+            }
+
+            // Recalculate totals
+            const { subTotal, taxAmount, totalAmount: newGrandTotal } = calculateTotals(
+                invoice.items,
+                invoice.customer.state
+            );
+            const newTotalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
+            const newBalance = newGrandTotal - paidAmount;
+
+            console.log('[INFO] Recalculated Totals:', { newGrandTotal, newBalance });
+
+            // Update the invoice in the DB to fix legacy data
+            invoice.subTotal = subTotal;
+            invoice.cgst = taxAmount.cgst;
+            invoice.sgst = taxAmount.sgst;
+            invoice.igst = taxAmount.igst;
+            invoice.totalTax = newTotalTax;
+            invoice.grandTotal = newGrandTotal;
+            invoice.balance = newBalance;
+            invoice.totalAmount = newGrandTotal;
+
+            await invoice.save();
+            console.log(`[SUCCESS] Legacy invoice ${invoiceId} has been updated with correct totals.`);
+
+            // Use the new values for QR generation
+            grandTotal = newGrandTotal;
+            balance = newBalance;
+        }
+
 
         if (balance <= 0) {
-            console.warn(`[WARN] Request denied: Invoice is already fully paid or has zero balance.`);
+            console.warn(`[WARN] Request denied: Invoice is already fully paid or has zero balance. Balance: ${balance}`);
             return res.status(400).json({ message: 'Invoice is already fully paid' });
         }
 

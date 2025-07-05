@@ -57,4 +57,9 @@ export const billingAPI = {
     const res = await api.get(`/billing/invoices/${id}/payment-qr`);
     return res.data;
   },
+  // Delete an invoice by ID
+  deleteInvoice: async (id) => {
+    const res = await api.delete(`/billing/invoices/${id}`);
+    return res.data;
+  },
 };

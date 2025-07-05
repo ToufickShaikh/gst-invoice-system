@@ -42,8 +42,11 @@ const Invoices = () => {
         if (!window.confirm('Delete this invoice?')) return;
         setLoading(true);
         try {
-            await billingAPI.remove(id);
+            await billingAPI.deleteInvoice(id); // FIX: Was billingAPI.remove(id)
             setInvoices(invoices.filter(inv => inv._id !== id));
+            toast.success('Invoice deleted successfully!');
+        } catch (err) {
+            toast.error('Failed to delete invoice.');
         } finally {
             setLoading(false);
         }
