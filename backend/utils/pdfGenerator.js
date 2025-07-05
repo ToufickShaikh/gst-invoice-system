@@ -57,6 +57,7 @@ async function generateInvoicePDF(invoiceData) {
                 const rate = item.rate || item.item?.rate || 0;
                 const quantity = item.quantity || 0;
                 const taxSlab = item.taxSlab || item.item?.taxSlab || 18;
+                const units = item.units || item.item?.units || 'per piece';
 
                 const itemTotal = rate * quantity;
                 const gstAmount = (itemTotal * taxSlab) / 100;
@@ -108,6 +109,7 @@ async function generateInvoicePDF(invoiceData) {
                     <td>${itemName}</td>
                     <td class="center">${hsnCode}</td>
                     <td class="center">${quantity}</td>
+                    <td class="center">${units}</td>
                     <td class="right">₹ ${rate.toFixed(2)}</td>
                     <td class="right">₹ ${gstAmount.toFixed(2)} (${taxSlab}%)</td>
                     <td class="right">₹ ${totalWithGst.toFixed(2)}</td>

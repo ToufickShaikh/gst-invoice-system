@@ -124,13 +124,13 @@ const Billing = () => {
     // Calculate total before discount for all items
     const totalBeforeDiscount = billItems.reduce((sum, billItem) => {
       if (!billItem.item) return sum
-      return sum + billItem.item.price * billItem.quantity
+      return sum + billItem.item.rate * billItem.quantity
     }, 0)
 
     // Distribute discount amount proportionally to each item
     return billItems.map(billItem => {
       if (!billItem.item) return null
-      const itemTotal = billItem.item.price * billItem.quantity
+      const itemTotal = billItem.item.rate * billItem.quantity
       const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * discountAmt : 0
       const taxableAmount = itemTotal - discountAmount
       const tax = calculateTax(taxableAmount, billItem.item.taxSlab, isInterState)
@@ -170,7 +170,7 @@ const Billing = () => {
         item: billItem.itemId,
         name: billItem.item.name,
         hsnCode: billItem.item.hsnCode,
-        price: billItem.item.price,
+        rate: billItem.item.rate,
         taxSlab: billItem.item.taxSlab,
         quantity: billItem.quantity,
         itemTotal: billItem.itemTotal,
@@ -308,7 +308,7 @@ const Billing = () => {
                         <option value="">Select an item</option>
                         {items.map(item => (
                           <option key={item._id} value={item._id}>
-                            {item.name} - {formatCurrency(item.price)} - {item.taxSlab}% GST
+                            {item.name} - {formatCurrency(item.rate)} {item.units || 'per piece'} - {item.taxSlab}% GST
                           </option>
                         ))}
                       </select>

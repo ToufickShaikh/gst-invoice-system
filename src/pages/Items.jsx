@@ -16,14 +16,16 @@ const Items = () => {
   const [formData, setFormData] = useState({
     name: '',
     hsnCode: '',
-    price: '',
-    taxSlab: ''
+    rate: '',
+    taxSlab: '',
+    units: 'per piece'
   })
 
   const columns = [
     { key: 'name', label: 'Item Name' },
     { key: 'hsnCode', label: 'HSN Code' },
-    { key: 'formattedPrice', label: 'Price' },
+    { key: 'formattedRate', label: 'Rate' },
+    { key: 'units', label: 'Units' },
     { key: 'taxSlabDisplay', label: 'Tax Slab' }
   ]
 
@@ -37,7 +39,7 @@ const Items = () => {
         : (Array.isArray(response) ? response : [])
       const formattedItems = itemsArr.map(item => ({
         ...item,
-        formattedPrice: formatCurrency(item.price),
+        formattedRate: formatCurrency(item.rate),
         taxSlabDisplay: `${item.taxSlab}%`
       }))
       setItems(formattedItems)
@@ -61,7 +63,7 @@ const Items = () => {
     e.preventDefault()
     const itemData = {
       ...formData,
-      price: parseFloat(formData.price),
+      rate: parseFloat(formData.rate),
       taxSlab: parseFloat(formData.taxSlab)
     }
 
@@ -85,8 +87,9 @@ const Items = () => {
     setFormData({
       name: item.name,
       hsnCode: item.hsnCode,
-      price: item.price.toString(),
-      taxSlab: item.taxSlab.toString()
+      rate: item.rate.toString(),
+      taxSlab: item.taxSlab.toString(),
+      units: item.units || 'per piece'
     })
     setIsModalOpen(true)
   }
@@ -109,8 +112,9 @@ const Items = () => {
     setFormData({
       name: '',
       hsnCode: '',
-      price: '',
-      taxSlab: ''
+      rate: '',
+      taxSlab: '',
+      units: 'per piece'
     })
   }
 
@@ -160,13 +164,34 @@ const Items = () => {
               required
             />
             <InputField
-              label="Price (₹)"
+              label="Rate (₹)"
               type="number"
-              name="price"
-              value={formData.price}
+              name="rate"
+              value={formData.rate}
               onChange={handleChange}
               required
             />
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Units <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="units"
+                value={formData.units}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="per piece">per piece</option>
+                <option value="per ft">per ft</option>
+                <option value="per roll">per roll</option>
+                <option value="per sqft">per sqft</option>
+                <option value="per box">per box</option>
+                <option value="per set">per set</option>
+                <option value="per gram">per gram</option>
+                <option value="per kg">per kg</option>
+              </select>
+            </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Tax Slab <span className="text-red-500">*</span>
