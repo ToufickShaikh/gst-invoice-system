@@ -2,6 +2,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 const { generateUpiQr } = require('./upiHelper');
+const { extractStateCode, COMPANY_STATE_CODE } = require('./taxHelpers');
 
 async function generateInvoicePDF(invoiceData) {
     console.log(`[PDF] Starting PDF generation for invoice: ${invoiceData.invoiceNumber}`);
@@ -36,6 +37,12 @@ async function generateInvoicePDF(invoiceData) {
 
         console.log(`[PDF] Basic placeholders replaced`);
 
+        // Determine if it's inter-state transaction for proper tax calculation
+        const customerStateCode = extractStateCode(customer?.state);
+        const isInterState = customerStateCode && customerStateCode !== COMPANY_STATE_CODE;
+
+        console.log(`[PDF] Tax calculation: Company State=${COMPANY_STATE_CODE}, Customer State=${customerStateCode}, Inter-State=${isInterState}`);
+
         // Calculate totals and prepare items data
         let totalQuantity = 0;
         let totalGST = 0;
@@ -58,22 +65,42 @@ async function generateInvoicePDF(invoiceData) {
                 totalQuantity += quantity;
                 totalGST += gstAmount;
 
-                // Add to tax summary
+                // Add to tax summary with proper IGST/CGST+SGST logic
                 if (!taxSummary[hsnCode]) {
-                    taxSummary[hsnCode] = {
-                        hsnCode,
-                        taxableAmount: 0,
-                        cgstRate: taxSlab / 2,
-                        sgstRate: taxSlab / 2,
-                        cgstAmount: 0,
-                        sgstAmount: 0,
-                        totalTax: 0
-                    };
+                    if (isInterState) {
+                        // Inter-state: Use IGST
+                        taxSummary[hsnCode] = {
+                            hsnCode,
+                            taxableAmount: 0,
+                            igstRate: taxSlab,
+                            igstAmount: 0,
+                            totalTax: 0,
+                            isInterState: true
+                        };
+                    } else {
+                        // Intra-state: Use CGST + SGST
+                        taxSummary[hsnCode] = {
+                            hsnCode,
+                            taxableAmount: 0,
+                            cgstRate: taxSlab / 2,
+                            sgstRate: taxSlab / 2,
+                            cgstAmount: 0,
+                            sgstAmount: 0,
+                            totalTax: 0,
+                            isInterState: false
+                        };
+                    }
                 }
+
                 taxSummary[hsnCode].taxableAmount += itemTotal;
-                taxSummary[hsnCode].cgstAmount += gstAmount / 2;
-                taxSummary[hsnCode].sgstAmount += gstAmount / 2;
                 taxSummary[hsnCode].totalTax += gstAmount;
+
+                if (isInterState) {
+                    taxSummary[hsnCode].igstAmount += gstAmount;
+                } else {
+                    taxSummary[hsnCode].cgstAmount += gstAmount / 2;
+                    taxSummary[hsnCode].sgstAmount += gstAmount / 2;
+                }
 
                 itemsHtml += `
                 <tr>
@@ -88,7 +115,7 @@ async function generateInvoicePDF(invoiceData) {
             });
         }
 
-        console.log(`[PDF] Items processed, total GST: ${totalGST}`);
+        console.log(`[PDF] Items processed, total GST: ${totalGST}, Inter-State: ${isInterState}`);
 
         // Replace items table
         html = html.replace(/{{itemsTable}}/g, itemsHtml);
@@ -99,33 +126,71 @@ async function generateInvoicePDF(invoiceData) {
         html = html.replace(/{{totalAmount}}/g, (invoiceData.totalAmount || invoiceData.grandTotal || 0).toFixed(2));
         html = html.replace(/{{subTotal}}/g, (invoiceData.subTotal || 0).toFixed(2));
 
-        // Generate tax summary HTML
+        // Generate tax summary HTML with proper IGST/CGST+SGST logic
         let taxSummaryHtml = '';
-        let taxSummaryTotals = { taxableAmount: 0, cgstAmount: 0, sgstAmount: 0, totalTax: 0 };
+        let taxSummaryTotals = {
+            taxableAmount: 0,
+            cgstAmount: 0,
+            sgstAmount: 0,
+            igstAmount: 0,
+            totalTax: 0
+        };
 
         Object.values(taxSummary).forEach(tax => {
             taxSummaryTotals.taxableAmount += tax.taxableAmount;
-            taxSummaryTotals.cgstAmount += tax.cgstAmount;
-            taxSummaryTotals.sgstAmount += tax.sgstAmount;
             taxSummaryTotals.totalTax += tax.totalTax;
 
-            taxSummaryHtml += `
-            <tr>
-                <td>${tax.hsnCode}</td>
-                <td class="right">${tax.taxableAmount.toFixed(2)}</td>
-                <td class="center">${tax.cgstRate}</td>
-                <td class="right">${tax.cgstAmount.toFixed(2)}</td>
-                <td class="center">${tax.sgstRate}</td>
-                <td class="right">${tax.sgstAmount.toFixed(2)}</td>
-                <td class="right">${tax.totalTax.toFixed(2)}</td>
-            </tr>`;
+            if (tax.isInterState) {
+                // Inter-state transaction: Show IGST
+                taxSummaryTotals.igstAmount += tax.igstAmount;
+                taxSummaryHtml += `
+                <tr>
+                    <td>${tax.hsnCode}</td>
+                    <td class="right">${tax.taxableAmount.toFixed(2)}</td>
+                    <td class="center">${tax.igstRate}%</td>
+                    <td class="right">${tax.igstAmount.toFixed(2)}</td>
+                    <td class="center">-</td>
+                    <td class="right">-</td>
+                    <td class="center">-</td>
+                    <td class="right">-</td>
+                    <td class="right">${tax.totalTax.toFixed(2)}</td>
+                </tr>`;
+            } else {
+                // Intra-state transaction: Show CGST + SGST
+                taxSummaryTotals.cgstAmount += tax.cgstAmount;
+                taxSummaryTotals.sgstAmount += tax.sgstAmount;
+                taxSummaryHtml += `
+                <tr>
+                    <td>${tax.hsnCode}</td>
+                    <td class="right">${tax.taxableAmount.toFixed(2)}</td>
+                    <td class="center">-</td>
+                    <td class="right">-</td>
+                    <td class="center">${tax.cgstRate}%</td>
+                    <td class="right">${tax.cgstAmount.toFixed(2)}</td>
+                    <td class="center">${tax.sgstRate}%</td>
+                    <td class="right">${tax.sgstAmount.toFixed(2)}</td>
+                    <td class="right">${tax.totalTax.toFixed(2)}</td>
+                </tr>`;
+            }
         });
 
         html = html.replace(/{{taxSummaryTable}}/g, taxSummaryHtml);
         html = html.replace(/{{taxSummaryTotal\.taxableAmount}}/g, taxSummaryTotals.taxableAmount.toFixed(2));
-        html = html.replace(/{{taxSummaryTotal\.cgstAmount}}/g, taxSummaryTotals.cgstAmount.toFixed(2));
-        html = html.replace(/{{taxSummaryTotal\.sgstAmount}}/g, taxSummaryTotals.sgstAmount.toFixed(2));
+
+        // Replace tax totals based on transaction type
+        if (isInterState) {
+            html = html.replace(/{{taxSummaryTotal\.cgstAmount}}/g, '-');
+            html = html.replace(/{{taxSummaryTotal\.sgstAmount}}/g, '-');
+            html = html.replace(/{{taxSummaryTotal\.igstAmount}}/g, taxSummaryTotals.igstAmount.toFixed(2));
+        } else {
+            html = html.replace(/{{taxSummaryTotal\.cgstAmount}}/g, taxSummaryTotals.cgstAmount.toFixed(2));
+            html = html.replace(/{{taxSummaryTotal\.sgstAmount}}/g, taxSummaryTotals.sgstAmount.toFixed(2));
+            html = html.replace(/{{taxSummaryTotal\.igstAmount}}/g, '-');
+        }
+
         html = html.replace(/{{taxSummaryTotal\.totalTax}}/g, taxSummaryTotals.totalTax.toFixed(2));
+
+        console.log(`[PDF] Tax Summary: CGST=${taxSummaryTotals.cgstAmount.toFixed(2)}, SGST=${taxSummaryTotals.sgstAmount.toFixed(2)}, IGST=${taxSummaryTotals.igstAmount.toFixed(2)}, Inter-State=${isInterState}`);
 
         // Amount in words (simplified)
         const amountInWords = convertToWords(invoiceData.totalAmount || invoiceData.grandTotal || 0);
