@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+// Only require puppeteer when needed to avoid startup issues
 const fs = require('fs/promises');
 const path = require('path');
 
@@ -142,56 +142,64 @@ async function generateInvoicePDF(invoiceData) {
         html = html.replace(/{{upiQrImage}}/g, ''); // Add QR image path if available
         html = html.replace(/{{signatureImage}}/g, ''); // Add signature image path if available
 
-        console.log(`[PDF] All placeholders replaced, launching browser...`);
+        console.log(`[PDF] All placeholders replaced, attempting PDF generation...`);
 
-        const browser = await puppeteer.launch({
-            headless: 'new',
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu'
-            ]
-        });
+        // Create output directory
+        const outputDir = path.resolve(__dirname, '../invoices');
+        await fs.mkdir(outputDir, { recursive: true });
 
-        console.log(`[PDF] Browser launched successfully`);
+        // For now, save as HTML since Puppeteer might not work in production
+        const htmlPath = path.join(outputDir, `invoice-${invoiceData.invoiceNumber}.html`);
+        await fs.writeFile(htmlPath, html, 'utf-8');
+        console.log(`[PDF] Invoice saved as HTML: ${htmlPath}`);
 
-        const page = await browser.newPage();
+        // Try PDF generation with Puppeteer (with fallback)
+        try {
+            // Require puppeteer only when needed
+            const puppeteer = require('puppeteer');
 
-        // Set a smaller viewport for faster processing
-        await page.setViewport({ width: 1024, height: 768 });
+            const browser = await puppeteer.launch({
+                headless: 'new',
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu'
+                ],
+                timeout: 30000
+            });
 
-        console.log(`[PDF] Setting page content...`);
+            console.log(`[PDF] Browser launched successfully`);
+            const page = await browser.newPage();
+            await page.setViewport({ width: 1024, height: 768 });
 
-        // Set content with a timeout
-        await page.setContent(html, {
-            waitUntil: 'domcontentloaded',
-            timeout: 30000
-        });
+            await page.setContent(html, {
+                waitUntil: 'domcontentloaded',
+                timeout: 20000
+            });
 
-        console.log(`[PDF] Page content set, creating PDF directory...`);
+            const pdfPath = path.join(outputDir, `invoice-${invoiceData.invoiceNumber}.pdf`);
+            await page.pdf({
+                path: pdfPath,
+                format: 'A4',
+                printBackground: true,
+                margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+                timeout: 20000
+            });
 
-        const pdfDir = path.resolve(__dirname, '../invoices');
-        await fs.mkdir(pdfDir, { recursive: true });
-        const pdfPath = path.join(pdfDir, `invoice-${invoiceData.invoiceNumber}.pdf`);
+            await browser.close();
+            console.log(`[PDF] PDF generation completed successfully`);
+            return `/invoices/invoice-${invoiceData.invoiceNumber}.pdf`;
 
-        console.log(`[PDF] Generating PDF at: ${pdfPath}`);
-
-        await page.pdf({
-            path: pdfPath,
-            format: 'A4',
-            printBackground: true,
-            margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
-            timeout: 30000
-        });
-
-        await browser.close();
-        console.log(`[PDF] PDF generation completed successfully`);
-        return `/invoices/invoice-${invoiceData.invoiceNumber}.pdf`;
+        } catch (puppeteerError) {
+            console.warn(`[PDF] Puppeteer failed, using HTML fallback:`, puppeteerError.message);
+            // Return HTML path as fallback
+            return `/invoices/invoice-${invoiceData.invoiceNumber}.html`;
+        }
     } catch (error) {
         console.error(`[PDF] Failed to generate PDF for invoice ${invoiceData.invoiceNumber}:`, error);
         console.error(`[PDF] Error stack:`, error.stack);
