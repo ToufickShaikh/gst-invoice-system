@@ -18,8 +18,54 @@ app.use(cors({
         'http://localhost:5173',
         'http://localhost:3000'
     ],
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 })); // Enable CORS for Netlify, local dev, etc.
+// Health check route
+app.get('/', (req, res) => {
+    res.json({
+        status: 'OK',
+        message: 'GST Billing Backend is running!',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
+
+// Enhanced API health check
+// Serve generated invoices as static files
+app.use('/invoices', express.static('invoices'));
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('Global error handler:', err);
+    res.status(500).json({
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+    });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+    res.status(404).json({
+        message: 'Route not found',
+        path: req.originalUrl,
+        method: req.method
+    });
+});
+
+module.exports = app; endpoints are working',
+        cors: 'enabled',
+        database: 'connected',
+        timestamp: new Date().toISOString()
+    });
+}); res.header('Access-Control-Allow-Origin', req.headers.origin || 'https://shaikhgst.netlify.app');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(200);
+});
+
 app.use(bodyParser.json()); // Parse JSON request bodies
 
 // Health check route
