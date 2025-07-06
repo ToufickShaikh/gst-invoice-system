@@ -4,41 +4,41 @@ console.log('================================');
 
 // Test the date range filtering logic
 const simulateFilterTest = () => {
-  console.log('\n📅 Simulating Filter Process:');
-  
-  // Step 1: Initial state
-  const initialDateRange = {
-    startDate: '2025-06-30',
-    endDate: '2025-07-06'
-  };
-  console.log('1. Initial date range:', initialDateRange);
-  
-  // Step 2: User selects new dates
-  const userSelectedDates = {
-    startDate: '2024-01-01',
-    endDate: '2024-12-31'
-  };
-  console.log('2. User selected dates:', userSelectedDates);
-  
-  // Step 3: Prepare API call
-  const apiDateRange = {};
-  if (userSelectedDates.startDate) apiDateRange.startDate = userSelectedDates.startDate;
-  if (userSelectedDates.endDate) apiDateRange.endDate = userSelectedDates.endDate;
-  console.log('3. API parameters to send:', apiDateRange);
-  
-  // Step 4: Expected backend query
-  const backendQuery = {};
-  if (apiDateRange.startDate) {
-    backendQuery.createdAt = { $gte: new Date(apiDateRange.startDate) };
-  }
-  if (apiDateRange.endDate) {
-    const end = new Date(apiDateRange.endDate);
-    end.setUTCHours(23, 59, 59, 999);
-    backendQuery.createdAt = { ...backendQuery.createdAt, $lte: end };
-  }
-  console.log('4. Backend MongoDB query:', JSON.stringify(backendQuery, null, 2));
-  
-  return { apiDateRange, backendQuery };
+    console.log('\n📅 Simulating Filter Process:');
+
+    // Step 1: Initial state
+    const initialDateRange = {
+        startDate: '2025-06-30',
+        endDate: '2025-07-06'
+    };
+    console.log('1. Initial date range:', initialDateRange);
+
+    // Step 2: User selects new dates
+    const userSelectedDates = {
+        startDate: '2024-01-01',
+        endDate: '2024-12-31'
+    };
+    console.log('2. User selected dates:', userSelectedDates);
+
+    // Step 3: Prepare API call
+    const apiDateRange = {};
+    if (userSelectedDates.startDate) apiDateRange.startDate = userSelectedDates.startDate;
+    if (userSelectedDates.endDate) apiDateRange.endDate = userSelectedDates.endDate;
+    console.log('3. API parameters to send:', apiDateRange);
+
+    // Step 4: Expected backend query
+    const backendQuery = {};
+    if (apiDateRange.startDate) {
+        backendQuery.createdAt = { $gte: new Date(apiDateRange.startDate) };
+    }
+    if (apiDateRange.endDate) {
+        const end = new Date(apiDateRange.endDate);
+        end.setUTCHours(23, 59, 59, 999);
+        backendQuery.createdAt = { ...backendQuery.createdAt, $lte: end };
+    }
+    console.log('4. Backend MongoDB query:', JSON.stringify(backendQuery, null, 2));
+
+    return { apiDateRange, backendQuery };
 };
 
 // Run the simulation
@@ -61,17 +61,17 @@ console.log('  Query string:', params.toString());
 // Common issues checklist
 console.log('\n⚠️  Common Filter Issues Checklist:');
 const issues = [
-  { check: 'Date format is YYYY-MM-DD', status: /^\d{4}-\d{2}-\d{2}$/.test('2024-01-01') ? '✅' : '❌' },
-  { check: 'Backend endpoint exists', status: '✅' },
-  { check: 'Date parameters are sent', status: '✅' },
-  { check: 'Authentication token included', status: '❓' },
-  { check: 'Backend processes date filters', status: '✅' },
-  { check: 'Response updates frontend state', status: '❓' },
-  { check: 'No CORS issues', status: '❓' }
+    { check: 'Date format is YYYY-MM-DD', status: /^\d{4}-\d{2}-\d{2}$/.test('2024-01-01') ? '✅' : '❌' },
+    { check: 'Backend endpoint exists', status: '✅' },
+    { check: 'Date parameters are sent', status: '✅' },
+    { check: 'Authentication token included', status: '❓' },
+    { check: 'Backend processes date filters', status: '✅' },
+    { check: 'Response updates frontend state', status: '❓' },
+    { check: 'No CORS issues', status: '❓' }
 ];
 
 issues.forEach((issue, index) => {
-  console.log(`${index + 1}. ${issue.check}: ${issue.status}`);
+    console.log(`${index + 1}. ${issue.check}: ${issue.status}`);
 });
 
 console.log('\n💡 DEBUGGING TIPS:');

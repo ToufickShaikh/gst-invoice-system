@@ -11,7 +11,7 @@ const DateInput = ({
     className = '',
     ...props
 }) => {
-    
+
     // Enhanced onChange handler
     const handleChange = (e) => {
         if (onChange) {

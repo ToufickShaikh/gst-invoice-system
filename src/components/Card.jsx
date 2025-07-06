@@ -86,8 +86,8 @@ const Card = memo(({
 
               {trend && (
                 <span className={`ml-2 flex items-center text-sm font-medium ${trend.direction === 'up'
-                    ? gradient ? 'text-white/80' : 'text-green-600'
-                    : gradient ? 'text-white/80' : 'text-red-600'
+                  ? gradient ? 'text-white/80' : 'text-green-600'
+                  : gradient ? 'text-white/80' : 'text-red-600'
                   }`}>
                   {trend.direction === 'up' ? (
                     <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">

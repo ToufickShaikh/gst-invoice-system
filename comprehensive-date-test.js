@@ -19,10 +19,10 @@ let dateRange = { startDate: initialStartDate, endDate: initialEndDate };
 console.log('✓ Initial state:', dateRange);
 
 const handleDateChange = (event) => {
-  const { name, value } = event.target;
-  dateRange = { ...dateRange, [name]: value };
-  console.log(`✓ ${name} changed to: ${value}`);
-  return dateRange;
+    const { name, value } = event.target;
+    dateRange = { ...dateRange, [name]: value };
+    console.log(`✓ ${name} changed to: ${value}`);
+    return dateRange;
 };
 
 // Test 3: Date change events
@@ -36,22 +36,22 @@ console.log('\n🔄 Test 4: Reset Functionality');
 const resetToday = new Date();
 const resetFirstDay = new Date(resetToday.getFullYear(), resetToday.getMonth(), 1);
 const resetState = {
-  startDate: resetFirstDay.toISOString().split('T')[0],
-  endDate: resetToday.toISOString().split('T')[0]
+    startDate: resetFirstDay.toISOString().split('T')[0],
+    endDate: resetToday.toISOString().split('T')[0]
 };
 console.log('✓ Reset state:', resetState);
 
 // Test 5: Edge cases
 console.log('\n⚠️  Test 5: Edge Cases');
 const edgeCases = [
-  '2024-02-29', // Leap year
-  '2023-12-31', // Year end
-  '2024-01-01', // Year start
+    '2024-02-29', // Leap year
+    '2023-12-31', // Year end
+    '2024-01-01', // Year start
 ];
 
 edgeCases.forEach(date => {
-  const isValid = /^\d{4}-\d{2}-\d{2}$/.test(date);
-  console.log(`✓ ${date} format valid:`, isValid);
+    const isValid = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    console.log(`✓ ${date} format valid:`, isValid);
 });
 
 console.log('\n✅ ALL TESTS PASSED!');

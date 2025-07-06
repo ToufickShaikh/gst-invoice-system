@@ -23,10 +23,10 @@ console.log('✓ Initial state:', dateRange);
 
 // Simulate onChange event
 const handleDateChange = (event) => {
-  const { name, value } = event.target;
-  dateRange = { ...dateRange, [name]: value };
-  console.log(`✓ Date changed - ${name}: ${value}`);
-  console.log('  Updated state:', dateRange);
+    const { name, value } = event.target;
+    dateRange = { ...dateRange, [name]: value };
+    console.log(`✓ Date changed - ${name}: ${value}`);
+    console.log('  Updated state:', dateRange);
 };
 
 // Test event objects

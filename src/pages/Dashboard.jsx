@@ -42,9 +42,9 @@ const Dashboard = () => {
       const apiDateRange = {};
       if (dateRange.startDate) apiDateRange.startDate = dateRange.startDate;
       if (dateRange.endDate) apiDateRange.endDate = dateRange.endDate;
-      
+
       const data = await billingAPI.getDashboardStats(apiDateRange);
-      
+
       setStats({
         totalRevenue: data.totalRevenue || 0,
         balanceDue: data.balanceDue || 0,
@@ -52,13 +52,13 @@ const Dashboard = () => {
         totalInvoices: data.totalInvoices || 0,
         totalCustomers: data.totalCustomers || 0,
       });
-      
+
       // Show success message with date range info
-      const dateInfo = Object.keys(apiDateRange).length > 0 
+      const dateInfo = Object.keys(apiDateRange).length > 0
         ? `for ${apiDateRange.startDate || 'start'} to ${apiDateRange.endDate || 'end'}`
         : 'for all dates';
       toast.success(`Dashboard updated ${dateInfo}`);
-      
+
     } catch (error) {
       toast.error('Failed to fetch dashboard stats. Please try again later.');
       console.error('Error fetching stats:', error);

@@ -144,11 +144,11 @@ const Billing = () => {
     // Distribute discount amount proportionally to each item
     return billItems.map(billItem => {
       if (!billItem.item) return null
-      
+
       const rate = Number(billItem.item.rate) || 0
       const quantity = Number(billItem.quantity) || 0
       const taxSlab = Number(billItem.item.taxSlab) || 0
-      
+
       const itemTotal = rate * quantity
       const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * Number(discountAmt || 0) : 0
       const taxableAmount = itemTotal - discountAmount
