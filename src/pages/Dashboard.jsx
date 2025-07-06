@@ -6,7 +6,7 @@ import Layout from '../components/Layout';
 import Card from '../components/Card';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
-import SimpleButtonTest from '../components/SimpleButtonTest';
+import DateInput from '../components/DateInput';
 import { billingAPI } from '../api/billing';
 import { formatCurrency } from '../utils/dateHelpers';
 
@@ -19,9 +19,13 @@ const Dashboard = () => {
     totalInvoices: 0,
     totalCustomers: 0,
   });
-  const [dateRange, setDateRange] = useState({
-    startDate: '',
-    endDate: ''
+  const [dateRange, setDateRange] = useState(() => {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    return {
+      startDate: firstDayOfMonth.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    };
   });
   const [loading, setLoading] = useState(false);
   const [recentActivity] = useState([
@@ -34,7 +38,13 @@ const Dashboard = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const data = await billingAPI.getDashboardStats(dateRange);
+      // Prepare date range for API call - only send non-empty dates
+      const apiDateRange = {};
+      if (dateRange.startDate) apiDateRange.startDate = dateRange.startDate;
+      if (dateRange.endDate) apiDateRange.endDate = dateRange.endDate;
+      
+      const data = await billingAPI.getDashboardStats(apiDateRange);
+      
       setStats({
         totalRevenue: data.totalRevenue || 0,
         balanceDue: data.balanceDue || 0,
@@ -42,6 +52,13 @@ const Dashboard = () => {
         totalInvoices: data.totalInvoices || 0,
         totalCustomers: data.totalCustomers || 0,
       });
+      
+      // Show success message with date range info
+      const dateInfo = Object.keys(apiDateRange).length > 0 
+        ? `for ${apiDateRange.startDate || 'start'} to ${apiDateRange.endDate || 'end'}`
+        : 'for all dates';
+      toast.success(`Dashboard updated ${dateInfo}`);
+      
     } catch (error) {
       toast.error('Failed to fetch dashboard stats. Please try again later.');
       console.error('Error fetching stats:', error);
@@ -59,6 +76,21 @@ const Dashboard = () => {
   };
 
   const handleFilter = () => {
+    if (!dateRange.startDate && !dateRange.endDate) {
+      toast('No date range selected. Showing all data.', { icon: '📅' });
+    } else {
+      toast('Applying date filter...', { icon: '🔍' });
+    }
+    fetchStats();
+  };
+
+  const handleReset = () => {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    setDateRange({
+      startDate: firstDayOfMonth.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    });
     fetchStats();
   };
 
@@ -130,9 +162,6 @@ const Dashboard = () => {
   return (
     <Layout>
       <div className="space-y-8 fade-in">
-        {/* Test Component - Remove after testing */}
-        <SimpleButtonTest />
-        
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
@@ -174,30 +203,21 @@ const Dashboard = () => {
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter by Date Range</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <InputField
+              {/* Specialized DateInput components */}
+              <DateInput
                 label="Start Date"
-                type="date"
                 name="startDate"
                 value={dateRange.startDate}
                 onChange={handleDateChange}
-                leftIcon={
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                }
               />
-              <InputField
+
+              <DateInput
                 label="End Date"
-                type="date"
                 name="endDate"
                 value={dateRange.endDate}
                 onChange={handleDateChange}
-                leftIcon={
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                }
               />
+
               <div className="flex items-end">
                 <Button
                   onClick={handleFilter}
@@ -216,10 +236,7 @@ const Dashboard = () => {
                 <Button
                   variant="ghost"
                   fullWidth
-                  onClick={() => {
-                    setDateRange({ startDate: '', endDate: '' })
-                    fetchStats()
-                  }}
+                  onClick={handleReset}
                   leftIcon={
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -326,50 +343,6 @@ const Dashboard = () => {
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
                 <div className="space-y-3">
-                  {/* Test with simple HTML buttons */}
-                  <button
-                    onClick={() => {
-                      console.log('SIMPLE Create Invoice button clicked');
-                      alert('Create Invoice clicked!');
-                      navigate('/billing');
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      backgroundColor: '#3B82F6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Create Invoice (SIMPLE)
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      console.log('SIMPLE Add Customer button clicked');
-                      alert('Add Customer clicked!');
-                      navigate('/customers');
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      backgroundColor: '#10B981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Add Customer (SIMPLE)
-                  </button>
-
-                  {/* Original Button components below for comparison */}
                   <Button
                     fullWidth
                     variant="primary"
@@ -379,8 +352,7 @@ const Dashboard = () => {
                       </svg>
                     }
                     onClick={() => {
-                      console.log('ORIGINAL Create Invoice button clicked');
-                      alert('ORIGINAL Create Invoice clicked!');
+                      console.log('Create Invoice clicked - navigating to /billing');
                       navigate('/billing');
                     }}
                   >
@@ -395,7 +367,7 @@ const Dashboard = () => {
                       </svg>
                     }
                     onClick={() => {
-                      console.log('Add Customer button clicked');
+                      console.log('Add Customer clicked - navigating to /customers');
                       navigate('/customers');
                     }}
                   >
@@ -410,7 +382,7 @@ const Dashboard = () => {
                       </svg>
                     }
                     onClick={() => {
-                      console.log('Add Item button clicked');
+                      console.log('Add Item clicked - navigating to /items');
                       navigate('/items');
                     }}
                   >
@@ -425,7 +397,7 @@ const Dashboard = () => {
                       </svg>
                     }
                     onClick={() => {
-                      console.log('View Reports button clicked');
+                      console.log('View Reports clicked - navigating to /invoices');
                       navigate('/invoices');
                     }}
                   >
@@ -444,15 +416,12 @@ const Dashboard = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                         </svg>
                       }
-                      onClick={() => {
-                        console.log('Assign Task button clicked');
-                        navigate('/assignments', {
-                          state: {
-                            prefilledTask: 'General Task Assignment',
-                            assignmentType: 'general'
-                          }
-                        });
-                      }}
+                      onClick={() => navigate('/assignments', {
+                        state: {
+                          prefilledTask: 'General Task Assignment',
+                          assignmentType: 'general'
+                        }
+                      })}
                     >
                       Assign Task
                     </Button>
@@ -466,10 +435,7 @@ const Dashboard = () => {
                         </svg>
                       }
                       className="mt-2"
-                      onClick={() => {
-                        console.log('Manage Workers button clicked');
-                        navigate('/assignments');
-                      }}
+                      onClick={() => navigate('/assignments')}
                     >
                       Manage Workers
                     </Button>
@@ -483,10 +449,7 @@ const Dashboard = () => {
                         </svg>
                       }
                       className="mt-2"
-                      onClick={() => {
-                        console.log('Track Progress button clicked');
-                        navigate('/assignments');
-                      }}
+                      onClick={() => navigate('/assignments')}
                     >
                       Track Progress
                     </Button>

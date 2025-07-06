@@ -65,7 +65,7 @@ const Card = memo(({
   return (
     <div className={baseClasses} onClick={onClick}>
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-5">
+      <div className="absolute inset-0 opacity-5 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
       </div>
 
@@ -129,7 +129,7 @@ const Card = memo(({
       </div>
 
       {/* Hover Effect */}
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 hover:opacity-10 transition-opacity duration-300 transform -skew-x-12" />
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 hover:opacity-10 transition-opacity duration-300 transform -skew-x-12 pointer-events-none" />
     </div>
   )
 })

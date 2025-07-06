@@ -1,7 +1,7 @@
-// Enhanced Button component with modern responsive design and accessibility
-import React, { memo, useMemo, forwardRef } from 'react'
+// Simplified Button component for debugging
+import React, { useMemo } from 'react'
 
-const Button = memo(forwardRef(({
+const Button = ({
   children,
   onClick,
   type = 'button',
@@ -14,7 +14,35 @@ const Button = memo(forwardRef(({
   rightIcon,
   className = '',
   ...props
-}, ref) => {
+}) => {
+
+  // Enhanced click handler with debugging
+  const handleClick = (e) => {
+    console.log('Button clicked!', { disabled, loading, onClick: !!onClick });
+    if (!disabled && !loading && onClick) {
+      onClick(e);
+    }
+  };
+
+  // Loading spinner component
+  const LoadingSpinner = () => (
+    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  )
+
   // Memoize className computation for performance
   const computedClassName = useMemo(() => {
     const baseStyles = `
@@ -79,50 +107,28 @@ const Button = memo(forwardRef(({
     ].join(' ').replace(/\s+/g, ' ').trim()
   }, [variant, size, disabled, fullWidth, className])
 
-  // Loading spinner component
-  const LoadingSpinner = () => (
-    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
-    </svg>
-  )
-
   return (
     <button
-      ref={ref}
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled || loading}
       className={computedClassName}
+      style={{
+        pointerEvents: 'auto',
+        cursor: disabled || loading ? 'not-allowed' : 'pointer',
+        zIndex: 1
+      }}
       {...props}
     >
-      {/* Ripple effect */}
-      <span className="absolute inset-0 overflow-hidden rounded-xl">
-        <span className="absolute inset-0 bg-white opacity-0 hover:opacity-10 transition-opacity duration-200" />
-      </span>
-
-      {/* Content */}
-      <span className="relative flex items-center justify-center space-x-2">
+      {/* Simplified content without overlapping spans */}
+      <div className="flex items-center justify-center space-x-2">
         {loading && <LoadingSpinner />}
         {leftIcon && !loading && <span className="flex-shrink-0">{leftIcon}</span>}
         <span className={loading ? 'opacity-75' : ''}>{children}</span>
         {rightIcon && !loading && <span className="flex-shrink-0">{rightIcon}</span>}
-      </span>
+      </div>
     </button>
   )
-}))
-
-Button.displayName = 'Button'
+}
 
 export default Button
