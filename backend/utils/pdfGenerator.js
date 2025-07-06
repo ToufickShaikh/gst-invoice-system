@@ -244,9 +244,11 @@ async function generateInvoicePDF(invoiceData) {
         // Schedule HTML file deletion after 30 seconds
         scheduleHtmlCleanup(htmlPath, invoiceData.invoiceNumber);
 
-        // Try PDF generation with Puppeteer (with fallback)
+        // Try PDF generation with multiple methods
+        
+        // Method 1: Try Puppeteer with enhanced configuration
         try {
-            // Require puppeteer only when needed
+            console.log(`[PDF] Attempting PDF generation with Puppeteer...`);
             const puppeteer = require('puppeteer');
 
             const browser = await puppeteer.launch({
@@ -259,37 +261,88 @@ async function generateInvoicePDF(invoiceData) {
                     '--no-first-run',
                     '--no-zygote',
                     '--single-process',
-                    '--disable-gpu'
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor',
+                    '--run-all-compositor-stages-before-draw',
+                    '--disable-background-timer-throttling',
+                    '--disable-renderer-backgrounding',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-ipc-flooding-protection'
                 ],
-                timeout: 30000
+                timeout: 60000 // Increased timeout
             });
 
             console.log(`[PDF] Browser launched successfully`);
             const page = await browser.newPage();
+            
+            // Set longer timeouts and better error handling
+            page.setDefaultTimeout(60000);
+            page.setDefaultNavigationTimeout(60000);
+            
             await page.setViewport({ width: 1024, height: 768 });
 
             await page.setContent(html, {
-                waitUntil: 'domcontentloaded',
-                timeout: 20000
+                waitUntil: ['domcontentloaded', 'networkidle0'],
+                timeout: 30000
             });
 
+            console.log(`[PDF] Page content set, generating PDF...`);
+            
             const pdfPath = path.join(outputDir, `invoice-${invoiceData.invoiceNumber}.pdf`);
+            
+            // Generate PDF with enhanced options
             await page.pdf({
                 path: pdfPath,
                 format: 'A4',
                 printBackground: true,
                 margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
-                timeout: 20000
+                timeout: 30000,
+                preferCSSPageSize: true,
+                displayHeaderFooter: false
             });
 
             await browser.close();
-            console.log(`[PDF] PDF generation completed successfully`);
+            console.log(`[PDF] PDF generation completed successfully with Puppeteer`);
             return `/invoices/invoice-${invoiceData.invoiceNumber}.pdf`;
 
         } catch (puppeteerError) {
-            console.warn(`[PDF] Puppeteer failed, using HTML fallback:`, puppeteerError.message);
-            // Return HTML path as fallback
-            return `/invoices/invoice-${invoiceData.invoiceNumber}.html`;
+            console.warn(`[PDF] Puppeteer method failed:`, puppeteerError.message);
+            
+            // Method 2: Try html-pdf-node as fallback
+            try {
+                console.log(`[PDF] Attempting PDF generation with html-pdf-node...`);
+                const htmlPdf = require('html-pdf-node');
+                
+                const options = {
+                    format: 'A4',
+                    margin: {
+                        top: '10mm',
+                        bottom: '10mm',
+                        left: '10mm',
+                        right: '10mm'
+                    },
+                    printBackground: true,
+                    displayHeaderFooter: false,
+                    timeout: 30000
+                };
+                
+                const file = { content: html };
+                const pdfBuffer = await htmlPdf.generatePdf(file, options);
+                
+                const pdfPath = path.join(outputDir, `invoice-${invoiceData.invoiceNumber}.pdf`);
+                await fs.writeFile(pdfPath, pdfBuffer);
+                
+                console.log(`[PDF] PDF generation completed successfully with html-pdf-node`);
+                return `/invoices/invoice-${invoiceData.invoiceNumber}.pdf`;
+                
+            } catch (htmlPdfError) {
+                console.warn(`[PDF] html-pdf-node method also failed:`, htmlPdfError.message);
+                
+                // Method 3: Save as HTML fallback (existing behavior)
+                console.warn(`[PDF] All PDF generation methods failed, using HTML fallback`);
+                return `/invoices/invoice-${invoiceData.invoiceNumber}.html`;
+            }
         }
     } catch (error) {
         console.error(`[PDF] Failed to generate PDF for invoice ${invoiceData.invoiceNumber}:`, error);
