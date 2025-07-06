@@ -6,6 +6,7 @@ import Layout from '../components/Layout';
 import Card from '../components/Card';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
+import SimpleButtonTest from '../components/SimpleButtonTest';
 import { billingAPI } from '../api/billing';
 import { formatCurrency } from '../utils/dateHelpers';
 
@@ -129,6 +130,9 @@ const Dashboard = () => {
   return (
     <Layout>
       <div className="space-y-8 fade-in">
+        {/* Test Component - Remove after testing */}
+        <SimpleButtonTest />
+        
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
@@ -322,6 +326,50 @@ const Dashboard = () => {
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
                 <div className="space-y-3">
+                  {/* Test with simple HTML buttons */}
+                  <button
+                    onClick={() => {
+                      console.log('SIMPLE Create Invoice button clicked');
+                      alert('Create Invoice clicked!');
+                      navigate('/billing');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      backgroundColor: '#3B82F6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Create Invoice (SIMPLE)
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      console.log('SIMPLE Add Customer button clicked');
+                      alert('Add Customer clicked!');
+                      navigate('/customers');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      backgroundColor: '#10B981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Add Customer (SIMPLE)
+                  </button>
+
+                  {/* Original Button components below for comparison */}
                   <Button
                     fullWidth
                     variant="primary"
@@ -331,7 +379,8 @@ const Dashboard = () => {
                       </svg>
                     }
                     onClick={() => {
-                      console.log('Create Invoice button clicked');
+                      console.log('ORIGINAL Create Invoice button clicked');
+                      alert('ORIGINAL Create Invoice clicked!');
                       navigate('/billing');
                     }}
                   >
