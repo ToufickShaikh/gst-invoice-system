@@ -5,6 +5,7 @@ import Button from '../components/Button';
 import Modal from '../components/Modal'; // Import Modal
 import { formatCurrency } from '../utils/dateHelpers';
 import { downloadInvoicePdf } from '../utils/downloadHelper';
+import { tryMultipleDownloadMethods } from '../utils/alternativeDownload';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { toast } from 'react-hot-toast';
 
@@ -63,22 +64,79 @@ const Invoices = () => {
     const handleReprint = async (invoiceId) => {
         setLoading(true);
         try {
+            console.log('Requesting invoice reprint for ID:', invoiceId);
             const res = await billingAPI.reprintInvoice(invoiceId);
-            if (res.pdfPath) {
-                const baseUrl = import.meta.env.VITE_API_BASE_URL;
-                const downloadSuccess = downloadInvoicePdf(res.pdfPath, invoiceId, baseUrl);
+            console.log('Reprint API response:', res);
+            
+            if (res && res.pdfPath) {
+                // Get the base URL from environment variable or fallback to default
+                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
+                console.log('Using base URL for download:', baseUrl);
+                
+                // Clean the base URL
+                const cleanBaseUrl = baseUrl.replace('/api', '');
+                const normalizedPath = res.pdfPath.startsWith('/') ? res.pdfPath : `/${res.pdfPath}`;
+                const pdfUrl = `${cleanBaseUrl}${normalizedPath}`;
+                
+                // Determine if it's a PDF or HTML file to set proper MIME type
+                const isPdf = res.pdfPath.toLowerCase().endsWith('.pdf');
+                const mimeType = isPdf ? 'application/pdf' : 'text/html';
+                
+                // Extract filename
+                let fileName = res.pdfPath.split('/').pop();
+                if (!fileName) {
+                    const extension = isPdf ? '.pdf' : '.html';
+                    fileName = `invoice-${invoiceId}${extension}`;
+                }
+                
+                console.log('Download details:', { 
+                    pdfUrl, 
+                    fileName, 
+                    mimeType, 
+                    isPdf 
+                });
+                
+                // Try multiple download methods to ensure compatibility
+                toast.success('Starting download...', { 
+                    duration: 3000,
+                    icon: '⬇️'
+                });
+                
+                const downloadSuccess = await tryMultipleDownloadMethods(pdfUrl, fileName, mimeType);
                 
                 if (downloadSuccess) {
-                    toast.success('Invoice downloaded successfully!');
+                    toast.success('Invoice download initiated successfully!', { 
+                        duration: 5000,
+                        icon: '📥'
+                    });
                 } else {
-                    toast.error('Download failed. Try again or check console for details.');
+                    // As a final fallback, provide direct link
+                    console.log('All download methods failed, opening URL directly:', pdfUrl);
+                    
+                    // Create a button in the toast for manual download
+                    toast.error(
+                        <div>
+                            <p>Auto-download failed. Click the link below to download manually:</p>
+                            <a 
+                                href={pdfUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                download={fileName}
+                                className="text-blue-600 underline"
+                            >
+                                Download {fileName}
+                            </a>
+                        </div>,
+                        { duration: 10000 }
+                    );
                 }
             } else {
-                toast.error(res.message || 'Could not find PDF to reprint.');
+                console.error('Invalid response from reprint API:', res);
+                toast.error(res?.message || 'Could not find PDF to reprint. Please try again.');
             }
         } catch (err) {
             console.error('Reprint error:', err);
-            toast.error('Failed to reprint invoice');
+            toast.error('Failed to reprint invoice. Please check console for details.');
         } finally {
             setLoading(false);
         }

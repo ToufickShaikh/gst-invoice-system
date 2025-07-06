@@ -16,13 +16,13 @@ const InvoiceSuccess = () => {
     navigate('/billing')
     return null
   }
-  
+
   // Auto-download PDF when component mounts
   useEffect(() => {
     if (pdfUrl) {
       const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
       const success = downloadFile(pdfUrl, fileName, 'application/pdf');
-      
+
       if (success) {
         toast.success('Invoice downloaded automatically');
       }
