@@ -1,18 +1,33 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Button from '../components/Button'
 import { formatCurrency } from '../utils/dateHelpers'
+import { downloadFile } from '../utils/downloadHelper'
+import { toast } from 'react-hot-toast'
 
 const InvoiceSuccess = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { invoiceId, pdfUrl, upiQr, balance } = location.state || {}
+  const { invoiceId, pdfUrl, upiQr, balance, invoiceNumber } = location.state || {}
 
+  // Redirect if no invoice data
   if (!invoiceId) {
     navigate('/billing')
     return null
   }
+  
+  // Auto-download PDF when component mounts
+  useEffect(() => {
+    if (pdfUrl) {
+      const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
+      const success = downloadFile(pdfUrl, fileName, 'application/pdf');
+      
+      if (success) {
+        toast.success('Invoice downloaded automatically');
+      }
+    }
+  }, [pdfUrl, invoiceId, invoiceNumber]);
 
   return (
     <Layout>
@@ -40,7 +55,15 @@ const InvoiceSuccess = () => {
           {/* PDF Download */}
           <div className="mb-8">
             <Button
-              onClick={() => window.open(pdfUrl, '_blank')}
+              onClick={() => {
+                const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
+                const success = downloadFile(pdfUrl, fileName, 'application/pdf');
+                if (success) {
+                  toast.success('Invoice downloaded');
+                } else {
+                  toast.error('Download failed. Try again.');
+                }
+              }}
               variant="primary"
               size="lg"
             >

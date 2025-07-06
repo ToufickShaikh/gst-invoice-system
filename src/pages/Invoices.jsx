@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import Button from '../components/Button';
 import Modal from '../components/Modal'; // Import Modal
 import { formatCurrency } from '../utils/dateHelpers';
+import { downloadInvoicePdf } from '../utils/downloadHelper';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { toast } from 'react-hot-toast';
 
@@ -58,23 +59,25 @@ const Invoices = () => {
         navigate(`/edit-invoice/${invoiceId}`);
     };
 
-    // Handle reprinting the invoice
+    // Handle reprinting the invoice with automatic PDF download
     const handleReprint = async (invoiceId) => {
         setLoading(true);
         try {
             const res = await billingAPI.reprintInvoice(invoiceId);
             if (res.pdfPath) {
-                // Construct the full URL to the PDF/HTML file
-                // Remove '/api' from base URL and ensure no double slashes
-                const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-                const pdfUrl = `${baseUrl}${res.pdfPath}`; // res.pdfPath already starts with '/'
-                console.log('Opening PDF URL:', pdfUrl);
-                window.open(pdfUrl, '_blank');
-                toast.success('Invoice reprinted successfully!');
+                const baseUrl = import.meta.env.VITE_API_BASE_URL;
+                const downloadSuccess = downloadInvoicePdf(res.pdfPath, invoiceId, baseUrl);
+                
+                if (downloadSuccess) {
+                    toast.success('Invoice downloaded successfully!');
+                } else {
+                    toast.error('Download failed. Try again or check console for details.');
+                }
             } else {
                 toast.error(res.message || 'Could not find PDF to reprint.');
             }
         } catch (err) {
+            console.error('Reprint error:', err);
             toast.error('Failed to reprint invoice');
         } finally {
             setLoading(false);
