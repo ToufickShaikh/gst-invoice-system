@@ -1,5 +1,9 @@
 export const calculateTax = (amount, taxRate, isInterState = false) => {
-    const taxAmount = (amount * taxRate) / 100
+    // Ensure inputs are valid numbers
+    const validAmount = Number(amount) || 0
+    const validTaxRate = Number(taxRate) || 0
+    
+    const taxAmount = (validAmount * validTaxRate) / 100
     
     if (isInterState) {
       return {

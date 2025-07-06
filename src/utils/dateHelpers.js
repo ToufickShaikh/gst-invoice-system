@@ -7,8 +7,9 @@ export const formatDate = (date) => {
   }
   
   export const formatCurrency = (amount) => {
+    const validAmount = Number(amount) || 0
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR'
-    }).format(amount)
+    }).format(validAmount)
   }

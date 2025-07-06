@@ -136,16 +136,23 @@ const Billing = () => {
     // Calculate total before discount for all items
     const totalBeforeDiscount = billItems.reduce((sum, billItem) => {
       if (!billItem.item) return sum
-      return sum + billItem.item.rate * billItem.quantity
+      const rate = Number(billItem.item.rate) || 0
+      const quantity = Number(billItem.quantity) || 0
+      return sum + (rate * quantity)
     }, 0)
 
     // Distribute discount amount proportionally to each item
     return billItems.map(billItem => {
       if (!billItem.item) return null
-      const itemTotal = billItem.item.rate * billItem.quantity
-      const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * discountAmt : 0
+      
+      const rate = Number(billItem.item.rate) || 0
+      const quantity = Number(billItem.quantity) || 0
+      const taxSlab = Number(billItem.item.taxSlab) || 0
+      
+      const itemTotal = rate * quantity
+      const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * Number(discountAmt || 0) : 0
       const taxableAmount = itemTotal - discountAmount
-      const tax = calculateTax(taxableAmount, billItem.item.taxSlab, isInterState)
+      const tax = calculateTax(taxableAmount, taxSlab, isInterState)
 
       return {
         ...billItem,
@@ -153,17 +160,23 @@ const Billing = () => {
         discountAmount,
         taxableAmount,
         tax,
-        totalWithTax: taxableAmount + tax.total
+        totalWithTax: taxableAmount + (tax ? tax.total : 0)
       }
     }).filter(Boolean)
   }
 
-  // Calculate totals
+  // Calculate totals with safe number handling
   const billItemsWithTax = getBillItemsWithTax()
-  const totalBeforeTax = billItemsWithTax.reduce((sum, item) => sum + (item ? item.taxableAmount : 0), 0)
-  const totalTax = billItemsWithTax.reduce((sum, item) => sum + (item ? item.tax.total : 0), 0)
-  const grandTotal = totalBeforeTax + totalTax + Number(shippingCharges)
-  const balance = grandTotal - paidAmount
+  const totalBeforeTax = billItemsWithTax.reduce((sum, item) => {
+    const taxableAmount = Number(item?.taxableAmount) || 0
+    return sum + taxableAmount
+  }, 0)
+  const totalTax = billItemsWithTax.reduce((sum, item) => {
+    const taxTotal = Number(item?.tax?.total) || 0
+    return sum + taxTotal
+  }, 0)
+  const grandTotal = totalBeforeTax + totalTax + Number(shippingCharges || 0)
+  const balance = grandTotal - Number(paidAmount || 0)
 
   const handleGenerateInvoice = async () => {
     if (!selectedCustomer) {
@@ -261,7 +274,7 @@ const Billing = () => {
               size="sm"
               leftIcon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 616 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
               }
