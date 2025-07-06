@@ -377,24 +377,40 @@ const getDashboardStats = async (req, res) => {
         const { startDate, endDate } = req.query;
 
         // Build the date range query for aggregations
-        const dateQuery = {};
-        if (startDate) {
-            dateQuery.createdAt = { ...dateQuery.createdAt, $gte: new Date(startDate) };
-        }
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setUTCHours(23, 59, 59, 999); // Set to the end of the day
-            dateQuery.createdAt = { ...dateQuery.createdAt, $lte: end };
+        let dateQuery = {};
+        let hasDateFilter = false;
+
+        if (startDate || endDate) {
+            hasDateFilter = true;
+            // Check if any invoices have createdAt field
+            const sampleInvoice = await Invoice.findOne({}, { createdAt: 1 });
+            console.log('Sample invoice createdAt check:', sampleInvoice?.createdAt);
+
+            if (sampleInvoice?.createdAt) {
+                // Only apply date filter if invoices have createdAt
+                if (startDate) {
+                    dateQuery.createdAt = { ...dateQuery.createdAt, $gte: new Date(startDate) };
+                }
+                if (endDate) {
+                    const end = new Date(endDate);
+                    end.setUTCHours(23, 59, 59, 999); // Set to the end of the day
+                    dateQuery.createdAt = { ...dateQuery.createdAt, $lte: end };
+                }
+            } else {
+                console.log('⚠️  No createdAt field found in invoices - ignoring date filter');
+                dateQuery = {}; // Reset to empty query to get all invoices
+            }
         }
 
         console.log('Constructed date query for invoices:', JSON.stringify(dateQuery));
+        console.log('Has date filter:', hasDateFilter, 'Using date query:', Object.keys(dateQuery).length > 0);
 
         const totalInvoices = await Invoice.countDocuments(dateQuery);
         // Customer count is not typically filtered by invoice date range, so we count all customers.
         const totalCustomers = await Customer.countDocuments();
 
         const invoiceData = await Invoice.aggregate([
-            { $match: dateQuery }, // Apply date filter
+            { $match: dateQuery }, // Apply date filter (may be empty)
             {
                 $group: {
                     _id: null,
@@ -403,6 +419,8 @@ const getDashboardStats = async (req, res) => {
                 },
             },
         ]);
+
+        console.log('Invoice aggregation result:', invoiceData);
 
         const stats = {
             totalInvoices,

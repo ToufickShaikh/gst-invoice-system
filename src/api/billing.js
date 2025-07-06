@@ -13,13 +13,18 @@ const api = axios.create({
   },
 });
 
-// Add a request interceptor to include the auth token
+// Add a request interceptor to include the auth token (optional for now)
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Note: Backend currently doesn't require authentication for most endpoints
   return config;
+}, error => {
+  // Handle request errors gracefully
+  console.warn('Request interceptor error:', error);
+  return Promise.resolve(error.config);
 });
 
 export const billingAPI = {
@@ -28,8 +33,17 @@ export const billingAPI = {
     return res.data;
   },
   getDashboardStats: async (dateRange) => {
-    const res = await api.get(`/billing/dashboard-stats`, { params: dateRange });
-    return res.data;
+    console.log('API: Sending dashboard stats request with dateRange:', dateRange);
+    try {
+      const res = await api.get(`/billing/dashboard-stats`, { params: dateRange });
+      console.log('API: Dashboard stats response:', res.data);
+      console.log('API: Response status:', res.status);
+      return res.data;
+    } catch (error) {
+      console.error('API: Dashboard stats error:', error);
+      console.error('API: Error response:', error.response?.data);
+      throw error;
+    }
   },
   createInvoice: async (invoiceData) => {
     const res = await api.post(`/billing/invoices`, invoiceData);

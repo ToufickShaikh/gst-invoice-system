@@ -20,14 +20,16 @@ const Dashboard = () => {
     totalCustomers: 0,
   });
   const [dateRange, setDateRange] = useState(() => {
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Start with empty date range to show all data initially
+    // This is because some invoices may not have createdAt dates
     return {
-      startDate: firstDayOfMonth.toISOString().split('T')[0],
-      endDate: today.toISOString().split('T')[0]
+      startDate: '',
+      endDate: ''
     };
   });
   const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [error, setError] = useState(null);
   const [recentActivity] = useState([
     { id: 1, action: 'Invoice Generated', description: 'INV-2024-001 for ABC Corp', time: '2 minutes ago', type: 'invoice' },
     { id: 2, action: 'Payment Received', description: '₹50,000 from XYZ Ltd', time: '15 minutes ago', type: 'payment' },
@@ -35,40 +37,105 @@ const Dashboard = () => {
     { id: 4, action: 'Item Updated', description: 'Steel Die price updated', time: '2 hours ago', type: 'item' }
   ]);
 
-  const fetchStats = async () => {
+  const fetchStats = async (showToast = true) => {
     setLoading(true);
+    setError(null);
+
     try {
       // Prepare date range for API call - only send non-empty dates
       const apiDateRange = {};
       if (dateRange.startDate) apiDateRange.startDate = dateRange.startDate;
       if (dateRange.endDate) apiDateRange.endDate = dateRange.endDate;
 
-      const data = await billingAPI.getDashboardStats(apiDateRange);
+      console.log('Dashboard: Fetching stats with date range:', apiDateRange);
+      console.log('Dashboard: Current dateRange state:', dateRange);
 
-      setStats({
-        totalRevenue: data.totalRevenue || 0,
-        balanceDue: data.balanceDue || 0,
-        totalPaid: data.totalPaid || 0,
-        totalInvoices: data.totalInvoices || 0,
-        totalCustomers: data.totalCustomers || 0,
+      const data = await billingAPI.getDashboardStats(apiDateRange);
+      console.log('Dashboard: Received raw data from API:', data);
+      console.log('Dashboard: Data type check:', typeof data, 'Is array:', Array.isArray(data));
+
+      // Validate that we received valid data
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid data received from server');
+      }
+
+      // Check if data has expected properties
+      const expectedProps = ['totalRevenue', 'balanceDue', 'totalPaid', 'totalInvoices', 'totalCustomers'];
+      const missingProps = expectedProps.filter(prop => !(prop in data));
+      if (missingProps.length > 0) {
+        console.warn('Dashboard: Missing properties in response:', missingProps);
+      }
+
+      // Log each property before processing
+      console.log('Dashboard: Raw property values:', {
+        totalRevenue: data.totalRevenue,
+        balanceDue: data.balanceDue,
+        totalPaid: data.totalPaid,
+        totalInvoices: data.totalInvoices,
+        totalCustomers: data.totalCustomers
       });
 
-      // Show success message with date range info
-      const dateInfo = Object.keys(apiDateRange).length > 0
-        ? `for ${apiDateRange.startDate || 'start'} to ${apiDateRange.endDate || 'end'}`
-        : 'for all dates';
-      toast.success(`Dashboard updated ${dateInfo}`);
+      // Ensure all values are properly converted to numbers
+      const processedStats = {
+        totalRevenue: Number(data.totalRevenue) || 0,
+        balanceDue: Number(data.balanceDue) || 0,
+        totalPaid: Number(data.totalPaid) || 0,
+        totalInvoices: Number(data.totalInvoices) || 0,
+        totalCustomers: Number(data.totalCustomers) || 0,
+      };
+
+      console.log('Dashboard: Processed stats:', processedStats);
+      console.log('Dashboard: Stats comparison - Before/After:', {
+        before: data,
+        after: processedStats
+      });
+
+      setStats(processedStats);
+      setLastUpdated(new Date());
+
+      // Check for potentially problematic results and provide helpful feedback
+      const hasDateFilter = Object.keys(apiDateRange).length > 0;
+      const hasZeroData = processedStats.totalInvoices === 0 && processedStats.totalRevenue === 0;
+
+      if (showToast) {
+        if (hasDateFilter && hasZeroData) {
+          // Warn about date filtering issues
+          toast.error('No data found for the selected date range. Try removing date filters to see all data.', {
+            duration: 6000
+          });
+        } else {
+          const dateInfo = hasDateFilter
+            ? `for ${apiDateRange.startDate || 'start'} to ${apiDateRange.endDate || 'end'}`
+            : 'for all dates';
+          toast.success(`Dashboard updated ${dateInfo}`);
+        }
+      }
 
     } catch (error) {
-      toast.error('Failed to fetch dashboard stats. Please try again later.');
-      console.error('Error fetching stats:', error);
+      console.error('Dashboard: Error fetching stats:', error);
+      console.error('Dashboard: Error details:', error.response?.data || error.message);
+
+      setError(error.message || 'Failed to fetch dashboard data');
+
+      if (showToast) {
+        toast.error('Failed to fetch dashboard stats. Please try again later.');
+      }
+
+      // Set default values on error
+      setStats({
+        totalRevenue: 0,
+        balanceDue: 0,
+        totalPaid: 0,
+        totalInvoices: 0,
+        totalCustomers: 0,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchStats();
+    fetchStats(false); // Don't show toast on initial load
   }, []);
 
   const handleDateChange = (e) => {
@@ -81,7 +148,7 @@ const Dashboard = () => {
     } else {
       toast('Applying date filter...', { icon: '🔍' });
     }
-    fetchStats();
+    fetchStats(true);
   };
 
   const handleReset = () => {
@@ -91,7 +158,8 @@ const Dashboard = () => {
       startDate: firstDayOfMonth.toISOString().split('T')[0],
       endDate: today.toISOString().split('T')[0]
     });
-    fetchStats();
+    // Fetch stats after a small delay to ensure state is updated
+    setTimeout(() => fetchStats(true), 100);
   };
 
   // Icons for stats cards
@@ -159,6 +227,45 @@ const Dashboard = () => {
     return colors[type] || colors.invoice
   }
 
+  // Debug function to test different scenarios
+  const debugDashboard = async () => {
+    console.log('🐛 DEBUG: Starting dashboard debug session');
+
+    try {
+      // Test 1: Check API without date filters
+      console.log('🔍 Test 1: API without date filters');
+      const allDataResponse = await billingAPI.getDashboardStats({});
+      console.log('All data response:', allDataResponse);
+
+      // Test 2: Check API with current date range
+      console.log('🔍 Test 2: API with current date range');
+      const filteredResponse = await billingAPI.getDashboardStats(dateRange);
+      console.log('Filtered response:', filteredResponse);
+
+      // Test 3: Check individual API components
+      console.log('🔍 Test 3: Testing individual API components');
+
+      try {
+        const invoicesResponse = await billingAPI.getInvoices();
+        console.log('All invoices:', invoicesResponse);
+      } catch (invoiceError) {
+        console.error('Invoice API error:', invoiceError);
+      }
+
+      // Test 4: Check authentication
+      console.log('🔍 Test 4: Check authentication');
+      const token = localStorage.getItem('token');
+      console.log('Token exists:', !!token);
+      console.log('Token preview:', token ? token.substring(0, 20) + '...' : 'No token');
+
+      toast.info('Debug session complete - check console for results');
+
+    } catch (error) {
+      console.error('🚨 Debug session error:', error);
+      toast.error('Debug session failed - check console');
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-8 fade-in">
@@ -168,12 +275,60 @@ const Dashboard = () => {
             <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
               Dashboard
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mb-2">
               Welcome back! Here's what's happening with your business today.
             </p>
+            {/* Status Indicator */}
+            <div className="flex items-center gap-2 text-sm">
+              {error ? (
+                <div className="flex items-center gap-1 text-red-600">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>Error: {error}</span>
+                </div>
+              ) : lastUpdated ? (
+                <div className="flex items-center gap-1 text-green-600">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-gray-500">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                  <span>Initializing...</span>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => fetchStats(true)}
+              loading={loading}
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              }
+            >
+              {loading ? 'Refreshing...' : 'Refresh Data'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={debugDashboard}
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                </svg>
+              }
+            >
+              Debug Data
+            </Button>
             <Button
               variant="outline"
               leftIcon={
