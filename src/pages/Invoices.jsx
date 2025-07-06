@@ -67,59 +67,59 @@ const Invoices = () => {
             console.log('Requesting invoice reprint for ID:', invoiceId);
             const res = await billingAPI.reprintInvoice(invoiceId);
             console.log('Reprint API response:', res);
-            
+
             if (res && res.pdfPath) {
                 // Get the base URL from environment variable or fallback to default
                 const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
                 console.log('Using base URL for download:', baseUrl);
-                
+
                 // Clean the base URL
                 const cleanBaseUrl = baseUrl.replace('/api', '');
                 const normalizedPath = res.pdfPath.startsWith('/') ? res.pdfPath : `/${res.pdfPath}`;
                 const pdfUrl = `${cleanBaseUrl}${normalizedPath}`;
-                
+
                 // Determine if it's a PDF or HTML file to set proper MIME type
                 const isPdf = res.pdfPath.toLowerCase().endsWith('.pdf');
                 const mimeType = isPdf ? 'application/pdf' : 'text/html';
-                
+
                 // Extract filename
                 let fileName = res.pdfPath.split('/').pop();
                 if (!fileName) {
                     const extension = isPdf ? '.pdf' : '.html';
                     fileName = `invoice-${invoiceId}${extension}`;
                 }
-                
-                console.log('Download details:', { 
-                    pdfUrl, 
-                    fileName, 
-                    mimeType, 
-                    isPdf 
+
+                console.log('Download details:', {
+                    pdfUrl,
+                    fileName,
+                    mimeType,
+                    isPdf
                 });
-                
+
                 // Try multiple download methods to ensure compatibility
-                toast.success('Starting download...', { 
+                toast.success('Starting download...', {
                     duration: 3000,
                     icon: '⬇️'
                 });
-                
+
                 const downloadSuccess = await tryMultipleDownloadMethods(pdfUrl, fileName, mimeType);
-                
+
                 if (downloadSuccess) {
-                    toast.success('Invoice download initiated successfully!', { 
+                    toast.success('Invoice download initiated successfully!', {
                         duration: 5000,
                         icon: '📥'
                     });
                 } else {
                     // As a final fallback, provide direct link
                     console.log('All download methods failed, opening URL directly:', pdfUrl);
-                    
+
                     // Create a button in the toast for manual download
                     toast.error(
                         <div>
                             <p>Auto-download failed. Click the link below to download manually:</p>
-                            <a 
-                                href={pdfUrl} 
-                                target="_blank" 
+                            <a
+                                href={pdfUrl}
+                                target="_blank"
                                 rel="noopener noreferrer"
                                 download={fileName}
                                 className="text-blue-600 underline"

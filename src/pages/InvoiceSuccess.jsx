@@ -24,7 +24,7 @@ const InvoiceSuccess = () => {
       const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
       const isPdf = pdfUrl.toLowerCase().includes('.pdf');
       const mimeType = isPdf ? 'application/pdf' : 'text/html';
-      
+
       // Use the improved download method
       tryMultipleDownloadMethods(pdfUrl, fileName, mimeType)
         .then(success => {
@@ -71,21 +71,21 @@ const InvoiceSuccess = () => {
                 const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
                 const isPdf = pdfUrl.toLowerCase().includes('.pdf');
                 const mimeType = isPdf ? 'application/pdf' : 'text/html';
-                
+
                 try {
                   toast.success('Starting download...', { duration: 2000 });
                   const success = await tryMultipleDownloadMethods(pdfUrl, fileName, mimeType);
-                  
+
                   if (success) {
-                    toast.success('Invoice download initiated!', { 
+                    toast.success('Invoice download initiated!', {
                       duration: 4000,
-                      icon: '📥' 
+                      icon: '📥'
                     });
                   } else {
                     // Fallback: open in new tab
                     window.open(pdfUrl, '_blank');
-                    toast.error('Auto-download failed. Opening in new tab. Right-click and select "Save As" to download.', { 
-                      duration: 8000 
+                    toast.error('Auto-download failed. Opening in new tab. Right-click and select "Save As" to download.', {
+                      duration: 8000
                     });
                   }
                 } catch (error) {

@@ -19,7 +19,7 @@ export const downloadFile = (url, fileName, mimeType) => {
         }
 
         console.log('Starting download process for URL:', url);
-        
+
         // Method 1: Using anchor element with download attribute
         try {
             // Create a hidden download link
@@ -41,7 +41,7 @@ export const downloadFile = (url, fileName, mimeType) => {
             // Set additional attributes for forcing download
             downloadLink.target = '_blank';
             downloadLink.rel = 'noopener noreferrer';
-            
+
             // Set MIME type if provided
             if (mimeType) {
                 downloadLink.type = mimeType;
@@ -49,7 +49,7 @@ export const downloadFile = (url, fileName, mimeType) => {
 
             // Style to be invisible
             downloadLink.style.display = 'none';
-            
+
             // Append to DOM, trigger click, and remove
             document.body.appendChild(downloadLink);
             console.log('Download link created with attributes:', {
@@ -57,12 +57,12 @@ export const downloadFile = (url, fileName, mimeType) => {
                 download: downloadLink.download,
                 type: downloadLink.type
             });
-            
+
             // Click with a small delay to ensure the browser processes it
             setTimeout(() => {
                 downloadLink.click();
                 console.log('Download link clicked');
-                
+
                 // Remove after a small delay
                 setTimeout(() => {
                     document.body.removeChild(downloadLink);
@@ -74,7 +74,7 @@ export const downloadFile = (url, fileName, mimeType) => {
             return true;
         } catch (anchorError) {
             console.warn('Anchor download method failed, trying alternative:', anchorError);
-            
+
             // Method 2: Alternative approach using window.open with _blank target
             // This is a fallback that might work in some browsers when the download attribute doesn't
             window.open(url, '_blank');
@@ -107,18 +107,18 @@ export const downloadInvoicePdf = (pdfPath, invoiceId, baseUrl) => {
         if (cleanBaseUrl.endsWith('/')) {
             cleanBaseUrl = cleanBaseUrl.slice(0, -1);
         }
-        
+
         // Make sure pdfPath starts with a slash
         const normalizedPath = pdfPath.startsWith('/') ? pdfPath : `/${pdfPath}`;
 
         // Construct the full URL to the PDF/HTML file
         const fileUrl = `${cleanBaseUrl}${normalizedPath}`;
         console.log('Downloading from URL:', fileUrl);
-        
+
         // Determine if it's a PDF or HTML file to set the proper MIME type
         const isPdf = pdfPath.toLowerCase().endsWith('.pdf');
         const mimeType = isPdf ? 'application/pdf' : 'text/html';
-        
+
         // Extract or construct a good filename
         let fileName;
         if (pdfPath.includes('/')) {
@@ -128,9 +128,9 @@ export const downloadInvoicePdf = (pdfPath, invoiceId, baseUrl) => {
             const extension = isPdf ? '.pdf' : '.html';
             fileName = `invoice-${invoiceId}${extension}`;
         }
-        
+
         console.log('Download details:', { fileName, mimeType });
-        
+
         // Try using fetch API first, which works better in modern browsers
         // especially for downloading PDFs directly
         fetch(fileUrl)
@@ -145,17 +145,17 @@ export const downloadInvoicePdf = (pdfPath, invoiceId, baseUrl) => {
                 link.href = blobUrl;
                 link.download = fileName;
                 link.style.display = 'none';
-                
+
                 // Append to DOM, click and cleanup
                 document.body.appendChild(link);
                 link.click();
-                
+
                 // Cleanup after short delay
                 setTimeout(() => {
                     document.body.removeChild(link);
                     URL.revokeObjectURL(blobUrl);
                 }, 100);
-                
+
                 console.log('Fetch-based download completed successfully');
             })
             .catch(error => {
@@ -163,7 +163,7 @@ export const downloadInvoicePdf = (pdfPath, invoiceId, baseUrl) => {
                 // Fallback to traditional download method
                 return downloadFile(fileUrl, fileName, mimeType);
             });
-            
+
         return true;
     } catch (error) {
         console.error('Error preparing invoice download:', error);
@@ -174,7 +174,7 @@ export const downloadInvoicePdf = (pdfPath, invoiceId, baseUrl) => {
             if (cleanBaseUrl.endsWith('/')) cleanBaseUrl = cleanBaseUrl.slice(0, -1);
             const normalizedPath = pdfPath.startsWith('/') ? pdfPath : `/${pdfPath}`;
             const fileUrl = `${cleanBaseUrl}${normalizedPath}`;
-            
+
             // Open in new tab as last resort
             window.open(fileUrl, '_blank');
             return true;

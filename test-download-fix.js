@@ -58,7 +58,7 @@ if (typeof window === 'undefined') {
             this.options = options;
         }
     };
-    
+
     // Use Object.defineProperty for navigator to avoid getter issues
     Object.defineProperty(global, 'navigator', {
         value: {
@@ -110,7 +110,7 @@ const testDownloadFunctions = {
     downloadInvoicePdf: (pdfPath, invoiceId, baseUrl) => {
         console.log(`\n--- Testing downloadInvoicePdf ---`);
         console.log(`Input: pdfPath=${pdfPath}, invoiceId=${invoiceId}, baseUrl=${baseUrl}`);
-        
+
         if (!pdfPath) {
             console.error('PDF path is missing');
             return false;
@@ -121,19 +121,19 @@ const testDownloadFunctions = {
         if (cleanBaseUrl.endsWith('/')) {
             cleanBaseUrl = cleanBaseUrl.slice(0, -1);
         }
-        
+
         const normalizedPath = pdfPath.startsWith('/') ? pdfPath : `/${pdfPath}`;
         const fileUrl = `${cleanBaseUrl}${normalizedPath}`;
-        
+
         const isPdf = pdfPath.toLowerCase().endsWith('.pdf');
         const mimeType = isPdf ? 'application/pdf' : 'text/html';
-        
+
         let fileName = pdfPath.includes('/') ? pdfPath.split('/').pop() : `invoice-${invoiceId}${isPdf ? '.pdf' : '.html'}`;
-        
+
         console.log(`Generated URL: ${fileUrl}`);
         console.log(`Generated filename: ${fileName}`);
         console.log(`MIME type: ${mimeType}`);
-        
+
         // Simulate fetch download
         console.log(`Simulating fetch download...`);
         return true;
@@ -142,15 +142,15 @@ const testDownloadFunctions = {
     tryMultipleDownloadMethods: async (url, filename, mimeType) => {
         console.log(`\n--- Testing tryMultipleDownloadMethods ---`);
         console.log(`Input: url=${url}, filename=${filename}, mimeType=${mimeType}`);
-        
+
         // Simulate browser detection
         const userAgent = global.navigator?.userAgent || '';
         const isChrome = userAgent.indexOf("Chrome") !== -1;
         const isFirefox = userAgent.indexOf("Firefox") !== -1;
         const isSafari = userAgent.indexOf("Safari") !== -1 && !isChrome;
-        
+
         console.log(`Browser detection: Chrome=${isChrome}, Firefox=${isFirefox}, Safari=${isSafari}`);
-        
+
         // Simulate fetch method
         try {
             console.log('Trying fetch download method...');
@@ -164,11 +164,11 @@ const testDownloadFunctions = {
         } catch (e) {
             console.log('✗ Fetch method would fail:', e.message);
         }
-        
+
         // Simulate standard link method
         console.log('Trying standard link download method...');
         console.log('✓ Standard link method would succeed');
-        
+
         return true;
     }
 };
@@ -182,7 +182,7 @@ testScenarios.forEach((scenario, index) => {
     console.log(`\n${'='.repeat(50)}`);
     console.log(`TEST ${index + 1}: ${scenario.name}`);
     console.log(`${'='.repeat(50)}`);
-    
+
     // Test downloadInvoicePdf
     const downloadResult = testDownloadFunctions.downloadInvoicePdf(
         scenario.pdfPath,
@@ -190,7 +190,7 @@ testScenarios.forEach((scenario, index) => {
         scenario.baseUrl
     );
     console.log(`downloadInvoicePdf result: ${downloadResult ? 'SUCCESS' : 'FAILED'}`);
-    
+
     // Test tryMultipleDownloadMethods  
     const cleanBaseUrl = scenario.baseUrl.replace('/api', '');
     const normalizedPath = scenario.pdfPath.startsWith('/') ? scenario.pdfPath : `/${scenario.pdfPath}`;
@@ -198,7 +198,7 @@ testScenarios.forEach((scenario, index) => {
     const isPdf = scenario.pdfPath.toLowerCase().endsWith('.pdf');
     const mimeType = isPdf ? 'application/pdf' : 'text/html';
     const fileName = scenario.pdfPath.split('/').pop();
-    
+
     testDownloadFunctions.tryMultipleDownloadMethods(fileUrl, fileName, mimeType)
         .then(result => {
             console.log(`tryMultipleDownloadMethods result: ${result ? 'SUCCESS' : 'FAILED'}`);

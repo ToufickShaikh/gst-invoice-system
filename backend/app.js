@@ -72,7 +72,7 @@ app.use('/invoices', (req, res, next) => {
     res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.header('Pragma', 'no-cache');
     res.header('Expires', '0');
-    
+
     // For PDF files, set appropriate content-disposition for download
     if (req.path.endsWith('.pdf')) {
         const filename = req.path.split('/').pop();
@@ -82,7 +82,7 @@ app.use('/invoices', (req, res, next) => {
         res.header('Content-Type', 'text/html');
         res.header('Content-Disposition', `attachment; filename="${req.path.split('/').pop()}"`);
     }
-    
+
     next();
 }, express.static('invoices'));
 
