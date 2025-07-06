@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Download Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+        .note {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF Download Test</h1>
+        <p>This test verifies that the PDF download functionality works correctly in your browser.</p>
+        
+        <div class="note">
+            <strong>Note:</strong> This test will attempt to download a test PDF from the GST Invoice System backend. 
+            If the download doesn't start automatically, check your browser's pop-up blocker and download settings.
+        </div>
+        
+        <button id="testButton">Test PDF Download</button>
+        
+        <div id="results">
+            <p>Click the button above to start the test. Results will appear here.</p>
+        </div>
+        
+        <h3>Troubleshooting</h3>
+        <ul>
+            <li>Make sure your browser allows downloads from this site</li>
+            <li>Check if pop-up blocker is disabled</li>
+            <li>Verify that the backend server is running</li>
+            <li>Check the browser console (F12) for error messages</li>
+        </ul>
+        
+        <h3>Manual Test Links</h3>
+        <p>If the automatic download doesn't work, try these direct links:</p>
+        <ul>
+            <li><a href="https://gst-invoice-system-back.onrender.com/invoices/" target="_blank">View Invoice Directory</a></li>
+            <li><a href="https://gst-invoice-system-back.onrender.com/api/health" target="_blank">Backend Health Check</a></li>
+        </ul>
+    </div>
+    
+    <script src="test-download-browser.js"></script>
+</body>
+</html>

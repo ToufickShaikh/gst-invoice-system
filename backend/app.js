@@ -63,8 +63,28 @@ app.use('/api/items', itemRoutes); // Item management routes
 app.use('/api/billing', billingRoutes); // Billing/invoice routes
 app.use('/api/gst', gstRoutes); // GST verification routes
 
-// Serve generated invoices as static files
-app.use('/invoices', express.static('invoices'));
+// Serve generated invoices as static files with proper headers
+app.use('/invoices', (req, res, next) => {
+    // Set headers to facilitate downloads and prevent caching issues
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.header('Pragma', 'no-cache');
+    res.header('Expires', '0');
+    
+    // For PDF files, set appropriate content-disposition for download
+    if (req.path.endsWith('.pdf')) {
+        const filename = req.path.split('/').pop();
+        res.header('Content-Type', 'application/pdf');
+        res.header('Content-Disposition', `attachment; filename="${filename}"`);
+    } else if (req.path.endsWith('.html')) {
+        res.header('Content-Type', 'text/html');
+        res.header('Content-Disposition', `attachment; filename="${req.path.split('/').pop()}"`);
+    }
+    
+    next();
+}, express.static('invoices'));
 
 // Global error handler
 app.use((err, req, res, next) => {

@@ -4,6 +4,7 @@ import Layout from '../components/Layout'
 import Button from '../components/Button'
 import { formatCurrency } from '../utils/dateHelpers'
 import { downloadFile } from '../utils/downloadHelper'
+import { tryMultipleDownloadMethods } from '../utils/alternativeDownload'
 import { toast } from 'react-hot-toast'
 
 const InvoiceSuccess = () => {
@@ -21,11 +22,22 @@ const InvoiceSuccess = () => {
   useEffect(() => {
     if (pdfUrl) {
       const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
-      const success = downloadFile(pdfUrl, fileName, 'application/pdf');
-
-      if (success) {
-        toast.success('Invoice downloaded automatically');
-      }
+      const isPdf = pdfUrl.toLowerCase().includes('.pdf');
+      const mimeType = isPdf ? 'application/pdf' : 'text/html';
+      
+      // Use the improved download method
+      tryMultipleDownloadMethods(pdfUrl, fileName, mimeType)
+        .then(success => {
+          if (success) {
+            toast.success('Invoice downloaded automatically', { duration: 3000 });
+          } else {
+            toast.info('Auto-download failed. Use the download button below.', { duration: 5000 });
+          }
+        })
+        .catch(error => {
+          console.error('Auto-download error:', error);
+          toast.info('Auto-download failed. Use the download button below.', { duration: 5000 });
+        });
     }
   }, [pdfUrl, invoiceId, invoiceNumber]);
 
@@ -55,13 +67,32 @@ const InvoiceSuccess = () => {
           {/* PDF Download */}
           <div className="mb-8">
             <Button
-              onClick={() => {
+              onClick={async () => {
                 const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
-                const success = downloadFile(pdfUrl, fileName, 'application/pdf');
-                if (success) {
-                  toast.success('Invoice downloaded');
-                } else {
-                  toast.error('Download failed. Try again.');
+                const isPdf = pdfUrl.toLowerCase().includes('.pdf');
+                const mimeType = isPdf ? 'application/pdf' : 'text/html';
+                
+                try {
+                  toast.success('Starting download...', { duration: 2000 });
+                  const success = await tryMultipleDownloadMethods(pdfUrl, fileName, mimeType);
+                  
+                  if (success) {
+                    toast.success('Invoice download initiated!', { 
+                      duration: 4000,
+                      icon: '📥' 
+                    });
+                  } else {
+                    // Fallback: open in new tab
+                    window.open(pdfUrl, '_blank');
+                    toast.error('Auto-download failed. Opening in new tab. Right-click and select "Save As" to download.', { 
+                      duration: 8000 
+                    });
+                  }
+                } catch (error) {
+                  console.error('Download error:', error);
+                  // Final fallback
+                  window.open(pdfUrl, '_blank');
+                  toast.error('Download failed. Opening in new tab instead.', { duration: 6000 });
                 }
               }}
               variant="primary"
