@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import Layout from '../components/Layout'
 import Table from '../components/Table'
@@ -9,6 +10,7 @@ import { itemsAPI } from '../api/items'
 import { formatCurrency } from '../utils/dateHelpers'
 
 const Items = () => {
+  const navigate = useNavigate()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -123,9 +125,29 @@ const Items = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Item Management</h1>
-          <Button onClick={() => setIsModalOpen(true)}>
-            Add Item
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              }
+              onClick={() => navigate('/assignments', {
+                state: {
+                  prefilledTask: 'Production Task Assignment',
+                  assignmentType: 'production',
+                  context: 'items_management'
+                }
+              })}
+            >
+              Assign Production
+            </Button>
+            <Button onClick={() => setIsModalOpen(true)}>
+              Add Item
+            </Button>
+          </div>
         </div>
 
         {/* Table */}

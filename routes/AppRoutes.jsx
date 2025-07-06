@@ -9,6 +9,8 @@ import InvoiceSuccess from '../src/pages/InvoiceSuccess'
 import Invoices from '../src/pages/Invoices'
 import Login from '../src/pages/Login'
 import EditInvoice from '../src/pages/EditInvoice' // Import the new page
+import Assignments from '../src/pages/Assignments'
+import NavigationTest from '../src/components/NavigationTest'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -39,6 +41,8 @@ const AppRoutes = () => {
       <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
       <Route path="/invoice-success" element={<PrivateRoute><InvoiceSuccess /></PrivateRoute>} />
       <Route path="/invoices" element={<PrivateRoute><Invoices /></PrivateRoute>} />
+      <Route path="/assignments" element={<PrivateRoute><Assignments /></PrivateRoute>} />
+      <Route path="/test-nav" element={<PrivateRoute><NavigationTest /></PrivateRoute>} />
       <Route path="/edit-invoice/:id" element={<PrivateRoute><EditInvoice /></PrivateRoute>} /> {/* Add the new route */}
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>

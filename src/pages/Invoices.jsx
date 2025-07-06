@@ -108,7 +108,50 @@ const Invoices = () => {
     return (
         <Layout>
             <div className="space-y-6">
-                <h1 className="text-2xl font-bold">Invoices</h1>
+                <div className="flex justify-between items-center">
+                    <h1 className="text-2xl font-bold">Invoices</h1>
+
+                    {/* Assignment Actions */}
+                    <div className="flex gap-3">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            }
+                            onClick={() => navigate('/assignments', {
+                                state: {
+                                    prefilledTask: 'Invoice Follow-up Tasks',
+                                    assignmentType: 'followup',
+                                    context: 'invoices'
+                                }
+                            })}
+                        >
+                            Assign Follow-up
+                        </Button>
+                        <Button
+                            variant="success"
+                            size="sm"
+                            leftIcon={
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            }
+                            onClick={() => navigate('/assignments', {
+                                state: {
+                                    prefilledTask: 'Bulk Invoice Assignment',
+                                    assignmentType: 'bulk',
+                                    context: 'invoices'
+                                }
+                            })}
+                        >
+                            Bulk Assign
+                        </Button>
+                    </div>
+                </div>
+
                 <div className="flex gap-4 mb-4">
                     <Button variant={tab === 'B2B' ? 'primary' : 'secondary'} onClick={() => setTab('B2B')}>B2B Invoices</Button>
                     <Button variant={tab === 'B2C' ? 'primary' : 'secondary'} onClick={() => setTab('B2C')}>B2C Invoices</Button>

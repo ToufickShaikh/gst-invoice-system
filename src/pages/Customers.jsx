@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import Layout from '../components/Layout'
 import Table from '../components/Table'
@@ -9,6 +10,7 @@ import { customersAPI } from '../api/customers'
 import { gstAPI } from '../api/gst'
 
 const Customers = () => {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('B2B')
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(false)
@@ -214,9 +216,29 @@ const Customers = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Customers</h1>
-          <Button onClick={() => setIsModalOpen(true)}>
-            Add Customer
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              }
+              onClick={() => navigate('/assignments', {
+                state: {
+                  prefilledTask: 'Customer Representative Assignment',
+                  assignmentType: 'customer',
+                  customerType: activeTab
+                }
+              })}
+            >
+              Assign Rep
+            </Button>
+            <Button onClick={() => setIsModalOpen(true)}>
+              Add Customer
+            </Button>
+          </div>
         </div>
 
         {/* Tabs */}

@@ -99,6 +99,15 @@ const Layout = ({ children }) => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
       )
+    },
+    {
+      path: '/assignments',
+      label: 'Assignments',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+      )
     }
   ]
 
@@ -106,8 +115,8 @@ const Layout = ({ children }) => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100">
       {/* Enhanced Header with modern design */}
       <header className={`sticky top-0 z-50 transition-all duration-300 ${scrolled
-          ? 'bg-white/95 backdrop-blur-md shadow-lg'
-          : 'bg-white shadow-md'
+        ? 'bg-white/95 backdrop-blur-md shadow-lg'
+        : 'bg-white shadow-md'
         }`}>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 lg:h-20">
@@ -133,8 +142,8 @@ const Layout = ({ children }) => {
                   key={item.path}
                   to={item.path}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-smooth ${location.pathname === item.path
-                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-md'
-                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-md'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
                     }`}
                 >
                   {item.icon}
@@ -213,8 +222,8 @@ const Layout = ({ children }) => {
                 to={item.path}
                 onClick={() => setIsMenuOpen(false)}
                 className={`flex items-center space-x-3 px-6 py-4 transition-smooth ${location.pathname === item.path
-                    ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 border-r-4 border-yellow-500'
-                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 border-r-4 border-yellow-500'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                   }`}
               >
                 {item.icon}
