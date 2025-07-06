@@ -25,7 +25,7 @@ const mockInvoiceData = {
             units: 'pieces'
         },
         {
-            name: 'Test Product 2', 
+            name: 'Test Product 2',
             hsnCode: '5678',
             quantity: 1,
             rate: 500,
@@ -48,7 +48,7 @@ const mockInvoiceData = {
 async function testInvoicePdfGeneration() {
     console.log('🧪 Testing Invoice PDF Generation');
     console.log('=================================\n');
-    
+
     try {
         console.log('📋 Mock Invoice Data:');
         console.log(`- Invoice Number: ${mockInvoiceData.invoiceNumber}`);
@@ -56,28 +56,28 @@ async function testInvoicePdfGeneration() {
         console.log(`- Items: ${mockInvoiceData.items.length}`);
         console.log(`- Total Amount: ₹${mockInvoiceData.grandTotal}`);
         console.log('');
-        
+
         console.log('🔧 Starting PDF generation...');
         const startTime = Date.now();
-        
+
         const pdfPath = await generateInvoicePDF(mockInvoiceData);
-        
+
         const endTime = Date.now();
         const timeTaken = endTime - startTime;
-        
+
         console.log(`✅ PDF Generation completed in ${timeTaken}ms`);
         console.log(`📄 PDF Path: ${pdfPath}`);
-        
+
         // Check if the file actually exists
         const fullPath = path.join(__dirname, 'invoices', `invoice-${mockInvoiceData.invoiceNumber}.pdf`);
         const htmlPath = path.join(__dirname, 'invoices', `invoice-${mockInvoiceData.invoiceNumber}.html`);
-        
+
         if (fs.existsSync(fullPath)) {
             const stats = fs.statSync(fullPath);
             console.log(`✅ PDF file created successfully`);
             console.log(`📊 File size: ${stats.size} bytes`);
             console.log(`📁 Full path: ${fullPath}`);
-            
+
             // Test if it's a valid PDF by checking the header
             const buffer = fs.readFileSync(fullPath);
             const pdfHeader = buffer.toString('ascii', 0, 4);
@@ -86,20 +86,20 @@ async function testInvoicePdfGeneration() {
             } else {
                 console.log('❌ File does not appear to be a valid PDF (incorrect header)');
             }
-            
+
         } else if (fs.existsSync(htmlPath)) {
             const stats = fs.statSync(htmlPath);
             console.log(`⚠️  HTML file created instead of PDF`);
             console.log(`📊 File size: ${stats.size} bytes`);
             console.log(`📁 Full path: ${htmlPath}`);
             console.log('🔍 This indicates PDF generation failed and fallback was used');
-            
+
         } else {
             console.log('❌ No file was created (neither PDF nor HTML)');
         }
-        
+
         return true;
-        
+
     } catch (error) {
         console.error('❌ PDF generation test failed:');
         console.error('Error:', error.message);
@@ -116,7 +116,7 @@ testInvoicePdfGeneration()
         } else {
             console.log('\n💥 Test failed. Check the error details above.');
         }
-        
+
         console.log('\n📝 Next Steps:');
         console.log('1. If PDF was created successfully, the fix is working');
         console.log('2. If HTML was created, we need to investigate Puppeteer issues');
