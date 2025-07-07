@@ -41,6 +41,17 @@ const Billing = () => {
   })
   const [addingCustomer, setAddingCustomer] = useState(false)
 
+  // Add Item Modal states
+  const [showAddItemModal, setShowAddItemModal] = useState(false)
+  const [newItem, setNewItem] = useState({
+    name: '',
+    hsnCode: '',
+    rate: '',
+    taxSlab: 18, // Default GST rate
+    units: 'per piece'
+  })
+  const [addingItem, setAddingItem] = useState(false)
+
   // Searchable Customer Dropdown states
   const [customerSearch, setCustomerSearch] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
@@ -60,7 +71,7 @@ const Billing = () => {
         const name = billingType === 'B2B' ? customer.firmName : customer.name
         const contact = customer.contact || ''
         const email = customer.email || ''
-        
+
         return (
           name?.toLowerCase().includes(searchTerm) ||
           contact.includes(searchTerm) ||
@@ -153,7 +164,7 @@ const Billing = () => {
     setCustomerSearch(`${displayName} - ${customer.contact}`)
     setSelectedCustomer(customer._id)
     setShowCustomerDropdown(false)
-    
+
     if (billingType === 'B2B') {
       detectTaxType(customer)
     } else {
@@ -184,9 +195,9 @@ const Billing = () => {
     const updatedItems = [...billItems]
     if (field === 'itemId') {
       const selectedItem = items.find(i => i._id === value)
-      updatedItems[index] = { 
-        ...updatedItems[index], 
-        itemId: value, 
+      updatedItems[index] = {
+        ...updatedItems[index],
+        itemId: value,
         item: selectedItem,
         customRate: selectedItem ? selectedItem.rate : '' // Initialize custom rate with original rate
       }
@@ -221,7 +232,7 @@ const Billing = () => {
       const itemTotal = rate * quantity
       const itemDiscountAmount = itemDiscount
       const subtotalAfterItemDiscount = itemTotal - itemDiscountAmount
-      
+
       // Apply global discount proportionally only to the subtotal after item discount
       const totalBeforeGlobalDiscount = billItems.reduce((sum, bItem) => {
         if (!bItem.item) return sum
@@ -231,10 +242,10 @@ const Billing = () => {
         const bItemTotal = bRate * bQuantity
         return sum + (bItemTotal - bItemDiscount)
       }, 0)
-      
-      const globalDiscountAmount = totalBeforeGlobalDiscount > 0 ? 
+
+      const globalDiscountAmount = totalBeforeGlobalDiscount > 0 ?
         (subtotalAfterItemDiscount / totalBeforeGlobalDiscount) * Number(discountAmt || 0) : 0
-      
+
       const taxableAmount = subtotalAfterItemDiscount - globalDiscountAmount
       const tax = calculateTax(taxableAmount, taxSlab, isInterState)
 
@@ -403,28 +414,106 @@ const Billing = () => {
 
       // Add to customers list
       setCustomers(prev => [...prev, createdCustomer])
-      
+
       // Auto-select the newly created customer in searchable dropdown
       const displayName = billingType === 'B2B' ? createdCustomer.firmName : createdCustomer.name
       setCustomerSearch(`${displayName} - ${createdCustomer.contact}`)
       setSelectedCustomer(createdCustomer._id)
       setShowCustomerDropdown(false)
-      
+
       // Close modal
       handleCloseAddCustomerModal()
-      
+
       toast.success(`${billingType} customer added successfully!`)
-      
+
       // Detect tax type for B2B customers
       if (billingType === 'B2B' && createdCustomer) {
         detectTaxType(createdCustomer)
       }
-      
+
     } catch (error) {
       console.error('Error adding customer:', error)
       toast.error('Failed to add customer. Please try again.')
     } finally {
       setAddingCustomer(false)
+    }
+  }
+
+  // Add Item functions
+  const handleOpenAddItemModal = () => {
+    setNewItem({
+      name: '',
+      hsnCode: '',
+      rate: '',
+      taxSlab: 18, // Default GST rate
+      units: 'per piece'
+    })
+    setShowAddItemModal(true)
+  }
+
+  const handleCloseAddItemModal = () => {
+    setShowAddItemModal(false)
+    setNewItem({
+      name: '',
+      hsnCode: '',
+      rate: '',
+      taxSlab: 18,
+      units: 'per piece'
+    })
+  }
+
+  const handleNewItemChange = (field, value) => {
+    setNewItem(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleAddNewItem = async () => {
+    // Validation
+    if (!newItem.name.trim()) {
+      toast.error('Item name is required')
+      return
+    }
+    if (!newItem.hsnCode.trim()) {
+      toast.error('HSN code is required')
+      return
+    }
+    if (!newItem.rate || parseFloat(newItem.rate) <= 0) {
+      toast.error('Valid rate is required')
+      return
+    }
+    if (!newItem.taxSlab || parseFloat(newItem.taxSlab) < 0) {
+      toast.error('Valid tax slab is required')
+      return
+    }
+
+    setAddingItem(true)
+    try {
+      const itemData = {
+        name: newItem.name.trim(),
+        hsnCode: newItem.hsnCode.trim(),
+        rate: parseFloat(newItem.rate),
+        taxSlab: parseFloat(newItem.taxSlab),
+        units: newItem.units
+      }
+
+      const response = await itemsAPI.create(itemData)
+      const createdItem = response.data || response
+
+      // Add to items list
+      setItems(prev => [...prev, createdItem])
+
+      // Close modal
+      handleCloseAddItemModal()
+
+      toast.success('Item added successfully!')
+
+    } catch (error) {
+      console.error('Error adding item:', error)
+      toast.error('Failed to add item. Please try again.')
+    } finally {
+      setAddingItem(false)
     }
   }
 
@@ -535,7 +624,7 @@ const Billing = () => {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Dropdown */}
                 {showCustomerDropdown && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -543,14 +632,13 @@ const Billing = () => {
                       filteredCustomers.map((customer) => {
                         const displayName = billingType === 'B2B' ? customer.firmName : customer.name
                         const isSelected = selectedCustomer === customer._id
-                        
+
                         return (
                           <div
                             key={customer._id}
                             onClick={() => handleCustomerSelect(customer)}
-                            className={`px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                              isSelected ? 'bg-blue-50 text-blue-700' : ''
-                            }`}
+                            className={`px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${isSelected ? 'bg-blue-50 text-blue-700' : ''
+                              }`}
                           >
                             <div className="font-medium">{displayName}</div>
                             <div className="text-sm text-gray-500">
@@ -566,7 +654,7 @@ const Billing = () => {
                         {customerSearch.trim() ? 'No customers found' : 'Start typing to search customers'}
                       </div>
                     )}
-                    
+
                     {/* Add Customer Option */}
                     <div
                       onClick={() => {
@@ -584,7 +672,7 @@ const Billing = () => {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Click outside handler */}
                 {showCustomerDropdown && (
                   <div
@@ -593,7 +681,7 @@ const Billing = () => {
                   />
                 )}
               </div>
-              
+
               <Button
                 onClick={handleOpenAddCustomerModal}
                 variant="primary"
@@ -607,7 +695,7 @@ const Billing = () => {
                 Add Customer
               </Button>
             </div>
-            
+
             {/* Selected Customer Info */}
             {selectedCustomer && (
               <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -639,9 +727,23 @@ const Billing = () => {
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium">Items</h3>
-              <Button onClick={handleAddItem} size="sm">
-                Add Item
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleOpenAddItemModal}
+                  variant="outline"
+                  size="sm"
+                  leftIcon={
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  }
+                >
+                  New Item
+                </Button>
+                <Button onClick={handleAddItem} size="sm">
+                  Add to Bill
+                </Button>
+              </div>
             </div>
 
             {billItems.length === 0 ? (
@@ -658,7 +760,13 @@ const Billing = () => {
                         </label>
                         <select
                           value={billItem.itemId}
-                          onChange={(e) => handleItemChange(index, 'itemId', e.target.value)}
+                          onChange={(e) => {
+                            if (e.target.value === 'ADD_NEW_ITEM') {
+                              handleOpenAddItemModal()
+                            } else {
+                              handleItemChange(index, 'itemId', e.target.value)
+                            }
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                         >
                           <option value="">Select an item</option>
@@ -667,6 +775,9 @@ const Billing = () => {
                               {item.name} - {formatCurrency(item.rate)} {item.units || 'per piece'} - {item.taxSlab}% GST
                             </option>
                           ))}
+                          <option value="ADD_NEW_ITEM" className="text-blue-600 font-medium">
+                            ➕ Add New Item
+                          </option>
                         </select>
                       </div>
                       <div className="flex justify-end">
@@ -862,14 +973,14 @@ const Billing = () => {
                       </div>
                     ))}
                   </div>
-                  
+
                   {/* Totals */}
                   <div className="border-t border-gray-300 pt-3 space-y-2">
                     <div className="flex justify-between">
                       <span>Subtotal (After Discounts):</span>
                       <span>{formatCurrency(totalBeforeTax)}</span>
                     </div>
-                    
+
                     {/* Total Discounts */}
                     {(billItemsWithTax.some(item => item.itemDiscountAmount > 0) || discountAmt > 0) && (
                       <div className="bg-green-50 p-2 rounded text-sm">
@@ -892,24 +1003,24 @@ const Billing = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="flex justify-between">
                       <span>Tax Amount ({taxType === 'IGST' ? 'IGST' : 'CGST + SGST'}):</span>
                       <span>{formatCurrency(totalTax)}</span>
                     </div>
-                    
+
                     {shippingCharges > 0 && (
                       <div className="flex justify-between">
                         <span>Shipping Charges:</span>
                         <span>{formatCurrency(shippingCharges)}</span>
                       </div>
                     )}
-                    
+
                     <div className="flex justify-between font-bold text-lg border-t border-gray-400 pt-2">
                       <span>Grand Total:</span>
                       <span>{formatCurrency(grandTotal)}</span>
                     </div>
-                    
+
                     {paidAmount > 0 && (
                       <>
                         <div className="flex justify-between text-blue-600">
@@ -1077,6 +1188,110 @@ const Billing = () => {
             loading={addingCustomer}
           >
             Add Customer
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Add Item Modal */}
+      <Modal
+        isOpen={showAddItemModal}
+        onRequestClose={handleCloseAddItemModal}
+        contentLabel="Add Item"
+        className="max-w-lg mx-auto p-6 rounded-lg shadow-lg bg-white"
+      >
+        <h2 className="text-xl font-semibold mb-4">Add New Item</h2>
+
+        <div className="space-y-4">
+          <div>
+            <InputField
+              label="Item Name"
+              value={newItem.name}
+              onChange={(e) => handleNewItemChange('name', e.target.value)}
+              placeholder="Enter item name"
+              required
+            />
+          </div>
+          <div>
+            <InputField
+              label="HSN Code"
+              value={newItem.hsnCode}
+              onChange={(e) => handleNewItemChange('hsnCode', e.target.value)}
+              placeholder="Enter HSN code (e.g., 1234, 5678)"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rate (₹) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={newItem.rate}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9.]/g, '')
+                handleNewItemChange('rate', value)
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              placeholder="Enter rate per unit"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tax Slab (%) <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={newItem.taxSlab}
+              onChange={(e) => handleNewItemChange('taxSlab', parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              required
+            >
+              <option value="0">0% - Exempt</option>
+              <option value="3">3% - GST</option>
+              <option value="5">5% - GST</option>
+              <option value="12">12% - GST</option>
+              <option value="18">18% - GST</option>
+              <option value="28">28% - GST</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Units <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={newItem.units}
+              onChange={(e) => handleNewItemChange('units', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              required
+            >
+              <option value="per piece">per piece</option>
+              <option value="per ft">per ft</option>
+              <option value="per roll">per roll</option>
+              <option value="per sqft">per sqft</option>
+              <option value="per box">per box</option>
+              <option value="per set">per set</option>
+              <option value="per gram">per gram</option>
+              <option value="per kg">per kg</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-4 mt-6">
+          <Button
+            onClick={handleCloseAddItemModal}
+            variant="outline"
+            size="sm"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddNewItem}
+            variant="primary"
+            size="sm"
+            loading={addingItem}
+          >
+            Add Item
           </Button>
         </div>
       </Modal>
