@@ -19,8 +19,12 @@ export const formatPhoneForWhatsApp = (phone) => {
 };
 
 // Generate comprehensive invoice message for WhatsApp
-export const generateInvoiceMessage = (invoiceData, customerData, items, pdfUrl) => {
+export const generateInvoiceMessage = (invoiceData, customerData, items, invoiceId) => {
     const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
+    
+    // Generate the public PDF URL that works without authentication
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
+    const publicPdfUrl = `${baseUrl}/billing/public/pdf/${invoiceId}`;
 
     const message = `🧾 *INVOICE GENERATED*
 ━━━━━━━━━━━━━━━━━━━━
@@ -59,15 +63,15 @@ ${invoiceData.balance > 0 ? `⚠️ *BALANCE DUE: ${formatCurrency(invoiceData.b
 📄 *DOWNLOAD OFFICIAL INVOICE PDF:*
 
 👆 *Click this link to download:*
-${pdfUrl}
+${publicPdfUrl}
 
 📱 *How to Download:*
 1️⃣ Tap the link above
-2️⃣ PDF will open in your browser
-3️⃣ Use "Download" or "Share" button
-4️⃣ Save to your device
+2️⃣ PDF will download automatically
+3️⃣ Check your Downloads folder
+4️⃣ Share or print as needed
 
-💡 *Tip:* Long-press the link and select "Copy" to share with others
+💡 *Note:* PDF link auto-expires in 1 minute for security
 
 Thank you for your business! 🙏
 
@@ -148,9 +152,9 @@ export const sendWhatsAppMessage = (phoneNumber, message) => {
 };
 
 // Send invoice via WhatsApp
-export const sendInvoiceViaWhatsApp = (customerData, invoiceData, items, pdfUrl) => {
+export const sendInvoiceViaWhatsApp = (customerData, invoiceData, items, invoiceId) => {
     try {
-        const message = generateInvoiceMessage(invoiceData, customerData, items, pdfUrl);
+        const message = generateInvoiceMessage(invoiceData, customerData, items, invoiceId);
         return sendWhatsAppMessage(customerData.contact, message);
     } catch (error) {
         console.error('WhatsApp send error:', error);

@@ -115,10 +115,6 @@ const InvoiceSuccess = () => {
                   onClick={async () => {
                     setSendingWhatsApp(true);
                     try {
-                      // Get the full PDF URL
-                      const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'https://gst-invoice-system-back.onrender.com';
-                      const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
-
                       const result = sendInvoiceViaWhatsApp(
                         customerData,
                         {
@@ -127,17 +123,17 @@ const InvoiceSuccess = () => {
                           balance: balance || 0
                         },
                         items || [],
-                        fullPdfUrl
+                        invoiceId // Pass invoiceId instead of pdfUrl
                       );
 
                       if (result.success) {
-                        toast.success('WhatsApp opened with complete invoice details and PDF download link!', {
+                        toast.success('WhatsApp opened with complete invoice details and direct PDF download link!', {
                           duration: 6000,
                           icon: '📱'
                         });
                         // Show additional helpful message
                         setTimeout(() => {
-                          toast('Customer will receive full invoice summary and can tap the PDF link to download', {
+                          toast('Customer will receive full invoice summary and can tap the link for instant PDF download', {
                             duration: 8000,
                             icon: 'ℹ️'
                           });

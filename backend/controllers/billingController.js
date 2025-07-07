@@ -531,6 +531,68 @@ const generatePaymentQr = async (req, res) => {
     }
 };
 
+// @desc    Generate PDF for public sharing (no auth required)
+// @route   GET /api/billing/public/pdf/:invoiceId
+// @access  Public
+const generatePublicPdf = async (req, res) => {
+    console.log('--- Public PDF Generation Request ---');
+    try {
+        const { invoiceId } = req.params;
+        
+        // Find the invoice
+        const invoice = await Invoice.findById(invoiceId)
+            .populate('customer')
+            .populate('items.item');
+
+        if (!invoice) {
+            return res.status(404).json({ message: 'Invoice not found' });
+        }
+
+        console.log(`Generating public PDF for invoice: ${invoice.invoiceNumber}`);
+
+        // Generate PDF with a temporary filename
+        const tempFileName = `public-invoice-${invoiceId}-${Date.now()}.pdf`;
+        const pdfPath = await pdfGenerator.generateInvoicePdf(invoice, tempFileName);
+        
+        // Set headers for PDF download
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
+        // Send the PDF file
+        res.sendFile(pdfPath, (err) => {
+            if (err) {
+                console.error('Error sending PDF file:', err);
+                if (!res.headersSent) {
+                    res.status(500).json({ message: 'Error sending PDF file' });
+                }
+            }
+            
+            // Auto-delete the file after 1 minute
+            setTimeout(() => {
+                const fs = require('fs');
+                try {
+                    if (fs.existsSync(pdfPath)) {
+                        fs.unlinkSync(pdfPath);
+                        console.log(`Temporary PDF deleted: ${tempFileName}`);
+                    }
+                } catch (deleteError) {
+                    console.error('Error deleting temporary PDF:', deleteError);
+                }
+            }, 60000); // 1 minute = 60,000 milliseconds
+        });
+
+    } catch (error) {
+        console.error('[ERROR] Public PDF generation failed:', error);
+        res.status(500).json({ 
+            message: 'Failed to generate PDF', 
+            error: error.message 
+        });
+    }
+};
+
 module.exports = {
     createInvoice,
     updateInvoice,
@@ -539,5 +601,6 @@ module.exports = {
     generatePaymentQr,
     getInvoices,
     getInvoiceById,
-    deleteInvoice, // Export the new function
+    deleteInvoice,
+    generatePublicPdf, // Export the new function
 };
