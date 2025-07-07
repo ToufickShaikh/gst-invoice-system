@@ -321,10 +321,10 @@ const Billing = () => {
 
       const response = await billingAPI.createInvoice(invoiceData)
       toast.success('Invoice generated successfully!')
-      
+
       // Get customer details for WhatsApp
       const customerDetails = customers.find(c => c._id === selectedCustomer)
-      
+
       navigate('/invoice-success', {
         state: {
           invoiceId: response.invoice?._id || response.invoiceId,

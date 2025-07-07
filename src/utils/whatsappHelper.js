@@ -5,24 +5,24 @@
 
 // Format phone number for WhatsApp (remove spaces, dashes, and ensure proper format)
 export const formatPhoneForWhatsApp = (phone) => {
-  if (!phone) return '';
-  
-  // Remove all non-numeric characters
-  let cleaned = phone.replace(/\D/g, '');
-  
-  // Add country code if not present (assuming India +91)
-  if (cleaned.length === 10) {
-    cleaned = '91' + cleaned;
-  }
-  
-  return cleaned;
+    if (!phone) return '';
+
+    // Remove all non-numeric characters
+    let cleaned = phone.replace(/\D/g, '');
+
+    // Add country code if not present (assuming India +91)
+    if (cleaned.length === 10) {
+        cleaned = '91' + cleaned;
+    }
+
+    return cleaned;
 };
 
 // Generate comprehensive invoice message for WhatsApp
 export const generateInvoiceMessage = (invoiceData, customerData, items, pdfUrl) => {
-  const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
-  
-  const message = `🧾 *INVOICE GENERATED*
+    const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
+
+    const message = `🧾 *INVOICE GENERATED*
 ━━━━━━━━━━━━━━━━━━━━
 
 📋 *Invoice Details:*
@@ -34,13 +34,13 @@ export const generateInvoiceMessage = (invoiceData, customerData, items, pdfUrl)
 ━━━━━━━━━━━━━━━━━━━━
 📦 *ITEMS SUMMARY:*
 
-${items.map((item, index) => 
-  `${index + 1}. ${item.name || 'Item'}
+${items.map((item, index) =>
+        `${index + 1}. ${item.name || 'Item'}
    📊 Qty: ${item.quantity} | Rate: ${formatCurrency(item.rate)}
    💰 Amount: ${formatCurrency(item.itemTotal || (item.quantity * item.rate))}
    ${item.itemDiscount > 0 ? `   🎯 Item Discount: -${formatCurrency(item.itemDiscount)}` : ''}
    ${item.tax?.total > 0 ? `   📈 Tax: ${formatCurrency(item.tax.total)}` : ''}`
-).join('\n\n')}
+    ).join('\n\n')}
 
 ━━━━━━━━━━━━━━━━━━━━
 💵 *PAYMENT SUMMARY:*
@@ -56,19 +56,33 @@ ${invoiceData.paidAmount > 0 ? `💳 Paid (${invoiceData.paymentMethod}): ${form
 ${invoiceData.balance > 0 ? `⚠️ *BALANCE DUE: ${formatCurrency(invoiceData.balance)}*` : '✅ *FULLY PAID*'}
 
 ━━━━━━━━━━━━━━━━━━━━
-📄 *Download Invoice PDF:*
+📄 *DOWNLOAD OFFICIAL INVOICE PDF:*
+
+👆 *Click this link to download:*
 ${pdfUrl}
 
-Thank you for your business! 🙏`;
+📱 *How to Download:*
+1️⃣ Tap the link above
+2️⃣ PDF will open in your browser
+3️⃣ Use "Download" or "Share" button
+4️⃣ Save to your device
 
-  return message;
+💡 *Tip:* Long-press the link and select "Copy" to share with others
+
+Thank you for your business! 🙏
+
+━━━━━━━━━━━━━━━━━━━━
+🏢 *GST Invoice System*
+📧 Professional invoicing made easy`;
+
+    return message;
 };
 
 // Generate payment reminder message
 export const generatePaymentReminderMessage = (invoiceData, customerData) => {
-  const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
-  
-  const message = `⏰ *PAYMENT REMINDER*
+    const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
+
+    const message = `⏰ *PAYMENT REMINDER*
 ━━━━━━━━━━━━━━━━━━━━
 
 Dear ${customerData.firmName || customerData.name},
@@ -86,14 +100,14 @@ Please make the payment at your earliest convenience.
 
 Thank you! 🙏`;
 
-  return message;
+    return message;
 };
 
 // Generate receipt confirmation message
 export const generateReceiptMessage = (invoiceData, customerData, paidAmount) => {
-  const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
-  
-  const message = `✅ *PAYMENT RECEIVED*
+    const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
+
+    const message = `✅ *PAYMENT RECEIVED*
 ━━━━━━━━━━━━━━━━━━━━
 
 Dear ${customerData.firmName || customerData.name},
@@ -109,54 +123,54 @@ ${invoiceData.balance <= 0 ? '✅ Invoice Fully Paid' : `Remaining Balance: ${fo
 
 We appreciate your business! 🙏`;
 
-  return message;
+    return message;
 };
 
 // Send message via WhatsApp URL scheme
 export const sendWhatsAppMessage = (phoneNumber, message) => {
-  const formattedPhone = formatPhoneForWhatsApp(phoneNumber);
-  
-  if (!formattedPhone) {
-    throw new Error('Invalid phone number');
-  }
-  
-  const encodedMessage = encodeURIComponent(message);
-  const whatsappURL = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
-  
-  // Open WhatsApp in new tab
-  window.open(whatsappURL, '_blank');
-  
-  return {
-    success: true,
-    url: whatsappURL,
-    phone: formattedPhone
-  };
+    const formattedPhone = formatPhoneForWhatsApp(phoneNumber);
+
+    if (!formattedPhone) {
+        throw new Error('Invalid phone number');
+    }
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappURL = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+
+    // Open WhatsApp in new tab
+    window.open(whatsappURL, '_blank');
+
+    return {
+        success: true,
+        url: whatsappURL,
+        phone: formattedPhone
+    };
 };
 
 // Send invoice via WhatsApp
 export const sendInvoiceViaWhatsApp = (customerData, invoiceData, items, pdfUrl) => {
-  try {
-    const message = generateInvoiceMessage(invoiceData, customerData, items, pdfUrl);
-    return sendWhatsAppMessage(customerData.contact, message);
-  } catch (error) {
-    console.error('WhatsApp send error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+    try {
+        const message = generateInvoiceMessage(invoiceData, customerData, items, pdfUrl);
+        return sendWhatsAppMessage(customerData.contact, message);
+    } catch (error) {
+        console.error('WhatsApp send error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
 };
 
 // Send payment reminder via WhatsApp
 export const sendPaymentReminderViaWhatsApp = (customerData, invoiceData) => {
-  try {
-    const message = generatePaymentReminderMessage(invoiceData, customerData);
-    return sendWhatsAppMessage(customerData.contact, message);
-  } catch (error) {
-    console.error('WhatsApp reminder send error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+    try {
+        const message = generatePaymentReminderMessage(invoiceData, customerData);
+        return sendWhatsAppMessage(customerData.contact, message);
+    } catch (error) {
+        console.error('WhatsApp reminder send error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
 };
