@@ -173,6 +173,8 @@ const Billing = () => {
       id: Date.now() + Math.random(), // Unique identifier
       itemId: '',
       quantity: 1,
+      customRate: '', // Custom rate for this invoice only
+      itemDiscount: 0, // Per-item discount
       item: null
     }
     setBillItems([...billItems, newItem])
@@ -182,7 +184,12 @@ const Billing = () => {
     const updatedItems = [...billItems]
     if (field === 'itemId') {
       const selectedItem = items.find(i => i._id === value)
-      updatedItems[index] = { ...updatedItems[index], itemId: value, item: selectedItem }
+      updatedItems[index] = { 
+        ...updatedItems[index], 
+        itemId: value, 
+        item: selectedItem,
+        customRate: selectedItem ? selectedItem.rate : '' // Initialize custom rate with original rate
+      }
     } else {
       updatedItems[index][field] = value
     }
@@ -202,31 +209,42 @@ const Billing = () => {
     const customer = getCustomerDetails()
     const isInterState = taxType === 'IGST'
 
-    // Calculate total before discount for all items
-    const totalBeforeDiscount = billItems.reduce((sum, billItem) => {
-      if (!billItem.item) return sum
-      const rate = Number(billItem.item.rate) || 0
-      const quantity = Number(billItem.quantity) || 0
-      return sum + (rate * quantity)
-    }, 0)
-
-    // Distribute discount amount proportionally to each item
     return billItems.map(billItem => {
       if (!billItem.item) return null
 
-      const rate = Number(billItem.item.rate) || 0
+      // Use custom rate if provided, otherwise use original item rate
+      const rate = Number(billItem.customRate) || Number(billItem.item.rate) || 0
       const quantity = Number(billItem.quantity) || 0
       const taxSlab = Number(billItem.item.taxSlab) || 0
+      const itemDiscount = Number(billItem.itemDiscount) || 0
 
       const itemTotal = rate * quantity
-      const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * Number(discountAmt || 0) : 0
-      const taxableAmount = itemTotal - discountAmount
+      const itemDiscountAmount = itemDiscount
+      const subtotalAfterItemDiscount = itemTotal - itemDiscountAmount
+      
+      // Apply global discount proportionally only to the subtotal after item discount
+      const totalBeforeGlobalDiscount = billItems.reduce((sum, bItem) => {
+        if (!bItem.item) return sum
+        const bRate = Number(bItem.customRate) || Number(bItem.item.rate) || 0
+        const bQuantity = Number(bItem.quantity) || 0
+        const bItemDiscount = Number(bItem.itemDiscount) || 0
+        const bItemTotal = bRate * bQuantity
+        return sum + (bItemTotal - bItemDiscount)
+      }, 0)
+      
+      const globalDiscountAmount = totalBeforeGlobalDiscount > 0 ? 
+        (subtotalAfterItemDiscount / totalBeforeGlobalDiscount) * Number(discountAmt || 0) : 0
+      
+      const taxableAmount = subtotalAfterItemDiscount - globalDiscountAmount
       const tax = calculateTax(taxableAmount, taxSlab, isInterState)
 
       return {
         ...billItem,
+        effectiveRate: rate, // Store the effective rate used
         itemTotal,
-        discountAmount,
+        itemDiscountAmount,
+        globalDiscountAmount,
+        totalDiscountAmount: itemDiscountAmount + globalDiscountAmount,
         taxableAmount,
         tax,
         totalWithTax: taxableAmount + (tax ? tax.total : 0)
@@ -259,16 +277,18 @@ const Billing = () => {
 
     setLoading(true)
     try {
-      // Prepare items for backend (include snapshot details)
+      // Prepare items for backend (include snapshot details with custom rates)
       const itemsForBackend = billItemsWithTax.map(billItem => ({
         item: billItem.itemId,
         name: billItem.item.name,
         hsnCode: billItem.item.hsnCode,
-        rate: billItem.item.rate,
+        originalRate: billItem.item.rate, // Store original rate
+        rate: billItem.effectiveRate, // Use custom/effective rate for invoice
         taxSlab: billItem.item.taxSlab,
         quantity: billItem.quantity,
+        itemDiscount: billItem.itemDiscountAmount,
         itemTotal: billItem.itemTotal,
-        discountAmount: billItem.discountAmount,
+        totalDiscountAmount: billItem.totalDiscountAmount,
         taxableAmount: billItem.taxableAmount,
         tax: billItem.tax,
         totalWithTax: billItem.totalWithTax
@@ -629,119 +649,280 @@ const Billing = () => {
             ) : (
               <div className="space-y-4">
                 {billItems.map((billItem, index) => (
-                  <div key={billItem.id || `item-${index}`} className="flex gap-4 items-end">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Item
-                      </label>
-                      <select
-                        value={billItem.itemId}
-                        onChange={(e) => handleItemChange(index, 'itemId', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Select an item</option>
-                        {items.map(item => (
-                          <option key={item._id} value={item._id}>
-                            {item.name} - {formatCurrency(item.rate)} {item.units || 'per piece'} - {item.taxSlab}% GST
-                          </option>
-                        ))}
-                      </select>
+                  <div key={billItem.id || `item-${index}`} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    {/* Item Selection Row */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Item <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={billItem.itemId}
+                          onChange={(e) => handleItemChange(index, 'itemId', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="">Select an item</option>
+                          {items.map(item => (
+                            <option key={item._id} value={item._id}>
+                              {item.name} - {formatCurrency(item.rate)} {item.units || 'per piece'} - {item.taxSlab}% GST
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={() => handleRemoveItem(index)}
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 border-red-300 hover:bg-red-50"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Remove
+                        </Button>
+                      </div>
                     </div>
-                    <div className="w-32">
-                      <InputField
-                        label="Quantity"
-                        type="number"
-                        value={billItem.quantity}
-                        onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 1)}
-                        min="1"
-                      />
-                    </div>
-                    <Button
-                      onClick={() => handleRemoveItem(index)}
-                      variant="danger"
-                      size="sm"
-                    >
-                      Remove
-                    </Button>
+
+                    {/* Quantity, Rate, and Discounts Row */}
+                    {billItem.item && (
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Quantity
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={billItem.quantity}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9]/g, '')
+                              handleItemChange(index, 'quantity', parseInt(value) || 1)
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder="1"
+                            min="1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Rate (₹)
+                            <span className="text-xs text-gray-500 ml-1">
+                              (Original: {formatCurrency(billItem.item.rate)})
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={billItem.customRate}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9.]/g, '')
+                              handleItemChange(index, 'customRate', value)
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder={billItem.item.rate}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Item Discount (₹)
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={billItem.itemDiscount || ''}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9.]/g, '')
+                              handleItemChange(index, 'itemDiscount', parseFloat(value) || 0)
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <div className="text-sm text-gray-600">
+                            <div>Subtotal: {formatCurrency((Number(billItem.customRate) || Number(billItem.item.rate) || 0) * (Number(billItem.quantity) || 0))}</div>
+                            {billItem.itemDiscount > 0 && (
+                              <div className="text-green-600">Discount: -{formatCurrency(billItem.itemDiscount)}</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Discount, Shipping, and Payment */}
+          {/* Global Discount, Shipping, and Payment */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <InputField
-              label="Discount (₹)"
-              type="number"
-              value={discountAmt}
-              onChange={(e) => setDiscountAmt(parseFloat(e.target.value) || 0)}
-              min="0"
-            />
-            <InputField
-              label="Shipping Charges (₹)"
-              type="number"
-              value={shippingCharges}
-              onChange={(e) => setShippingCharges(parseFloat(e.target.value) || 0)}
-              min="0"
-            />
-            <InputField
-              label="Paid Amount (₹)"
-              type="number"
-              value={paidAmount}
-              onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
-              min="0"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Global Discount (₹)
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={discountAmt || ''}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9.]/g, '')
+                  setDiscountAmt(parseFloat(value) || 0)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="0"
+              />
+              <p className="text-xs text-gray-500 mt-1">Applied proportionally to all items</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Shipping Charges (₹)
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={shippingCharges || ''}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9.]/g, '')
+                  setShippingCharges(parseFloat(value) || 0)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Paid Amount (₹)
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={paidAmount || ''}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9.]/g, '')
+                  setPaidAmount(parseFloat(value) || 0)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="0"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
               <select
                 value={paymentMethod}
                 onChange={e => setPaymentMethod(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               >
                 <option value="UPI">UPI</option>
                 <option value="Bank Transfer">Bank Transfer</option>
                 <option value="Cash">Cash</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Debit Card">Debit Card</option>
+                <option value="Cheque">Cheque</option>
               </select>
             </div>
           </div>
 
-          {/* Summary */}
+          {/* Enhanced Summary */}
           {billItems.some(item => item.item) && (
-            <div className="border-t pt-4">
-              <h3 className="text-lg font-medium mb-4">Summary</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Total Before Tax:</span>
-                  <span>{formatCurrency(totalBeforeTax)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Discount:</span>
-                  <span>- {formatCurrency(discountAmt)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Shipping Charges:</span>
-                  <span>{formatCurrency(shippingCharges)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax Amount:</span>
-                  <span>{formatCurrency(totalTax)}</span>
-                </div>
-                <div className="flex justify-between font-bold text-lg border-t pt-2">
-                  <span>Total After Tax:</span>
-                  <span>{formatCurrency(grandTotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Paid Amount:</span>
-                  <span>{formatCurrency(paidAmount)}</span>
-                </div>
-                <div className="flex justify-between font-medium">
-                  <span>Balance:</span>
-                  <span>{formatCurrency(balance)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Payment Method:</span>
-                  <span>{paymentMethod}</span>
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-medium mb-4">Invoice Summary</h3>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="space-y-3">
+                  {/* Item Details */}
+                  <div className="space-y-2">
+                    {billItemsWithTax.map((item, index) => (
+                      <div key={item.id || index} className="text-sm border-b border-gray-200 pb-2 last:border-b-0">
+                        <div className="flex justify-between font-medium">
+                          <span>{item.item.name} (x{item.quantity})</span>
+                          <span>{formatCurrency(item.itemTotal)}</span>
+                        </div>
+                        {item.effectiveRate !== item.item.rate && (
+                          <div className="flex justify-between text-blue-600 text-xs">
+                            <span>Custom Rate: {formatCurrency(item.effectiveRate)} (Original: {formatCurrency(item.item.rate)})</span>
+                          </div>
+                        )}
+                        {item.itemDiscountAmount > 0 && (
+                          <div className="flex justify-between text-green-600 text-xs">
+                            <span>Item Discount</span>
+                            <span>-{formatCurrency(item.itemDiscountAmount)}</span>
+                          </div>
+                        )}
+                        {item.globalDiscountAmount > 0 && (
+                          <div className="flex justify-between text-orange-600 text-xs">
+                            <span>Global Discount</span>
+                            <span>-{formatCurrency(item.globalDiscountAmount)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Taxable Amount</span>
+                          <span>{formatCurrency(item.taxableAmount)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Totals */}
+                  <div className="border-t border-gray-300 pt-3 space-y-2">
+                    <div className="flex justify-between">
+                      <span>Subtotal (After Discounts):</span>
+                      <span>{formatCurrency(totalBeforeTax)}</span>
+                    </div>
+                    
+                    {/* Total Discounts */}
+                    {(billItemsWithTax.some(item => item.itemDiscountAmount > 0) || discountAmt > 0) && (
+                      <div className="bg-green-50 p-2 rounded text-sm">
+                        <div className="font-medium text-green-800 mb-1">Discount Breakdown:</div>
+                        {billItemsWithTax.some(item => item.itemDiscountAmount > 0) && (
+                          <div className="flex justify-between text-green-700">
+                            <span>Item Discounts:</span>
+                            <span>-{formatCurrency(billItemsWithTax.reduce((sum, item) => sum + item.itemDiscountAmount, 0))}</span>
+                          </div>
+                        )}
+                        {discountAmt > 0 && (
+                          <div className="flex justify-between text-green-700">
+                            <span>Global Discount:</span>
+                            <span>-{formatCurrency(discountAmt)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-medium text-green-800 border-t border-green-200 pt-1">
+                          <span>Total Discount:</span>
+                          <span>-{formatCurrency(billItemsWithTax.reduce((sum, item) => sum + item.totalDiscountAmount, 0))}</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between">
+                      <span>Tax Amount ({taxType === 'IGST' ? 'IGST' : 'CGST + SGST'}):</span>
+                      <span>{formatCurrency(totalTax)}</span>
+                    </div>
+                    
+                    {shippingCharges > 0 && (
+                      <div className="flex justify-between">
+                        <span>Shipping Charges:</span>
+                        <span>{formatCurrency(shippingCharges)}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between font-bold text-lg border-t border-gray-400 pt-2">
+                      <span>Grand Total:</span>
+                      <span>{formatCurrency(grandTotal)}</span>
+                    </div>
+                    
+                    {paidAmount > 0 && (
+                      <>
+                        <div className="flex justify-between text-blue-600">
+                          <span>Paid Amount ({paymentMethod}):</span>
+                          <span>{formatCurrency(paidAmount)}</span>
+                        </div>
+                        <div className={`flex justify-between font-medium ${balance > 0 ? 'text-red-600' : balance < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                          <span>{balance > 0 ? 'Balance Due:' : balance < 0 ? 'Excess Paid:' : 'Fully Paid:'}</span>
+                          <span>{balance > 0 ? formatCurrency(balance) : balance < 0 ? formatCurrency(Math.abs(balance)) : '₹0'}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
