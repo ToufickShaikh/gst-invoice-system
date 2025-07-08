@@ -25,59 +25,81 @@ export const generateInvoiceMessage = (invoiceData, customerData, items, invoice
     // Generate the public PDF URL that works without authentication
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
     const publicPdfUrl = `${baseUrl}/billing/public/pdf/${invoiceId}`;
+    
+    // Get current date in Indian format
+    const today = new Date().toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
 
-    const message = `🧾 *INVOICE GENERATED*
+    // Create a clear, bold headline for the PDF download link
+    const pdfDownloadSection = `📥 *DOWNLOAD INVOICE PDF:*
+👉 ${publicPdfUrl}
+_(Tap link above to download)_`;
+
+    // Create payment instructions if there's a balance due
+    const paymentInstructions = invoiceData.balance > 0 
+        ? `\n\n💰 *PAYMENT INSTRUCTIONS:*
+• Amount Due: ${formatCurrency(invoiceData.balance)}
+• Please pay by UPI or bank transfer
+• Reference your Invoice #${invoiceData.invoiceNumber || 'N/A'} in payment`
+        : '\n\n✅ *Thank you for your payment!*';
+
+    const message = `🧾 *INVOICE FROM ${customerData?.firmName ? customerData?.firmName.toUpperCase() : 'YOUR BUSINESS'}*
 ━━━━━━━━━━━━━━━━━━━━
 
-📋 *Invoice Details:*
-📄 Invoice #: ${invoiceData.invoiceNumber || 'N/A'}
-📅 Date: ${new Date().toLocaleDateString('en-IN')}
-🏢 Customer: ${customerData.firmName || customerData.name || 'N/A'}
-📱 Contact: ${customerData.contact || 'N/A'}
+Dear ${customerData.name || 'Customer'},
+
+Your invoice #${invoiceData.invoiceNumber || 'N/A'} is ready.
+
+${pdfDownloadSection}
+
+📋 *INVOICE DETAILS:*
+• Invoice #: *${invoiceData.invoiceNumber || 'N/A'}*
+• Date: *${today}*
+• Billed to: *${customerData.firmName || customerData.name || 'N/A'}*
 
 ━━━━━━━━━━━━━━━━━━━━
 📦 *ITEMS SUMMARY:*
 
 ${items.map((item, index) =>
-        `${index + 1}. ${item.name || 'Item'}
-   📊 Qty: ${item.quantity} | Rate: ${formatCurrency(item.rate)}
-   💰 Amount: ${formatCurrency(item.itemTotal || (item.quantity * item.rate))}
-   ${item.itemDiscount > 0 ? `   🎯 Item Discount: -${formatCurrency(item.itemDiscount)}` : ''}
-   ${item.tax?.total > 0 ? `   📈 Tax: ${formatCurrency(item.tax.total)}` : ''}`
+        `*${index + 1}. ${item.name || 'Item'}*
+   • Qty: ${item.quantity} × Rate: ${formatCurrency(item.rate)}
+   • Total: ${formatCurrency(item.itemTotal || (item.quantity * item.rate))}
+   ${item.itemDiscount > 0 ? `   • Discount: -${formatCurrency(item.itemDiscount)}` : ''}
+   ${item.tax?.total > 0 ? `   • Tax: ${formatCurrency(item.tax.total)}` : ''}`
     ).join('\n\n')}
 
 ━━━━━━━━━━━━━━━━━━━━
 💵 *PAYMENT SUMMARY:*
 
-📊 Subtotal: ${formatCurrency(invoiceData.totalBeforeTax)}
-${invoiceData.discount > 0 ? `🎯 Global Discount: -${formatCurrency(invoiceData.discount)}` : ''}
-📈 Total Tax: ${formatCurrency(invoiceData.totalTax)}
-${invoiceData.shippingCharges > 0 ? `🚚 Shipping: ${formatCurrency(invoiceData.shippingCharges)}` : ''}
+• Subtotal: ${formatCurrency(invoiceData.totalBeforeTax)}
+${invoiceData.discount > 0 ? `• Discount: -${formatCurrency(invoiceData.discount)}` : ''}
+${invoiceData.totalTax > 0 ? `• GST: ${formatCurrency(invoiceData.totalTax)}` : ''}
+${invoiceData.shippingCharges > 0 ? `• Shipping: ${formatCurrency(invoiceData.shippingCharges)}` : ''}
 
 💰 *GRAND TOTAL: ${formatCurrency(invoiceData.grandTotal)}*
 
-${invoiceData.paidAmount > 0 ? `💳 Paid (${invoiceData.paymentMethod}): ${formatCurrency(invoiceData.paidAmount)}` : ''}
+${invoiceData.paidAmount > 0 ? `💳 Paid (${invoiceData.paymentMethod || 'Payment'}): ${formatCurrency(invoiceData.paidAmount)}` : ''}
 ${invoiceData.balance > 0 ? `⚠️ *BALANCE DUE: ${formatCurrency(invoiceData.balance)}*` : '✅ *FULLY PAID*'}
+${paymentInstructions}
 
 ━━━━━━━━━━━━━━━━━━━━
-📄 *DOWNLOAD OFFICIAL INVOICE PDF:*
 
-👆 *Click this link to download:*
-${publicPdfUrl}
-
-📱 *How to Download:*
-1️⃣ Tap the link above
+📲 *INVOICE PDF DOWNLOAD GUIDE:*
+1️⃣ Tap the link at the top of this message
 2️⃣ PDF will download automatically
-3️⃣ Check your Downloads folder
-4️⃣ Share or print as needed
-
-💡 *Note:* PDF link auto-expires in 1 minute for security
+3️⃣ Open from your Downloads folder
+4️⃣ Save for your records
 
 Thank you for your business! 🙏
 
+Best regards,
+${customerData?.firmName || 'Your Business Name'}
+
 ━━━━━━━━━━━━━━━━━━━━
-🏢 *GST Invoice System*
-📧 Professional invoicing made easy`;
+Need help? Reply to this message.`;
 
     return message;
 };

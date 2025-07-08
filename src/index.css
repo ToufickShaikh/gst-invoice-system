@@ -389,6 +389,51 @@
         @apply bg-gray-400 rounded hover:bg-gray-500;
     }
 
+    /* WhatsApp button special styling for InvoiceSuccess page */
+    .whatsapp-button-mobile {
+        @apply relative overflow-hidden shadow-md text-white font-medium;
+        min-height: 54px; /* Larger touch target */
+        transition: transform 0.2s, box-shadow 0.3s;
+    }
+    
+    .whatsapp-button-mobile:active {
+        transform: translateY(2px);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    /* Invoice Success page enhancements */
+    .mobile-content-wrapper {
+        @apply rounded-lg overflow-hidden;
+        max-width: 100%;
+    }
+    
+    .card-enhanced {
+        @apply bg-white rounded-lg shadow-md;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .action-buttons-mobile {
+        @apply flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-center;
+        margin-top: 0.75rem;
+    }
+    
+    /* Fade in animation */
+    .fade-in {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* WhatsApp floating button */
+    @media (max-width: 640px) {
+        .whatsapp-button-mobile {
+            @apply py-4 px-5 text-base;
+            border-radius: 12px;
+        }
+    }
 } /* End of @layer components */
 
 /* Animations */
@@ -639,5 +684,80 @@
     
     .dark-mode-ready .dark-text {
         color: var(--dark-text);
+    }
+}
+
+/* WhatsApp Sharing and Invoice Success page styles */
+.whatsapp-button-mobile {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    min-height: 54px; /* Larger touch target for mobile */
+    transition: transform 0.2s, box-shadow 0.3s;
+    font-weight: 600;
+}
+
+.whatsapp-button-mobile:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced success page components */
+.card-enhanced {
+    background-color: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.action-buttons-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+    justify-content: center;
+    margin-top: 0.75rem;
+}
+
+/* Fade in animation */
+.fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+    .whatsapp-button-mobile {
+        padding: 1rem 1.25rem;
+        font-size: 1rem;
+        border-radius: 12px;
+        width: 100%;
+    }
+    
+    .mobile-content-wrapper {
+        border-radius: 0.5rem;
+        max-width: 100%;
+        overflow: hidden;
+    }
+}
+
+@media (min-width: 641px) {
+    .action-buttons-mobile {
+        flex-direction: row;
+        align-items: center;
+        gap: 1rem;
     }
 }
