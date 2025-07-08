@@ -16,11 +16,76 @@ const InvoiceSuccess = () => {
   const [downloadComplete, setDownloadComplete] = useState(false)
   const [whatsappButtonFocused, setWhatsappButtonFocused] = useState(false)
   const [showSendPrompt, setShowSendPrompt] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  // Redirect if no invoice data
-  if (!invoiceId) {
-    navigate('/billing')
-    return null
+  // Debug logging
+  useEffect(() => {
+    console.log('InvoiceSuccess: location.state:', location.state);
+    console.log('InvoiceSuccess: invoiceId:', invoiceId);
+    console.log('InvoiceSuccess: pdfUrl:', pdfUrl);
+    console.log('InvoiceSuccess: customerData:', customerData);
+    setLoading(false);
+  }, [location.state, invoiceId, pdfUrl, customerData]);
+
+  // Show loading state while checking data
+  if (loading) {
+    return (
+      <Layout>
+        <div className="max-w-2xl mx-auto px-3 sm:px-0">
+          <div className="card-enhanced p-4 sm:p-6 lg:p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading invoice details...</p>
+          </div>
+        </div>
+      </Layout>
+    )
+  }
+
+  // Show error state if no invoice data
+  if (!invoiceId && !invoiceNumber) {
+    return (
+      <Layout>
+        <div className="max-w-2xl mx-auto px-3 sm:px-0">
+          <div className="card-enhanced p-4 sm:p-6 lg:p-8 text-center">
+            <div className="mb-4">
+              <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-red-600 mb-2">Invoice Data Missing</h2>
+            <p className="text-gray-600 mb-4">
+              Unable to load invoice details. This usually happens when navigating directly to this page.
+            </p>
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <p className="text-sm text-gray-600">
+                <strong>Debug Info:</strong><br />
+                Invoice ID: {invoiceId || 'Missing'}<br />
+                Invoice Number: {invoiceNumber || 'Missing'}<br />
+                PDF URL: {pdfUrl || 'Missing'}<br />
+                Customer Data: {customerData ? 'Present' : 'Missing'}<br />
+                Location State: {location.state ? 'Present' : 'Missing'}
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                onClick={() => navigate('/billing')}
+                variant="primary"
+                size="lg"
+              >
+                Create New Invoice
+              </Button>
+              <Button
+                onClick={() => navigate('/invoices')}
+                variant="secondary"
+                size="lg"
+              >
+                View All Invoices
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
   // Auto-download PDF when component mounts

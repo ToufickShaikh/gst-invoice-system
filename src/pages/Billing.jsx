@@ -320,43 +320,48 @@ const Billing = () => {
       }
 
       const response = await billingAPI.createInvoice(invoiceData)
+      console.log('Invoice creation response:', response); // Debug log
+      
       toast.success('Invoice generated successfully!')
 
       // Get customer details for WhatsApp
       const customerDetails = customers.find(c => c._id === selectedCustomer)
 
-      navigate('/invoice-success', {
-        state: {
-          invoiceId: response.invoice?._id || response.invoiceId,
+      // Create state object with fallback values
+      const successState = {
+        invoiceId: response.invoice?._id || response.invoiceId || response._id,
+        invoiceNumber: response.invoice?.invoiceNumber || response.invoiceNumber,
+        pdfUrl: response.pdfPath || response.pdfUrl || response.invoice?.pdfPath,
+        upiQr: response.upiQr,
+        balance: Number(grandTotal) - Number(paidAmount),
+        // Pass data for WhatsApp integration
+        customerData: customerDetails,
+        invoiceData: {
           invoiceNumber: response.invoice?.invoiceNumber || response.invoiceNumber,
-          pdfUrl: response.pdfPath || response.pdfUrl,
-          upiQr: response.upiQr,
-          balance: Number(grandTotal) - Number(paidAmount),
-          // Pass data for WhatsApp integration
-          customerData: customerDetails,
-          invoiceData: {
-            invoiceNumber: response.invoice?.invoiceNumber || response.invoiceNumber,
-            grandTotal: Number(grandTotal),
-            totalBeforeTax: Number(totalBeforeTax),
-            totalTax: Number(totalTax),
-            discount: Number(discountAmt),
-            shippingCharges: Number(shippingCharges),
-            paidAmount: Number(paidAmount),
-            balance: Number(balance),
-            paymentMethod,
-            billingType,
-            invoiceDate: new Date().toISOString()
-          },
-          items: billItemsWithTax.map(item => ({
-            name: item.item.name,
-            quantity: item.quantity,
-            rate: item.effectiveRate,
-            itemTotal: item.itemTotal,
-            itemDiscount: item.itemDiscountAmount,
-            tax: item.tax
-          }))
-        }
-      })
+          grandTotal: Number(grandTotal),
+          totalBeforeTax: Number(totalBeforeTax),
+          totalTax: Number(totalTax),
+          discount: Number(discountAmt),
+          shippingCharges: Number(shippingCharges),
+          paidAmount: Number(paidAmount),
+          balance: Number(balance),
+          paymentMethod,
+          billingType,
+          invoiceDate: new Date().toISOString()
+        },
+        items: billItemsWithTax.map(item => ({
+          name: item.item.name,
+          quantity: item.quantity,
+          rate: item.effectiveRate,
+          itemTotal: item.itemTotal,
+          itemDiscount: item.itemDiscountAmount,
+          tax: item.tax
+        }))
+      }
+
+      console.log('Navigating to invoice-success with state:', successState); // Debug log
+
+      navigate('/invoice-success', { state: successState })
     } catch (error) {
       // Log error details for debugging
       if (error.response) {
