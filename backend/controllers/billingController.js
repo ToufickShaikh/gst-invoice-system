@@ -538,7 +538,7 @@ const generatePublicPdf = async (req, res) => {
     console.log('--- Public PDF Generation Request ---');
     try {
         const { invoiceId } = req.params;
-        
+
         // Find the invoice
         const invoice = await Invoice.findById(invoiceId)
             .populate('customer')
@@ -553,7 +553,7 @@ const generatePublicPdf = async (req, res) => {
         // Generate PDF with a temporary filename
         const tempFileName = `public-invoice-${invoiceId}-${Date.now()}.pdf`;
         const pdfPath = await pdfGenerator.generateInvoicePdf(invoice, tempFileName);
-        
+
         // Set headers for PDF download
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`);
@@ -569,7 +569,7 @@ const generatePublicPdf = async (req, res) => {
                     res.status(500).json({ message: 'Error sending PDF file' });
                 }
             }
-            
+
             // Auto-delete the file after 1 minute
             setTimeout(() => {
                 const fs = require('fs');
@@ -586,9 +586,9 @@ const generatePublicPdf = async (req, res) => {
 
     } catch (error) {
         console.error('[ERROR] Public PDF generation failed:', error);
-        res.status(500).json({ 
-            message: 'Failed to generate PDF', 
-            error: error.message 
+        res.status(500).json({
+            message: 'Failed to generate PDF',
+            error: error.message
         });
     }
 };

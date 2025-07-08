@@ -177,7 +177,7 @@ const InvoiceSuccess = () => {
                   <div className="text-blue-700 text-sm">
                     📱 {customerData.contact} | 📧 {customerData.email || 'No email'}
                   </div>
-                  
+
                   {/* Enhanced sharing instructions */}
                   <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div className="text-green-800 text-sm">
@@ -191,14 +191,14 @@ const InvoiceSuccess = () => {
                       </ul>
                     </div>
                   </div>
-                  
+
                   {/* Additional sharing options */}
                   <div className="mt-3 flex flex-wrap gap-2 justify-center">
                     <Button
                       onClick={() => {
                         const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'https://gst-invoice-system-back.onrender.com';
                         const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
-                        
+
                         if (navigator.share) {
                           navigator.share({
                             title: `Invoice ${invoiceNumber || invoiceId}`,
@@ -225,12 +225,12 @@ const InvoiceSuccess = () => {
                     >
                       Copy PDF Link
                     </Button>
-                    
+
                     <Button
                       onClick={() => {
                         const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'https://gst-invoice-system-back.onrender.com';
                         const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
-                        
+
                         const emailSubject = encodeURIComponent(`Invoice ${invoiceNumber || invoiceId}`);
                         const emailBody = encodeURIComponent(`Dear ${customerData.firmName || customerData.name},
 
@@ -244,7 +244,7 @@ Invoice Details:
 Thank you for your business!
 
 Best regards`);
-                        
+
                         window.open(`mailto:${customerData.email || ''}?subject=${emailSubject}&body=${emailBody}`);
                       }}
                       variant="outline"
