@@ -138,11 +138,35 @@
 
     /* Mobile-first form layouts */
     .form-grid-mobile {
-        @apply grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: 1fr;
+    }
+    
+    @media (min-width: 640px) {
+        .form-grid-mobile {
+            gap: 1rem;
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (min-width: 1024px) {
+        .form-grid-mobile {
+            grid-template-columns: repeat(3, 1fr);
+        }
     }
 
     .form-section-mobile {
-        @apply space-y-4 p-4 sm:p-6 bg-white rounded-lg shadow-md;
+        background-color: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        padding: 0.75rem;
+    }
+    
+    @media (min-width: 640px) {
+        .form-section-mobile {
+            padding: 1.25rem;
+        }
     }
 
     /* Mobile-optimized modal */
@@ -170,7 +194,9 @@
 
     /* Mobile-optimized invoice items */
     .invoice-item-mobile {
-        @apply bg-white rounded-lg shadow-md p-4 mb-4 border border-gray-200;
+        @apply bg-white rounded-lg shadow-md border border-gray-200;
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
     }
 
     /* Mobile-friendly customer/item selection */
@@ -193,11 +219,17 @@
 
     /* Mobile-optimized spacing */
     .container-mobile {
-        @apply px-4 sm:px-6 lg:px-8;
+        @apply px-3 sm:px-5 lg:px-8;
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
+        max-width: 100%;
     }
 
     .section-mobile {
-        @apply py-6 sm:py-8 lg:py-12;
+        @apply py-4 sm:py-6 lg:py-10;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
     }
 
     /* Mobile-friendly status badges */
@@ -415,6 +447,38 @@
         padding-right: env(safe-area-inset-right);
     }
 
+    /* Mobile-specific padding classes */
+    .mobile-padding-all {
+        padding: 0.75rem;
+    }
+    
+    .mobile-padding-x {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+    
+    .mobile-padding-y {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+
+    /* Responsive container with consistent padding on all screen sizes */
+    .content-container {
+        padding: 0.75rem;
+    }
+    
+    @media (min-width: 640px) {
+        .content-container {
+            padding: 1rem;
+        }
+    }
+    
+    @media (min-width: 768px) {
+        .content-container {
+            padding: 1.25rem;
+        }
+    }
+
     /* Enhanced focus states for accessibility */
     .focus-enhanced:focus {
         @apply outline-none ring-2 ring-yellow-500 ring-offset-2;
@@ -434,18 +498,41 @@
     }
 }
 
-/* Mobile-first responsive breakpoints */
+/* Mobile-first responsive breakpoints with consistent padding */
 @media (max-width: 640px) {
     .responsive-text {
         font-size: 0.875rem;
     }
 
     .responsive-padding {
-        padding: 1rem;
+        padding: 0.75rem;
+    }
+    
+    .responsive-padding-x {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+    
+    .responsive-padding-y {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
     }
 
     .responsive-margin {
         margin: 0.5rem;
+    }
+    
+    /* Mobile card and content containers */
+    .mobile-card {
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    /* Mobile content wrapper with proper side spacing */
+    .mobile-content-wrapper {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
     }
 }
 
@@ -455,11 +542,32 @@
     }
 
     .responsive-padding {
-        padding: 1.5rem;
+        padding: 1rem;
+    }
+    
+    .responsive-padding-x {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .responsive-padding-y {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
     }
 
     .responsive-margin {
-        margin: 1rem;
+        margin: 0.75rem;
+    }
+    
+    .mobile-card {
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .mobile-content-wrapper {
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
 }
 
@@ -469,11 +577,32 @@
     }
 
     .responsive-padding {
-        padding: 2rem;
+        padding: 1.5rem;
+    }
+    
+    .responsive-padding-x {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+    }
+    
+    .responsive-padding-y {
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
     }
 
     .responsive-margin {
-        margin: 1.5rem;
+        margin: 1rem;
+    }
+    
+    .mobile-card {
+        border-radius: 0.5rem;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+    }
+    
+    .mobile-content-wrapper {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
     }
 }
 
@@ -490,11 +619,25 @@
     }
 }
 
-} /* End of @layer utilities */
-
 /* Dark mode support preparation */
 @media (prefers-color-scheme: dark) {
-    .dark-mode-ready {
-        /* Dark mode styles can be added here in future */
+    :root {
+        --dark-bg: #121212;
+        --dark-card-bg: #1e1e1e;
+        --dark-text: #e0e0e0;
+        --dark-border: #333333;
+    }
+    
+    /* These styles will be enabled when dark mode is fully implemented */
+    .dark-mode-ready .dark-bg {
+        background-color: var(--dark-bg);
+    }
+    
+    .dark-mode-ready .dark-card {
+        background-color: var(--dark-card-bg);
+    }
+    
+    .dark-mode-ready .dark-text {
+        color: var(--dark-text);
     }
 }
