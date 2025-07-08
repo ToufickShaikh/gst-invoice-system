@@ -113,25 +113,31 @@ const Layout = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100">
-      {/* Enhanced Header with modern design */}
+      {/* Enhanced Header with mobile-first design */}
       <header className={`sticky top-0 z-50 transition-all duration-300 ${scrolled
         ? 'bg-white/95 backdrop-blur-md shadow-lg'
         : 'bg-white shadow-md'
         }`}>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16 lg:h-20">
-            {/* Logo and Brand */}
-            <div className="flex items-center space-x-3 fade-in">
-              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-smooth">
-                <span className="text-white font-bold text-lg lg:text-xl">S</span>
+        <div className="container-mobile">
+          <div className="flex justify-between items-center h-14 sm:h-16 lg:h-20">
+            {/* Logo and Brand - Mobile optimized */}
+            <div className="flex items-center space-x-2 sm:space-x-3 fade-in">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-smooth">
+                <span className="text-white font-bold text-sm sm:text-lg lg:text-xl">S</span>
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
                   Shaikh Tools and Dies
                 </h1>
                 <p className="text-xs lg:text-sm text-gray-500 font-medium">
                   Professional GST Billing
                 </p>
+              </div>
+              {/* Mobile-only compact title */}
+              <div className="block sm:hidden">
+                <h1 className="text-lg font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                  Shaikh Tools
+                </h1>
               </div>
             </div>
 
@@ -141,13 +147,13 @@ const Layout = ({ children }) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-smooth ${location.pathname === item.path
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-smooth ${location.pathname === item.path
                     ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-md'
                     : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
                     }`}
                 >
                   {item.icon}
-                  <span className="font-medium">{item.label}</span>
+                  <span className="font-medium text-sm">{item.label}</span>
                 </Link>
               ))}
             </nav>

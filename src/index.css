@@ -28,7 +28,7 @@
     }
 }
 
-/* Enhanced Components */
+/* Enhanced Components with Mobile-First Responsive Design */
 @layer components {
 
     /* Smooth transitions for all interactive elements */
@@ -36,11 +36,17 @@
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Enhanced buttons with better responsiveness */
+    /* Enhanced buttons with better mobile responsiveness */
     .btn-enhanced {
-        @apply px-4 py-2 rounded-lg font-medium transition-smooth focus:outline-none focus:ring-2 focus:ring-offset-2;
-        min-height: 44px;
-        /* Touch-friendly minimum */
+        @apply px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-smooth focus:outline-none focus:ring-2 focus:ring-offset-2;
+        min-height: 44px; /* Touch-friendly minimum */
+        font-size: 14px;
+    }
+
+    @media (min-width: 640px) {
+        .btn-enhanced {
+            font-size: 16px;
+        }
     }
 
     .btn-primary {
@@ -59,18 +65,19 @@
         @apply bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 focus:ring-red-500;
     }
 
-    /* Enhanced cards with modern shadows */
+    /* Enhanced cards with modern shadows and mobile optimization */
     .card-enhanced {
-        @apply bg-white rounded-xl shadow-lg hover:shadow-xl transition-smooth border border-gray-100;
+        @apply bg-white rounded-lg sm:rounded-xl shadow-md sm:shadow-lg hover:shadow-xl transition-smooth border border-gray-100;
     }
 
-    /* Enhanced input fields */
+    /* Enhanced input fields with mobile-first design */
     .input-enhanced {
-        @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-smooth placeholder-gray-400;
+        @apply w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-smooth placeholder-gray-400;
         min-height: 44px;
+        font-size: 16px; /* Prevents zoom on iOS */
     }
 
-    /* Enhanced table styles */
+    /* Enhanced table styles with mobile responsiveness */
     .table-enhanced {
         @apply min-w-full bg-white rounded-lg overflow-hidden shadow-lg;
     }
@@ -80,23 +87,234 @@
     }
 
     .table-enhanced th {
-        @apply px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+        @apply px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
     }
 
     .table-enhanced td {
-        @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 border-b border-gray-200;
+        @apply px-3 py-3 sm:px-6 sm:py-4 text-sm text-gray-900 border-b border-gray-200;
     }
 
-    /* Responsive grid containers */
+    /* Mobile-first responsive grid containers */
     .grid-responsive {
-        @apply grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+        @apply grid gap-3 grid-cols-1 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4;
     }
 
     .grid-responsive-2 {
-        @apply grid gap-6 grid-cols-1 lg:grid-cols-2;
+        @apply grid gap-4 grid-cols-1 sm:gap-6 lg:grid-cols-2;
+    }
+
+    /* Mobile-optimized stat cards */
+    .stat-card-mobile {
+        @apply bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-100;
     }
 
     /* Enhanced animations */
+    .fade-in {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-up {
+        animation: slideUp 0.4s ease-out;
+    }
+
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    .scale-in {
+        animation: scaleIn 0.3s ease-out;
+    }
+
+    @keyframes scaleIn {
+        from { transform: scale(0.95); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    /* Mobile-first form layouts */
+    .form-grid-mobile {
+        @apply grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+    }
+
+    .form-section-mobile {
+        @apply space-y-4 p-4 sm:p-6 bg-white rounded-lg shadow-md;
+    }
+
+    /* Mobile-optimized modal */
+    .modal-mobile {
+        @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    }
+
+    .modal-content-mobile {
+        @apply bg-white rounded-lg shadow-xl max-w-md w-full max-h-full overflow-y-auto;
+    }
+
+    /* Mobile-friendly action buttons */
+    .action-buttons-mobile {
+        @apply flex flex-col sm:flex-row gap-2 sm:gap-4;
+    }
+
+    .action-buttons-mobile .btn-enhanced {
+        @apply w-full sm:w-auto;
+    }
+
+    /* Mobile table wrapper */
+    .table-mobile-wrapper {
+        @apply overflow-x-auto shadow-lg rounded-lg;
+    }
+
+    /* Mobile-optimized invoice items */
+    .invoice-item-mobile {
+        @apply bg-white rounded-lg shadow-md p-4 mb-4 border border-gray-200;
+    }
+
+    /* Mobile-friendly customer/item selection */
+    .dropdown-mobile {
+        @apply absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto;
+    }
+
+    .dropdown-item-mobile {
+        @apply px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0;
+    }
+
+    /* Mobile navigation enhancements */
+    .nav-mobile {
+        @apply fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40;
+    }
+
+    .nav-mobile-item {
+        @apply flex-1 py-2 px-1 text-center text-xs font-medium text-gray-600 hover:text-gray-800;
+    }
+
+    /* Mobile-optimized spacing */
+    .container-mobile {
+        @apply px-4 sm:px-6 lg:px-8;
+    }
+
+    .section-mobile {
+        @apply py-6 sm:py-8 lg:py-12;
+    }
+
+    /* Mobile-friendly status badges */
+    .status-badge-mobile {
+        @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+    }
+
+    /* Mobile touch targets */
+    .touch-target {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Mobile-optimized WhatsApp button */
+    .whatsapp-button-mobile {
+        @apply bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center space-x-2 transition-smooth;
+    }
+
+    /* Mobile-safe areas */
+    .safe-area {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* Mobile-first responsive text */
+    .text-responsive {
+        @apply text-sm sm:text-base;
+    }
+
+    .text-responsive-large {
+        @apply text-lg sm:text-xl lg:text-2xl;
+    }
+
+    .text-responsive-small {
+        @apply text-xs sm:text-sm;
+    }
+
+    /* Mobile-optimized branding */
+    .branding-section {
+        @apply relative overflow-hidden bg-gradient-to-r from-yellow-500 via-yellow-600 to-yellow-700 text-white p-6 sm:p-8 rounded-lg;
+    }
+
+    .branding-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+        pointer-events: none;
+    }
+
+    /* Mobile-optimized loading states */
+    .loading-mobile {
+        @apply flex items-center justify-center p-8;
+    }
+
+    .loading-spinner-mobile {
+        @apply animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500;
+    }
+
+    /* Mobile-friendly empty states */
+    .empty-state-mobile {
+        @apply text-center py-8 px-4;
+    }
+
+    .empty-state-mobile svg {
+        @apply mx-auto h-12 w-12 text-gray-400 mb-4;
+    }
+
+    /* Mobile-optimized error states */
+    .error-state-mobile {
+        @apply bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm;
+    }
+
+    /* Mobile keyboard-friendly inputs */
+    .input-mobile-friendly {
+        @apply appearance-none;
+    }
+
+    .input-mobile-friendly:focus {
+        @apply outline-none ring-2 ring-yellow-500 border-transparent;
+    }
+
+    /* Mobile-optimized date inputs */
+    .date-input-mobile {
+        @apply input-enhanced appearance-none;
+    }
+
+    .date-input-mobile::-webkit-calendar-picker-indicator {
+        @apply cursor-pointer;
+    }
+
+    /* Mobile-friendly select inputs */
+    .select-mobile {
+        @apply input-enhanced appearance-none pr-8;
+        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>');
+        background-repeat: no-repeat;
+        background-position: right 0.5rem center;
+        background-size: 1.25rem;
+    }
+
+    /* Mobile-optimized tooltips */
+    .tooltip-mobile {
+        @apply absolute z-10 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded shadow-lg;
+    }
+
+    /* Mobile-friendly progress indicators */
+    .progress-mobile {
+        @apply w-full bg-gray-200 rounded-full h-2;
+    }
+
+    .progress-bar-mobile {
+        @apply bg-yellow-500 h-2 rounded-full transition-all duration-300;
+    }
+
+    /* Animation utilities */
     .fade-in {
         animation: fadeIn 0.5s ease-in-out;
     }
@@ -138,7 +356,8 @@
     .custom-scrollbar::-webkit-scrollbar-thumb {
         @apply bg-gray-400 rounded hover:bg-gray-500;
     }
-}
+
+} /* End of @layer components */
 
 /* Animations */
 @keyframes fadeIn {
@@ -270,6 +489,8 @@
         box-shadow: none !important;
     }
 }
+
+} /* End of @layer utilities */
 
 /* Dark mode support preparation */
 @media (prefers-color-scheme: dark) {

@@ -46,10 +46,10 @@ const InvoiceSuccess = () => {
   return (
     <Layout>
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-          <div className="mb-6">
+        <div className="card-enhanced p-4 sm:p-6 lg:p-8 text-center">
+          <div className="mb-4 sm:mb-6">
             <svg
-              className="w-20 h-20 text-green-500 mx-auto"
+              className="w-16 h-16 sm:w-20 sm:h-20 text-green-500 mx-auto"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -63,12 +63,12 @@ const InvoiceSuccess = () => {
             </svg>
           </div>
 
-          <h2 className="text-2xl font-bold mb-4">Invoice Generated Successfully!</h2>
-          <p className="text-gray-600 mb-6">Invoice ID: {invoiceId}</p>
+          <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Invoice Generated Successfully!</h2>
+          <p className="text-gray-600 mb-4 sm:mb-6 text-sm sm:text-base">Invoice ID: {invoiceId}</p>
 
-          {/* PDF Download */}
-          <div className="mb-8">
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          {/* PDF Download - Mobile optimized */}
+          <div className="mb-6 sm:mb-8">
+            <div className="action-buttons-mobile">
               <Button
                 onClick={async () => {
                   const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
