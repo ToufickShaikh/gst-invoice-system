@@ -101,7 +101,7 @@ const InvoiceSuccess = () => {
           if (success) {
             toast.success('Invoice downloaded automatically', { duration: 3000 });
             setDownloadComplete(true);
-            
+
             // After successful download, focus on the WhatsApp button if customer contact exists
             if (customerData?.contact) {
               setTimeout(() => {
@@ -190,7 +190,7 @@ const InvoiceSuccess = () => {
           <p className="text-gray-600 mb-4 text-sm sm:text-base">
             Invoice <span className="font-medium">#{invoiceNumber || invoiceId}</span>
           </p>
-          
+
           {/* Show prompt banner if customer has phone number */}
           {customerData?.contact && showSendPrompt && (
             <div className="bg-green-100 border-l-4 border-green-500 p-4 mb-5 animate-pulse rounded-lg">
@@ -224,7 +224,7 @@ const InvoiceSuccess = () => {
                   <p className="text-green-700 mb-4 text-sm">
                     Send this invoice directly to {customerData.firmName || customerData.name} via WhatsApp including a direct PDF download link!
                   </p>
-                  
+
                   <div className="flex justify-center">
                     <Button
                       onClick={handleWhatsAppSend}
@@ -241,7 +241,7 @@ const InvoiceSuccess = () => {
                       {sendingWhatsApp ? 'Opening WhatsApp...' : 'Send Invoice via WhatsApp'}
                     </Button>
                   </div>
-                  
+
                   <div className="mt-3 text-sm text-green-700 border-t border-green-200 pt-3">
                     <p>✓ Includes complete invoice details</p>
                     <p>✓ Direct PDF download link for your customer</p>
@@ -250,7 +250,7 @@ const InvoiceSuccess = () => {
                 </div>
               </div>
             )}
-            
+
             <div className="action-buttons-mobile">
               {/* PDF Download Button */}
               <Button
@@ -419,7 +419,7 @@ Best regards`);
                 </svg>
                 Balance Amount: {formatCurrency(balance)}
               </h3>
-              
+
               <div className="flex flex-col md:flex-row gap-4 items-center justify-center">
                 <div className="bg-white p-4 rounded-lg border-2 border-yellow-300 shadow-md">
                   <p className="text-gray-700 mb-3 font-medium">Scan QR code to pay via UPI</p>
@@ -430,7 +430,7 @@ Best regards`);
                   </div>
                   <p className="text-sm font-medium text-center mt-2">UPI: {upiQr}</p>
                 </div>
-                
+
                 {customerData?.contact && (
                   <div className="bg-green-50 p-4 rounded-lg border-2 border-green-200 max-w-sm">
                     <h4 className="font-bold text-green-800 mb-2 flex items-center">

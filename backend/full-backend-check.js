@@ -126,13 +126,13 @@ console.log('\n6. Invoice Directory:');
 try {
     const invoiceFiles = fs.readdirSync('./invoices');
     console.log(`✅ Invoice directory contains ${invoiceFiles.length} files`);
-    
+
     const pdfFiles = invoiceFiles.filter(f => f.endsWith('.pdf'));
     const htmlFiles = invoiceFiles.filter(f => f.endsWith('.html'));
-    
+
     console.log(`   📄 PDF files: ${pdfFiles.length}`);
     console.log(`   📄 HTML files: ${htmlFiles.length}`);
-    
+
     if (invoiceFiles.length > 0) {
         console.log(`   📋 Recent files: ${invoiceFiles.slice(-3).join(', ')}`);
     }
@@ -161,11 +161,11 @@ console.log('\n8. Testing Server Start:');
 try {
     const app = require('./app');
     console.log('✅ App module loaded successfully');
-    
+
     const server = app.listen(3001, () => {
         console.log('✅ Test server started on port 3001');
         console.log('🌐 Try accessing: http://localhost:3001/api/health');
-        
+
         // Close server after 5 seconds
         setTimeout(() => {
             server.close(() => {
@@ -174,12 +174,12 @@ try {
             });
         }, 5000);
     });
-    
+
     server.on('error', (error) => {
         console.log('❌ Server error:', error.message);
         process.exit(1);
     });
-    
+
 } catch (error) {
     console.log('❌ Failed to start server:', error.message);
     console.log('Stack trace:', error.stack);

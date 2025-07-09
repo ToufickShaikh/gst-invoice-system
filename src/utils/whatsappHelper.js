@@ -25,7 +25,7 @@ export const generateInvoiceMessage = (invoiceData, customerData, items, invoice
     // Generate the public PDF URL that works without authentication
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
     const publicPdfUrl = `${baseUrl}/billing/public/pdf/${invoiceId}`;
-    
+
     // Get current date in Indian format
     const today = new Date().toLocaleDateString('en-IN', {
         day: 'numeric',
@@ -39,7 +39,7 @@ export const generateInvoiceMessage = (invoiceData, customerData, items, invoice
 _(Tap link above to download)_`;
 
     // Create payment instructions if there's a balance due
-    const paymentInstructions = invoiceData.balance > 0 
+    const paymentInstructions = invoiceData.balance > 0
         ? `\n\n💰 *PAYMENT INSTRUCTIONS:*
 • Amount Due: ${formatCurrency(invoiceData.balance)}
 • Please pay by UPI or bank transfer

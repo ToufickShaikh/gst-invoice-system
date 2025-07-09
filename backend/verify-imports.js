@@ -38,7 +38,7 @@ try {
     console.log('✅ Main app imported successfully');
 
     console.log('\n🎉 All imports successful! Backend should be able to start.');
-    
+
 } catch (error) {
     console.error('❌ Error during testing:', error.message);
     console.error('Stack trace:', error.stack);

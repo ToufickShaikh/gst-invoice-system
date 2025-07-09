@@ -11,8 +11,8 @@ app.use(express.json());
 
 // Test route
 app.get('/test', (req, res) => {
-    res.json({ 
-        message: 'Backend is working!', 
+    res.json({
+        message: 'Backend is working!',
         timestamp: new Date().toISOString(),
         status: 'OK'
     });
@@ -20,7 +20,7 @@ app.get('/test', (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
-    res.json({ 
+    res.json({
         status: 'healthy',
         server: 'running',
         port: PORT,

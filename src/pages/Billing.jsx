@@ -321,7 +321,7 @@ const Billing = () => {
 
       const response = await billingAPI.createInvoice(invoiceData)
       console.log('Invoice creation response:', response); // Debug log
-      
+
       toast.success('Invoice generated successfully!')
 
       // Get customer details for WhatsApp
