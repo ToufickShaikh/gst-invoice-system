@@ -24,11 +24,7 @@ export const forceDownloadWithFetch = async (url, filename, mimeType) => {
         // Set up request options with proper headers to force download
         const requestOptions = {
             method: 'GET',
-            headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            },
+            // Remove problematic headers that cause CORS issues
             mode: 'cors',
             credentials: 'include' // Include credentials for cross-origin requests
         };

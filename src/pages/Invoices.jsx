@@ -63,17 +63,23 @@ const Invoices = () => {
 
     // Handle reprinting the invoice with automatic PDF download
     const handleReprint = async (invoiceId) => {
+        // Confirm before reprinting
+        if (!window.confirm('Are you sure you want to reprint this invoice?')) {
+            return;
+        }
+        
         setLoading(true);
         try {
-            console.log('Requesting invoice reprint for ID:', invoiceId);
+            toast.loading('Generating invoice PDF...', { id: 'reprint-toast' });
             const res = await billingAPI.reprintInvoice(invoiceId);
-            console.log('Reprint API response:', res);
-
+            
             if (res && res.pdfPath) {
+                toast.dismiss('reprint-toast');
+                toast.success('Invoice generated successfully!');
+                
                 // Get the base URL from environment variable or fallback to default
                 const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
-                console.log('Using base URL for download:', baseUrl);
-
+                
                 // Clean the base URL
                 const cleanBaseUrl = baseUrl.replace('/api', '');
                 const normalizedPath = res.pdfPath.startsWith('/') ? res.pdfPath : `/${res.pdfPath}`;
@@ -89,43 +95,35 @@ const Invoices = () => {
                     const extension = isPdf ? '.pdf' : '.html';
                     fileName = `invoice-${invoiceId}${extension}`;
                 }
-
-                console.log('Download details:', {
-                    pdfUrl,
-                    fileName,
-                    mimeType,
-                    isPdf
-                });
-
-                // Try multiple download methods to ensure compatibility
-                toast.success('Starting download...', {
+                
+                // Use direct window.open for simple and reliable download
+                toast.success('Opening invoice...', {
                     duration: 3000,
-                    icon: '⬇️'
+                    icon: '📄'
                 });
-
-                const downloadSuccess = await tryMultipleDownloadMethods(pdfUrl, fileName, mimeType);
-
-                if (downloadSuccess) {
-                    toast.success('Invoice download initiated successfully!', {
+                
+                try {
+                    // Open the PDF in a new tab
+                    window.open(pdfUrl, '_blank');
+                    
+                    toast.success('Invoice opened in new tab!', {
                         duration: 5000,
                         icon: '📥'
                     });
-                } else {
-                    // As a final fallback, provide direct link
-                    console.log('All download methods failed, opening URL directly:', pdfUrl);
-
-                    // Create a button in the toast for manual download
+                } catch (err) {
+                    console.error('Error opening PDF:', err);
+                    
+                    // Fallback with manual link
                     toast.error(
                         <div>
-                            <p>Auto-download failed. Click the link below to download manually:</p>
+                            <p>Could not open automatically. Click the link below to open manually:</p>
                             <a
                                 href={pdfUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                download={fileName}
                                 className="text-blue-600 underline"
                             >
-                                Download {fileName}
+                                Open {fileName}
                             </a>
                         </div>,
                         { duration: 10000 }
@@ -183,13 +181,9 @@ const Invoices = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             }
-                            onClick={() => navigate('/assignments', {
-                                state: {
-                                    prefilledTask: 'Invoice Follow-up Tasks',
-                                    assignmentType: 'followup',
-                                    context: 'invoices'
-                                }
-                            })}
+                            onClick={() => {
+                                toast.info('Assignment feature has been removed');
+                            }}
                         >
                             Assign Follow-up
                         </Button>
@@ -198,18 +192,15 @@ const Invoices = () => {
                             size="sm"
                             leftIcon={
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                 </svg>
                             }
-                            onClick={() => navigate('/assignments', {
-                                state: {
-                                    prefilledTask: 'Bulk Invoice Assignment',
-                                    assignmentType: 'bulk',
-                                    context: 'invoices'
-                                }
-                            })}
+                            onClick={() => {
+                                toast.success('Opening invoice browser!', { duration: 1000 });
+                                window.open('/invoices', '_blank');
+                            }}
                         >
-                            Bulk Assign
+                            Open Invoice Browser
                         </Button>
                     </div>
                 </div>
@@ -236,9 +227,18 @@ const Invoices = () => {
                         </thead>
                         <tbody>
                             {invoices.map((inv, idx) => (
-                                <tr key={inv._id} className={!inv.customer ? 'bg-yellow-50' : ''}>
+                                <tr key={inv._id} className={!inv.customer ? 'bg-yellow-50' : (inv.hasBeenEdited ? 'bg-blue-50' : '')}>
                                     <td className="border px-2 py-1">{idx + 1}</td>
-                                    <td className="border px-2 py-1">{inv.invoiceNumber}</td>
+                                    <td className="border px-2 py-1">
+                                        <div className="flex items-center">
+                                            {inv.invoiceNumber}
+                                            {inv.hasBeenEdited && (
+                                                <span className="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                                                    Edited
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="border px-2 py-1">
                                         {inv.customer ? (
                                             <div>
@@ -255,8 +255,28 @@ const Invoices = () => {
                                     <td className="border px-2 py-1">{formatCurrency((inv.grandTotal || inv.totalAmount) - (inv.paidAmount || 0))}</td>
                                     <td className="border px-2 py-1 space-x-1">
                                         <div className="flex flex-wrap gap-1">
-                                            <Button size="sm" variant="secondary" onClick={() => handleEdit(inv._id)}>Edit</Button>
-                                            <Button size="sm" onClick={() => handleReprint(inv._id)}>Reprint</Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="primary" 
+                                                className="flex items-center"
+                                                onClick={() => handleEdit(inv._id)}
+                                            >
+                                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                                Edit
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="secondary"
+                                                className="flex items-center" 
+                                                onClick={() => handleReprint(inv._id)}
+                                            >
+                                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                </svg>
+                                                Reprint
+                                            </Button>
                                             {((inv.grandTotal || 0) - (inv.paidAmount || 0)) > 0 && (
                                                 <>
                                                     <Button size="sm" variant="success" onClick={() => handlePay(inv)}>Pay</Button>

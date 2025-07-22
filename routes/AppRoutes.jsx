@@ -6,13 +6,9 @@ import Customers from '../src/pages/Customers'
 import Items from '../src/pages/Items'
 import Billing from '../src/pages/Billing'
 import InvoiceSuccess from '../src/pages/InvoiceSuccess'
-import InvoiceSuccessTest from '../src/pages/InvoiceSuccessTest'
-import InvoiceTest from '../src/pages/InvoiceTest'
 import Invoices from '../src/pages/Invoices'
 import Login from '../src/pages/Login'
-import EditInvoice from '../src/pages/EditInvoice' // Import the new page
-import Assignments from '../src/pages/Assignments'
-import NavigationTest from '../src/components/NavigationTest'
+import EditInvoice from '../src/pages/EditInvoice'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -42,11 +38,8 @@ const AppRoutes = () => {
       <Route path="/items" element={<PrivateRoute><Items /></PrivateRoute>} />
       <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
       <Route path="/invoice-success" element={<PrivateRoute><InvoiceSuccess /></PrivateRoute>} />
-      <Route path="/invoice-test" element={<PrivateRoute><InvoiceTest /></PrivateRoute>} />
       <Route path="/invoices" element={<PrivateRoute><Invoices /></PrivateRoute>} />
-      <Route path="/assignments" element={<PrivateRoute><Assignments /></PrivateRoute>} />
-      <Route path="/test-nav" element={<PrivateRoute><NavigationTest /></PrivateRoute>} />
-      <Route path="/edit-invoice/:id" element={<PrivateRoute><EditInvoice /></PrivateRoute>} /> {/* Add the new route */}
+      <Route path="/edit-invoice/:id" element={<PrivateRoute><EditInvoice /></PrivateRoute>} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   )
