@@ -96,6 +96,19 @@ const Invoices = () => {
                 const isPdf = res.pdfPath.toLowerCase().endsWith('.pdf');
                 const mimeType = isPdf ? 'application/pdf' : 'text/html';
 
+                // Show different messages based on file type
+                if (isPdf) {
+                    toast.success('PDF invoice generated successfully! 📄', {
+                        duration: 4000,
+                        icon: '✅'
+                    });
+                } else {
+                    toast.success('Invoice generated as HTML (PDF generation unavailable) 📄', {
+                        duration: 5000,
+                        icon: '⚠️'
+                    });
+                }
+
                 // Extract filename
                 let fileName = res.pdfPath.split('/').pop();
                 if (!fileName) {
@@ -105,19 +118,18 @@ const Invoices = () => {
                 console.log('📎 Filename:', fileName, 'Type:', mimeType);
 
                 // Use direct window.open for simple and reliable download
-                toast.success('Opening invoice...', {
-                    duration: 3000,
-                    icon: '📄'
-                });
-
                 try {
-                    console.log('🪟 Opening PDF in new tab...');
-                    // Open the PDF in a new tab
+                    console.log('🪟 Opening invoice in new tab...');
+                    // Open the invoice in a new tab
                     const newWindow = window.open(pdfUrl, '_blank');
 
                     if (newWindow) {
                         console.log('✅ New window opened successfully');
-                        toast.success('Invoice opened in new tab!', {
+                        const successMessage = isPdf ? 
+                            'PDF invoice opened in new tab! 📄' : 
+                            'HTML invoice opened in new tab! (Use browser\'s print to PDF for PDF version) 🖨️';
+                        
+                        toast.success(successMessage, {
                             duration: 5000,
                             icon: '📥'
                         });

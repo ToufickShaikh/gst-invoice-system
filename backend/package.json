@@ -15,12 +15,16 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "html-pdf": "^3.0.1",
     "html-pdf-node": "^1.0.7",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.1",
     "mongoose": "^8.5.1",
     "nodemon": "^3.1.4",
-    "pdfkit": "^0.15.0",
+    "pdfkit": "^0.15.2",
     "puppeteer": "^24.11.2",
     "qrcode": "^1.5.3",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "wkhtmltopdf": "^0.4.0"
   }
 }
