@@ -56,6 +56,33 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Test endpoint to check file serving
+app.get('/api/test-file-serving', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    
+    try {
+        const invoicesDir = path.resolve(__dirname, 'invoices');
+        const files = fs.readdirSync(invoicesDir);
+        
+        res.json({
+            status: 'success',
+            message: 'File serving is working',
+            invoicesDirectory: invoicesDir,
+            filesFound: files.length,
+            files: files,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            message: 'File serving test failed',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // API Routes
 app.use('/api/auth', authRoutes); // Authentication routes
 app.use('/api/customers', customerRoutes); // Customer management routes

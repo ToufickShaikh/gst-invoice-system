@@ -241,8 +241,9 @@ async function generateInvoicePDF(invoiceData) {
         await fs.writeFile(htmlPath, html, 'utf-8');
         console.log(`[PDF] Invoice saved as HTML: ${htmlPath}`);
 
-        // Schedule HTML file deletion after 30 seconds
-        scheduleHtmlCleanup(htmlPath, invoiceData.invoiceNumber);
+        // Schedule HTML file deletion after 5 minutes (commented out for testing)
+        // scheduleHtmlCleanup(htmlPath, invoiceData.invoiceNumber);
+        console.log(`[PDF] HTML cleanup disabled for testing - file will remain at: ${htmlPath}`);
 
         // Try PDF generation with multiple methods
 
@@ -403,19 +404,20 @@ function convertToWords(num) {
 
 // Helper function to schedule HTML file cleanup after 30 seconds
 function scheduleHtmlCleanup(htmlPath, invoiceNumber) {
+    // Increase cleanup delay to 5 minutes (300 seconds) to give users more time
     setTimeout(async () => {
         try {
             await fs.unlink(htmlPath);
-            console.log(`[CLEANUP] Successfully deleted HTML file for invoice ${invoiceNumber} after 30 seconds`);
+            console.log(`[CLEANUP] Successfully deleted HTML file for invoice ${invoiceNumber} after 5 minutes`);
         } catch (error) {
             // File might already be deleted or not exist - this is not critical
             if (error.code !== 'ENOENT') {
                 console.warn(`[CLEANUP] Failed to delete HTML file for invoice ${invoiceNumber}:`, error.message);
             }
         }
-    }, 30000); // 30 seconds = 30,000 milliseconds
+    }, 300000); // 5 minutes = 300,000 milliseconds
 
-    console.log(`[CLEANUP] Scheduled HTML cleanup for invoice ${invoiceNumber} in 30 seconds`);
+    console.log(`[CLEANUP] Scheduled HTML cleanup for invoice ${invoiceNumber} in 5 minutes`);
 }
 
 module.exports = { generateInvoicePDF };

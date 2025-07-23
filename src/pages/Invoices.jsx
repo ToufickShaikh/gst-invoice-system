@@ -67,23 +67,30 @@ const Invoices = () => {
         if (!window.confirm('Are you sure you want to reprint this invoice?')) {
             return;
         }
-        
+
         setLoading(true);
         try {
+            console.log('🔄 Starting reprint process for invoice:', invoiceId);
             toast.loading('Generating invoice PDF...', { id: 'reprint-toast' });
-            const res = await billingAPI.reprintInvoice(invoiceId);
             
+            console.log('📡 Making API call to reprint invoice...');
+            const res = await billingAPI.reprintInvoice(invoiceId);
+            console.log('✅ API Response received:', res);
+
             if (res && res.pdfPath) {
                 toast.dismiss('reprint-toast');
                 toast.success('Invoice generated successfully!');
-                
+                console.log('📄 PDF Path received:', res.pdfPath);
+
                 // Get the base URL from environment variable or fallback to default
                 const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
-                
+                console.log('🌐 Using base URL:', baseUrl);
+
                 // Clean the base URL
                 const cleanBaseUrl = baseUrl.replace('/api', '');
                 const normalizedPath = res.pdfPath.startsWith('/') ? res.pdfPath : `/${res.pdfPath}`;
                 const pdfUrl = `${cleanBaseUrl}${normalizedPath}`;
+                console.log('🔗 Final PDF URL:', pdfUrl);
 
                 // Determine if it's a PDF or HTML file to set proper MIME type
                 const isPdf = res.pdfPath.toLowerCase().endsWith('.pdf');
@@ -95,24 +102,32 @@ const Invoices = () => {
                     const extension = isPdf ? '.pdf' : '.html';
                     fileName = `invoice-${invoiceId}${extension}`;
                 }
-                
+                console.log('📎 Filename:', fileName, 'Type:', mimeType);
+
                 // Use direct window.open for simple and reliable download
                 toast.success('Opening invoice...', {
                     duration: 3000,
                     icon: '📄'
                 });
-                
+
                 try {
+                    console.log('🪟 Opening PDF in new tab...');
                     // Open the PDF in a new tab
-                    window.open(pdfUrl, '_blank');
+                    const newWindow = window.open(pdfUrl, '_blank');
                     
-                    toast.success('Invoice opened in new tab!', {
-                        duration: 5000,
-                        icon: '📥'
-                    });
+                    if (newWindow) {
+                        console.log('✅ New window opened successfully');
+                        toast.success('Invoice opened in new tab!', {
+                            duration: 5000,
+                            icon: '📥'
+                        });
+                    } else {
+                        console.log('⚠️ Popup blocked, showing manual link');
+                        throw new Error('Popup blocked');
+                    }
                 } catch (err) {
-                    console.error('Error opening PDF:', err);
-                    
+                    console.error('❌ Error opening PDF:', err);
+
                     // Fallback with manual link
                     toast.error(
                         <div>
@@ -130,12 +145,28 @@ const Invoices = () => {
                     );
                 }
             } else {
-                console.error('Invalid response from reprint API:', res);
+                console.error('❌ Invalid response from reprint API:', res);
+                toast.dismiss('reprint-toast');
                 toast.error(res?.message || 'Could not find PDF to reprint. Please try again.');
             }
         } catch (err) {
-            console.error('Reprint error:', err);
-            toast.error('Failed to reprint invoice. Please check console for details.');
+            console.error('❌ Reprint error:', err);
+            toast.dismiss('reprint-toast');
+            
+            // Provide more specific error information
+            if (err.response) {
+                // Server responded with error status
+                console.error('Server error response:', err.response.data);
+                toast.error(`Server error: ${err.response.data?.message || err.response.statusText}`);
+            } else if (err.request) {
+                // Request was made but no response received
+                console.error('No response received:', err.request);
+                toast.error('No response from server. Please check your internet connection.');
+            } else {
+                // Something else happened
+                console.error('Request setup error:', err.message);
+                toast.error(`Error: ${err.message}`);
+            }
         } finally {
             setLoading(false);
         }
@@ -255,9 +286,9 @@ const Invoices = () => {
                                     <td className="border px-2 py-1">{formatCurrency((inv.grandTotal || inv.totalAmount) - (inv.paidAmount || 0))}</td>
                                     <td className="border px-2 py-1 space-x-1">
                                         <div className="flex flex-wrap gap-1">
-                                            <Button 
-                                                size="sm" 
-                                                variant="primary" 
+                                            <Button
+                                                size="sm"
+                                                variant="primary"
                                                 className="flex items-center"
                                                 onClick={() => handleEdit(inv._id)}
                                             >
@@ -266,10 +297,10 @@ const Invoices = () => {
                                                 </svg>
                                                 Edit
                                             </Button>
-                                            <Button 
-                                                size="sm" 
+                                            <Button
+                                                size="sm"
                                                 variant="secondary"
-                                                className="flex items-center" 
+                                                className="flex items-center"
                                                 onClick={() => handleReprint(inv._id)}
                                             >
                                                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

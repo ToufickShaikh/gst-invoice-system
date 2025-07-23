@@ -144,20 +144,20 @@ const EditInvoice = () => {
 
     const handleUpdateInvoice = async () => {
         setLoading(true);
-        
+
         // Validate form before submitting
         if (!invoiceData.customer) {
             toast.error('Please select a customer');
             setLoading(false);
             return;
         }
-        
+
         if (invoiceData.items.length === 0) {
             toast.error('Please add at least one item');
             setLoading(false);
             return;
         }
-        
+
         // Check if all items have valid values
         const invalidItems = invoiceData.items.filter(item => !item.itemId || !item.quantity || item.quantity <= 0);
         if (invalidItems.length > 0) {
@@ -165,10 +165,10 @@ const EditInvoice = () => {
             setLoading(false);
             return;
         }
-        
+
         try {
             toast.loading('Updating invoice...', { id: 'update-toast' });
-            
+
             // Ensure items being sent to backend have the correct structure
             const itemsForBackend = invoiceData.items.map(({ item, itemId, ...rest }) => ({
                 ...rest,
@@ -186,7 +186,7 @@ const EditInvoice = () => {
                 toast.success(
                     <div>
                         <p>Invoice updated successfully!</p>
-                        <button 
+                        <button
                             className="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
                             onClick={() => {
                                 // Fix URL construction to avoid double slashes
@@ -236,7 +236,7 @@ const EditInvoice = () => {
                             <div className="bg-gray-50 p-4 rounded-lg">
                                 <h4 className="text-sm font-medium text-gray-500">Invoice Number</h4>
                                 <p className="text-xl font-bold">{invoiceData.invoiceNumber}</p>
-                                
+
                                 <div className="mt-2">
                                     <h4 className="text-sm font-medium text-gray-500">Date</h4>
                                     <p>{new Date(invoiceData.invoiceDate).toLocaleDateString()}</p>
@@ -254,9 +254,9 @@ const EditInvoice = () => {
                                         Editing invoice. All changes are saved when you click "Save Changes".
                                     </p>
                                 </div>
-                                
+
                                 <div className="mt-4 flex justify-between items-center">
-                                    <button 
+                                    <button
                                         onClick={() => navigate('/invoices')}
                                         className="text-gray-600 hover:text-gray-900 text-sm flex items-center"
                                     >
@@ -391,15 +391,15 @@ const EditInvoice = () => {
                     </div>
 
                     <div className="flex justify-between mt-6">
-                        <Button 
-                            onClick={() => navigate('/invoices')} 
-                            variant="outline" 
+                        <Button
+                            onClick={() => navigate('/invoices')}
+                            variant="outline"
                             size="lg"
                         >
                             Cancel
                         </Button>
                         <div className="flex gap-2">
-                            <Button 
+                            <Button
                                 onClick={() => {
                                     // Add hasBeenEdited flag to mark this invoice as edited
                                     const updatedData = {
@@ -409,8 +409,8 @@ const EditInvoice = () => {
                                     setInvoiceData(updatedData);
                                     handleUpdateInvoice();
                                 }}
-                                variant="primary" 
-                                size="lg" 
+                                variant="primary"
+                                size="lg"
                                 disabled={loading}
                                 className="flex items-center"
                             >

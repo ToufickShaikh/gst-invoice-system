@@ -7,6 +7,7 @@ import Card from '../components/Card';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
 import DateInput from '../components/DateInput';
+import BackendDiagnostic from '../components/BackendDiagnostic';
 import { billingAPI } from '../api/billing';
 import { formatCurrency } from '../utils/dateHelpers';
 
@@ -588,6 +589,11 @@ const Dashboard = () => {
               </div>
             </Card>
           </div>
+        </div>
+
+        {/* Temporary Backend Diagnostic Component */}
+        <div className="mt-8">
+          <BackendDiagnostic />
         </div>
       </div>
     </Layout>
