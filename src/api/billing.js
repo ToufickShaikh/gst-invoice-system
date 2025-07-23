@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Correctly access the environment variable
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 // Optional: A debug line to confirm the URL is loaded correctly
 console.log('API_BASE_URL:', API_BASE_URL);

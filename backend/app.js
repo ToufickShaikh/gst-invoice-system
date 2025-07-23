@@ -60,11 +60,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/test-file-serving', (req, res) => {
     const fs = require('fs');
     const path = require('path');
-    
+
     try {
         const invoicesDir = path.resolve(__dirname, 'invoices');
         const files = fs.readdirSync(invoicesDir);
-        
+
         res.json({
             status: 'success',
             message: 'File serving is working',

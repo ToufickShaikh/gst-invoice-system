@@ -72,7 +72,7 @@ const Invoices = () => {
         try {
             console.log('🔄 Starting reprint process for invoice:', invoiceId);
             toast.loading('Generating invoice PDF...', { id: 'reprint-toast' });
-            
+
             console.log('📡 Making API call to reprint invoice...');
             const res = await billingAPI.reprintInvoice(invoiceId);
             console.log('✅ API Response received:', res);
@@ -83,7 +83,7 @@ const Invoices = () => {
                 console.log('📄 PDF Path received:', res.pdfPath);
 
                 // Get the base URL from environment variable or fallback to default
-                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
+                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
                 console.log('🌐 Using base URL:', baseUrl);
 
                 // Clean the base URL
@@ -114,7 +114,7 @@ const Invoices = () => {
                     console.log('🪟 Opening PDF in new tab...');
                     // Open the PDF in a new tab
                     const newWindow = window.open(pdfUrl, '_blank');
-                    
+
                     if (newWindow) {
                         console.log('✅ New window opened successfully');
                         toast.success('Invoice opened in new tab!', {
@@ -152,7 +152,7 @@ const Invoices = () => {
         } catch (err) {
             console.error('❌ Reprint error:', err);
             toast.dismiss('reprint-toast');
-            
+
             // Provide more specific error information
             if (err.response) {
                 // Server responded with error status

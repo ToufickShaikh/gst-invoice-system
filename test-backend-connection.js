@@ -17,7 +17,7 @@ async function testBackendConnection() {
         const invoicesResponse = await fetch(`${API_BASE_URL}/billing/invoices`);
         const invoicesData = await invoicesResponse.json();
         console.log('✅ Invoices count:', invoicesData.length);
-        
+
         if (invoicesData.length > 0) {
             const firstInvoice = invoicesData[0];
             console.log('First invoice ID:', firstInvoice._id);
@@ -31,21 +31,21 @@ async function testBackendConnection() {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             if (reprintResponse.ok) {
                 const reprintData = await reprintResponse.json();
                 console.log('✅ Reprint response:', reprintData);
-                
+
                 if (reprintData.pdfPath) {
                     // Test 4: Check if PDF is accessible
                     console.log('\n📄 Test 4: Check PDF accessibility...');
                     const pdfUrl = `https://gst-invoice-system-back.onrender.com${reprintData.pdfPath}`;
                     console.log('PDF URL:', pdfUrl);
-                    
+
                     const pdfResponse = await fetch(pdfUrl);
                     console.log('PDF status:', pdfResponse.status);
                     console.log('PDF headers:', Object.fromEntries(pdfResponse.headers.entries()));
-                    
+
                     if (pdfResponse.ok) {
                         console.log('✅ PDF is accessible!');
                     } else {

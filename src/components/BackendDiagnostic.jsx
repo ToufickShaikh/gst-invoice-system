@@ -41,20 +41,20 @@ const BackendDiagnostic = () => {
             try {
                 const invoices = await billingAPI.getInvoices();
                 addResult('Get Invoices', true, `Found ${invoices.length} invoices`, invoices.slice(0, 3));
-                
+
                 if (invoices.length > 0) {
                     const firstInvoice = invoices[0];
-                    
+
                     // Test 4: Reprint First Invoice
                     try {
                         const reprintResult = await billingAPI.reprintInvoice(firstInvoice._id);
                         addResult('Reprint Invoice', true, `PDF Path: ${reprintResult.pdfPath}`, reprintResult);
-                        
+
                         // Test 5: Check PDF accessibility
                         if (reprintResult.pdfPath) {
                             const cleanBaseUrl = baseUrl.replace('/api', '');
                             const pdfUrl = `${cleanBaseUrl}${reprintResult.pdfPath}`;
-                            
+
                             try {
                                 const pdfResponse = await fetch(pdfUrl, { method: 'HEAD' });
                                 addResult('PDF Accessibility', pdfResponse.ok, `PDF URL: ${pdfUrl}, Status: ${pdfResponse.status}`);
@@ -80,8 +80,8 @@ const BackendDiagnostic = () => {
     return (
         <div className="p-6 bg-white rounded-lg shadow-lg max-w-4xl mx-auto">
             <h2 className="text-2xl font-bold mb-4">Backend Diagnostic Test</h2>
-            
-            <button 
+
+            <button
                 onClick={runDiagnostics}
                 disabled={isRunning}
                 className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4 disabled:opacity-50"
@@ -92,13 +92,12 @@ const BackendDiagnostic = () => {
             {testResults.length > 0 && (
                 <div className="space-y-3">
                     {testResults.map((result, index) => (
-                        <div 
+                        <div
                             key={index}
-                            className={`p-3 rounded border-l-4 ${
-                                result.success 
-                                    ? 'bg-green-50 border-green-500 text-green-800' 
+                            className={`p-3 rounded border-l-4 ${result.success
+                                    ? 'bg-green-50 border-green-500 text-green-800'
                                     : 'bg-red-50 border-red-500 text-red-800'
-                            }`}
+                                }`}
                         >
                             <div className="flex items-center justify-between">
                                 <h3 className="font-semibold">
