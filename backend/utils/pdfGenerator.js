@@ -262,12 +262,13 @@ async function generateInvoicePDF(invoiceData) {
             const options = {
                 format: 'A4',
                 border: {
-                    top: '10mm',
-                    bottom: '10mm',
-                    left: '10mm',
-                    right: '10mm'
+                    top: '5mm',
+                    bottom: '5mm',
+                    left: '5mm',
+                    right: '5mm'
                 },
-                timeout: 30000
+                timeout: 30000,
+                zoomFactor: 0.9
             };
 
             const pdfBuffer = await new Promise((resolve, reject) => {
@@ -295,10 +296,10 @@ async function generateInvoicePDF(invoiceData) {
                 const options = {
                     format: 'A4',
                     margin: {
-                        top: '10mm',
-                        bottom: '10mm',
-                        left: '10mm',
-                        right: '10mm'
+                        top: '5mm',
+                        bottom: '5mm',
+                        left: '5mm',
+                        right: '5mm'
                     },
                     printBackground: true,
                     displayHeaderFooter: false,

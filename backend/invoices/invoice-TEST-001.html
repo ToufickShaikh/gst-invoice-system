@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tax Invoice - {{invoiceNumber}}</title>
+    <title>Tax Invoice - TEST-001</title>
     <style>
         * {
             margin: 0;
@@ -878,22 +878,22 @@
 
             <div class="company-section">
                 <div class="company-info">
-                    <img src="{{companyLogo}}" class="company-logo" alt="Company Logo" />
+                    <img src="https://bri.ct.ws/include/logo.png" class="company-logo" alt="Company Logo" />
                     <div class="company-details">
-                        <h2>{{companyName}}</h2>
-                        <p>Address: {{companyAddress}}</p>
-                        <p>Phone: {{companyPhone}}</p>
-                        <p>Email: {{companyEmail}}</p>
-                        <p>GSTIN: {{companyGSTIN}}</p>
-                        <p>State: {{companyState}}</p>
+                        <h2>Shaikh Tools And Dies</h2>
+                        <p>Address: NO.11/44 EDAPALLAM STREET PARK TOWN</p>
+                        <p>Phone: 8939487096</p>
+                        <p>Email: shaikhtoolsanddies@yahoo.com</p>
+                        <p>GSTIN: 33BVRPS2849Q1ZH</p>
+                        <p>State: 33-Tamil Nadu</p>
                     </div>
                 </div>
 
                 <div class="invoice-meta">
                     <h3>Invoice Details</h3>
-                    <p><strong>Invoice No:</strong> {{invoiceNumber}}</p>
-                    <p><strong>Date:</strong> {{invoiceDate}}</p>
-                    <p><strong>Place of Supply:</strong> {{placeOfSupply}}</p>
+                    <p><strong>Invoice No:</strong> TEST-001</p>
+                    <p><strong>Date:</strong> 23/07/2025</p>
+                    <p><strong>Place of Supply:</strong> 33-Tamil Nadu</p>
                 </div>
             </div>
         </div>
@@ -906,27 +906,27 @@
                     <h3 class="section-header">Bill To</h3>
                     <div class="detail-item">
                         <span class="detail-label">Name:</span>
-                        <span class="detail-value">{{customerName}}</span>
+                        <span class="detail-value">Test Customer</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Address:</span>
-                        <span class="detail-value">{{customerAddress}}</span>
+                        <span class="detail-value"></span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Phone:</span>
-                        <span class="detail-value">{{customerPhone}}</span>
+                        <span class="detail-value"></span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Email:</span>
-                        <span class="detail-value">{{customerEmail}}</span>
+                        <span class="detail-value">test@example.com</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">GSTIN:</span>
-                        <span class="detail-value">{{customerGSTIN}}</span>
+                        <span class="detail-value"></span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">State:</span>
-                        <span class="detail-value">{{customerState}}</span>
+                        <span class="detail-value">33-Tamil Nadu</span>
                     </div>
                 </div>
 
@@ -934,23 +934,23 @@
                     <h3 class="section-header">Invoice Information</h3>
                     <div class="detail-item">
                         <span class="detail-label">Invoice Number:</span>
-                        <span class="detail-value">{{invoiceNumber}}</span>
+                        <span class="detail-value">TEST-001</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Invoice Date:</span>
-                        <span class="detail-value">{{invoiceDate}}</span>
+                        <span class="detail-value">23/07/2025</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Due Date:</span>
-                        <span class="detail-value">{{dueDate}}</span>
+                        <span class="detail-value">22/08/2025</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Place of Supply:</span>
-                        <span class="detail-value">{{placeOfSupply}}</span>
+                        <span class="detail-value">33-Tamil Nadu</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Payment Status:</span>
-                        <span class="detail-value">{{paymentStatus}}</span>
+                        <span class="detail-value">Pending</span>
                     </div>
                 </div>
             </div>
@@ -971,16 +971,36 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {{itemsTable}}
+                        
+                <tr>
+                    <td class="text-center">1</td>
+                    <td class="text-left"></td>
+                    <td class="text-center"></td>
+                    <td class="text-center">1</td>
+                    <td class="text-center">per piece</td>
+                    <td class="text-right">₹0.00</td>
+                    <td class="text-center">18%</td>
+                    <td class="text-right">₹0.00</td>
+                </tr>
+                <tr>
+                    <td class="text-center">2</td>
+                    <td class="text-left"></td>
+                    <td class="text-center"></td>
+                    <td class="text-center">1</td>
+                    <td class="text-center">per piece</td>
+                    <td class="text-right">₹0.00</td>
+                    <td class="text-center">18%</td>
+                    <td class="text-right">₹0.00</td>
+                </tr>
                     </tbody>
                     <tfoot>
                         <tr class="total-row">
                             <td colspan="3" class="text-right font-bold">TOTAL</td>
-                            <td class="text-center font-bold">{{totalQuantity}}</td>
+                            <td class="text-center font-bold">2</td>
                             <td></td>
                             <td></td>
-                            <td class="text-right font-bold">₹{{totalGST}}</td>
-                            <td class="text-right font-bold">₹{{totalAmount}}</td>
+                            <td class="text-right font-bold">₹0.00</td>
+                            <td class="text-right font-bold">₹0.00</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -989,7 +1009,7 @@
             <!-- Amount in Words -->
             <div class="amount-words">
                 <h4>Invoice Amount in Words:</h4>
-                <p><strong>{{amountInWords}}</strong></p>
+                <p><strong>Zero Rupees Only</strong></p>
             </div>
 
             <!-- Tax Summary and Invoice Summary -->
@@ -1011,19 +1031,30 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {{taxSummaryTable}}
+                            
+                <tr>
+                    <td class="text-left"></td>
+                    <td class="text-right">₹0.00</td>
+                    <td class="text-center">-</td>
+                    <td class="text-right">-</td>
+                    <td class="text-center">9%</td>
+                    <td class="text-right">₹0.00</td>
+                    <td class="text-center">9%</td>
+                    <td class="text-right">₹0.00</td>
+                    <td class="text-right">₹0.00</td>
+                </tr>
                         </tbody>
                         <tfoot>
                             <tr class="font-bold">
                                 <td class="text-left">TOTAL</td>
-                                <td class="text-right">₹{{taxSummaryTotal.taxableAmount}}</td>
+                                <td class="text-right">₹0.00</td>
                                 <td></td>
-                                <td class="text-right">₹{{taxSummaryTotal.igstAmount}}</td>
+                                <td class="text-right">₹-</td>
                                 <td></td>
-                                <td class="text-right">₹{{taxSummaryTotal.cgstAmount}}</td>
+                                <td class="text-right">₹0.00</td>
                                 <td></td>
-                                <td class="text-right">₹{{taxSummaryTotal.sgstAmount}}</td>
-                                <td class="text-right">₹{{taxSummaryTotal.totalTax}}</td>
+                                <td class="text-right">₹0.00</td>
+                                <td class="text-right">₹0.00</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -1034,23 +1065,23 @@
                         <h3>Invoice Summary</h3>
                         <div class="summary-item">
                             <span>Sub Total:</span>
-                            <span>₹{{subTotal}}</span>
+                            <span>₹0.00</span>
                         </div>
                         <div class="summary-item">
                             <span>Total GST:</span>
-                            <span>₹{{totalGST}}</span>
+                            <span>₹0.00</span>
                         </div>
                         <div class="summary-item">
                             <span>Grand Total:</span>
-                            <span>₹{{totalAmount}}</span>
+                            <span>₹0.00</span>
                         </div>
                         <div class="summary-item">
                             <span>Amount Received:</span>
-                            <span>₹{{receivedAmount}}</span>
+                            <span>₹0.00</span>
                         </div>
                         <div class="summary-item">
                             <span>Balance Due:</span>
-                            <span>₹{{balanceAmount}}</span>
+                            <span>₹0.00</span>
                         </div>
                     </div>
                 </div>
@@ -1071,26 +1102,26 @@
                     <h4>Bank Details</h4>
                     <div class="bank-info-item">
                         <span>Bank Name:</span>
-                        <span>{{bankName}}</span>
+                        <span>INDIAN OVERSEAS BANK, B RDWAY</span>
                     </div>
                     <div class="bank-info-item">
                         <span>Account No:</span>
-                        <span>{{bankAccount}}</span>
+                        <span>130702000003546</span>
                     </div>
                     <div class="bank-info-item">
                         <span>IFSC Code:</span>
-                        <span>{{bankIFSC}}</span>
+                        <span>IOBA0001307</span>
                     </div>
                     <div class="bank-info-item">
                         <span>Account Holder:</span>
-                        <span>{{bankHolder}}</span>
+                        <span>Shaikh Tools And Dies</span>
                     </div>
-                    <img src="{{upiQrImage}}" class="qr-code" alt="UPI QR Code" />
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJQAAACUCAYAAAB1PADUAAAAAklEQVR4AewaftIAAATCSURBVO3BQY4cSRIEQdNA/f/Lun30UwCJ9OohuSaCP1K15KRq0UnVopOqRSdVi06qFp1ULTqpWnRSteikatFJ1aKTqkUnVYtOqhadVC06qVr0yUtAfpOaCcgbap4AcqNmAjKpeQLIb1LzxknVopOqRSdViz5ZpmYTkBs1TwC5AXKjZgLyBpBJzY2aTUA2nVQtOqladFK16JMvA/KEmieA3Kh5Qs0EZAJyA+QJNW8AeULNN51ULTqpWnRSteiTv5yaCcg3qXkCyARkUvMvOaladFK16KRq0Sf/OCA3QJ4AMqmZgNyo+ZedVC06qVp0UrXoky9T801AJjU3QG7U3AC5UfMEkEnNE2r+JCdVi06qFp1ULfpkGZA/CZBJzQTkBsikZgIyqZmATGreAPInO6ladFK16KRqEf7I/xEgN2omIE+ouQFyo+ZvdlK16KRq0UnVok9eAjKpmYBMap4AcqNmAnKjZgIyAblRMwF5Qs0E5Akgk5obIJOaCcik5o2TqkUnVYtOqhZ98mVqJiCTmhs1T6i5ATKpmYA8oWYCMqmZgNwAuVHzBpBvOqladFK16KRq0SfLgNyomYA8oeYGyI2aCcik5gbIE0CeUPMEkBs1E5BvOqladFK16KRqEf7IC0AmNROQN9TcAPkmNROQSc0NkEnNBORGzSYgk5pNJ1WLTqoWnVQt+uQlNZvUTEAmNW+omYB8k5oJyKTmBsiNmgnIpOY3nVQtOqladFK16JOXgExqnlAzAZnUvKFmAnKj5kbNBGRS8wSQbwIyqZmATGreOKladFK16KRq0SfLgExqboDcAHlCzY2aGyCbgHwTkEnNf+mkatFJ1aKTqkWfLFMzAblRswnIpOYGyKRmAvKGmieA3KjZpGbTSdWik6pFJ1WLPlkGZFIzAZmAPKHmRs0NkBsgN2omIG8AmdRMQJ4AMqmZgNyoeeOkatFJ1aKTqkWfvKRmAjIBmdTcAJnU3AB5Qs0NkDeATGomIG8AmdTcAPlNJ1WLTqoWnVQt+uQlIDdqboBMaiYgk5on1NwAmdTcAJnUTECeUDMBmdQ8oeYJIJtOqhadVC06qVqEP/KLgExqngAyqbkBcqNmAjKp2QRkUvMEkCfUTEAmNZtOqhadVC06qVr0yUtAnlDzBJBJzQTkRs03AZnUTEAmNROQTWpu1ExAJjVvnFQtOqladFK16JOX1HyTmk1AbtRsUvOEmieAPAHkm06qFp1ULTqpWvTJS0B+k5obNTdqboA8oeabgExqboDcqJmAbDqpWnRSteikatEny9RsAnKjZpOaCcikZgIyqbkB8oSaN9T8ppOqRSdVi06qFn3yZUCeUPMGkEnNBGSTmk1AvgnIN51ULTqpWnRSteiTf4yaCcgmIJOaN9RMQCY1E5AbNTdqJiCbTqoWnVQtOqla9MlfDsikZlLzBpA3gPyXgPymk6pFJ1WLTqoWffJlar5JzQTkRs0NkBs1E5BJzY2aCcik5gk1E5BJzW86qVp0UrXopGrRJ8uA/CYgm9TcAJnU3Kh5A8gTap4AMql546Rq0UnVopOqRfgjVUtOqhadVC06qVp0UrXopGrRSdWik6pFJ1WLTqoWnVQtOqladFK16KRq0UnVopOqRf8DrfQWYjBXI4oAAAAASUVORK5CYII=" class="qr-code" alt="UPI QR Code" />
                 </div>
 
                 <div class="signature-section">
-                    <h4>For {{companyName}}</h4>
-                    <img src="{{signatureImage}}" class="signature-image" alt="Authorized Signature" />
+                    <h4>For Shaikh Tools And Dies</h4>
+                    <img src="https://bri.ct.ws/include/sign.png" class="signature-image" alt="Authorized Signature" />
                     <p><strong>Authorized Signatory</strong></p>
                 </div>
             </div>
