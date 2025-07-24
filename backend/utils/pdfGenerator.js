@@ -13,14 +13,23 @@ async function generateInvoicePDF(invoiceData) {
         let html = await fs.readFile(templatePath, 'utf-8');
         console.log(`[PDF] Template loaded, size: ${html.length} characters`);
 
-        // Company details
+        // Company details with fallback logo
+        const companyLogo = 'data:image/svg+xml;base64,' + Buffer.from(`
+            <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="30" cy="30" r="28" fill="#1e40af" stroke="#0f172a" stroke-width="2"/>
+                <text x="30" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="white">ST</text>
+                <text x="30" y="35" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="white">TOOLS</text>
+                <text x="30" y="45" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="white">DIES</text>
+            </svg>
+        `).toString('base64');
+
         html = html.replace(/{{companyName}}/g, 'Shaikh Tools And Dies');
         html = html.replace(/{{companyAddress}}/g, 'NO.11/44 EDAPALLAM STREET PARK TOWN');
         html = html.replace(/{{companyPhone}}/g, '8939487096');
         html = html.replace(/{{companyEmail}}/g, 'shaikhtoolsanddies@yahoo.com');
         html = html.replace(/{{companyGSTIN}}/g, '33BVRPS2849Q1ZH');
         html = html.replace(/{{companyState}}/g, '33-Tamil Nadu');
-        html = html.replace(/{{companyLogo}}/g, 'https://bri.ct.ws/include/logo.png');
+        html = html.replace(/{{companyLogo}}/g, companyLogo);
 
         // Customer details
         const customer = invoiceData.customer;
@@ -211,7 +220,7 @@ async function generateInvoicePDF(invoiceData) {
         // Generate UPI QR code - always generate, even for zero balance
         let upiQrDataUrl = '';
         try {
-            const upiId = process.env.UPI_ID || 'shaikhtool@ibl';
+            const upiId = process.env.UPI_ID || 'shaikhtoolsanddies@ybl';
 
             if (balanceAmount > 0) {
                 console.log(`[PDF] Generating UPI QR code for balance amount: ₹${balanceAmount.toFixed(2)}`);
@@ -227,15 +236,33 @@ async function generateInvoicePDF(invoiceData) {
             }
         } catch (error) {
             console.error(`[PDF] Failed to generate UPI QR code:`, error);
+            // Create a fallback QR placeholder
+            upiQrDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(`
+                <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100" height="100" fill="#f0f0f0" stroke="#000" stroke-width="1"/>
+                    <text x="50" y="25" font-family="Arial" font-size="8" text-anchor="middle" fill="#000">UPI QR</text>
+                    <text x="50" y="40" font-family="Arial" font-size="6" text-anchor="middle" fill="#000">shaikhtoolsanddies</text>
+                    <text x="50" y="50" font-family="Arial" font-size="6" text-anchor="middle" fill="#000">@ybl</text>
+                    <text x="50" y="70" font-family="Arial" font-size="6" text-anchor="middle" fill="#000">Scan to Pay</text>
+                    <text x="50" y="85" font-family="Arial" font-size="6" text-anchor="middle" fill="#000">₹${balanceAmount.toFixed(2)}</text>
+                </svg>
+            `).toString('base64');
         }
 
-        // Bank details
+        // Bank details and signature with fallbacks
+        const signatureImage = 'data:image/svg+xml;base64,' + Buffer.from(`
+            <svg width="120" height="40" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 25 Q20 15, 30 25 T50 25 Q60 15, 70 25 T90 25 Q100 15, 110 25" stroke="#000" stroke-width="2" fill="none"/>
+                <text x="60" y="35" font-family="cursive" font-size="10" text-anchor="middle" fill="#000">Authorized Signatory</text>
+            </svg>
+        `).toString('base64');
+
         html = html.replace(/{{bankName}}/g, 'INDIAN OVERSEAS BANK, B RDWAY');
         html = html.replace(/{{bankAccount}}/g, '130702000003546');
         html = html.replace(/{{bankIFSC}}/g, 'IOBA0001307');
         html = html.replace(/{{bankHolder}}/g, 'Shaikh Tools And Dies');
         html = html.replace(/{{upiQrImage}}/g, upiQrDataUrl);
-        html = html.replace(/{{signatureImage}}/g, 'https://bri.ct.ws/include/sign.png');
+        html = html.replace(/{{signatureImage}}/g, signatureImage);
 
         console.log(`[PDF] All placeholders replaced, attempting PDF generation...`);
 

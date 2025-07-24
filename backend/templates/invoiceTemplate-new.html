@@ -161,23 +161,26 @@
             width: 100%;
             border-collapse: collapse;
             border: 2px solid #000;
+            font-size: 8px; /* Make table text smaller */
         }
 
         .items-table th {
             background: #f0f0f0;
-            padding: 5px 4px; /* Reduced from 10px 8px */
+            padding: 3px 2px; /* Further reduced padding */
             text-align: center;
             font-weight: bold;
-            font-size: 9px; /* Reduced from 11px */
+            font-size: 8px; /* Reduced font size */
             border: 1px solid #000;
             vertical-align: middle;
+            line-height: 1.1;
         }
 
         .items-table td {
-            padding: 4px; /* Reduced from 8px */
+            padding: 2px; /* Further reduced padding */
             border: 1px solid #000;
-            font-size: 9px; /* Reduced from 11px */
+            font-size: 8px; /* Reduced font size */
             vertical-align: middle;
+            line-height: 1.1;
         }
 
         .center {
@@ -230,10 +233,11 @@
 
         .tax-table th,
         .tax-table td {
-            padding: 3px 4px; /* Reduced from 6px 8px */
+            padding: 2px 3px; /* Further reduced padding */
             border: 1px solid #000;
-            font-size: 8px; /* Reduced from 10px */
+            font-size: 7px; /* Even smaller font */
             text-align: center;
+            line-height: 1.1;
         }
 
         .tax-table th {
@@ -473,12 +477,17 @@
         <!-- Header Section -->
         <div class="header">
             <div class="header-top">
-                <div class="company-name">{{companyName}}</div>
-                <div class="company-tagline">Tools & Dies Manufacturing</div>
-                <div class="company-details">
-                    {{companyAddress}}<br>
-                    Phone: {{companyPhone}} | Email: {{companyEmail}}<br>
-                    GSTIN: {{companyGSTIN}} | State: {{companyState}}
+                <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
+                    <img src="{{companyLogo}}" alt="Company Logo" style="max-width: 60px; height: auto; border-radius: 50%;">
+                    <div style="text-align: center; flex: 1;">
+                        <div class="company-name">{{companyName}}</div>
+                        <div class="company-tagline">Tools & Dies Manufacturing</div>
+                        <div class="company-details">
+                            {{companyAddress}}<br>
+                            Phone: {{companyPhone}} | Email: {{companyEmail}}<br>
+                            GSTIN: {{companyGSTIN}} | State: {{companyState}}
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="invoice-title">TAX INVOICE</div>
@@ -694,7 +703,11 @@
                 <div class="footer-header">PAYMENT QR CODE</div>
                 <div class="qr-section">
                     <div class="qr-label">Scan to Pay</div>
-                    <img src="{{upiQrImage}}" alt="UPI QR Code" style="max-width: 120px; height: auto;">
+                    <img src="{{upiQrImage}}" alt="UPI QR Code" style="max-width: 100px; height: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div style="display: none; font-size: 8px; padding: 10px; border: 1px solid #ccc; text-align: center;">
+                        UPI ID: shaikhtoolsanddies@ybl<br>
+                        Scan any QR app to pay
+                    </div>
                 </div>
             </div>
         </div>
@@ -726,9 +739,10 @@
         </div>
 
         <!-- Company Signature -->
-        <div style="text-align: right; margin-top: 30px; padding-right: 50px;">
-            <img src="{{signatureImage}}" alt="Signature" style="max-width: 150px; height: auto;">
-            <div style="margin-top: 10px; font-weight: bold;">For {{companyName}}</div>
+        <div style="text-align: right; margin-top: 15px; padding-right: 30px;">
+            <img src="{{signatureImage}}" alt="Signature" style="max-width: 120px; height: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; height: 40px; border-bottom: 1px solid #000; width: 120px; margin: 0 0 10px auto;"></div>
+            <div style="margin-top: 10px; font-weight: bold; font-size: 10px;">For {{companyName}}</div>
         </div>
     </div>
 </body>
