@@ -7,8 +7,8 @@ const { extractStateCode, COMPANY_STATE_CODE } = require('./taxHelpers');
 async function generateInvoicePDF(invoiceData) {
     console.log(`[PDF] Starting PDF generation for invoice: ${invoiceData.invoiceNumber}`);
     try {
-        const templatePath = path.resolve(__dirname, '../templates/invoiceTemplate.html');
-        console.log(`[PDF] Reading template from: ${templatePath}`);
+        const templatePath = path.resolve(__dirname, '../templates/invoiceTemplate-new.html');
+        console.log(`[PDF] Reading single-page template from: ${templatePath}`);
 
         let html = await fs.readFile(templatePath, 'utf-8');
         console.log(`[PDF] Template loaded, size: ${html.length} characters`);
@@ -262,17 +262,21 @@ async function generateInvoicePDF(invoiceData) {
             const options = {
                 format: 'A4',
                 border: {
-                    top: '3mm',
-                    bottom: '3mm',
-                    left: '3mm',
-                    right: '3mm'
+                    top: '2mm',
+                    bottom: '2mm',
+                    left: '2mm',
+                    right: '2mm'
                 },
                 timeout: 30000,
-                zoomFactor: 0.75,
+                zoomFactor: 0.65, // Reduced zoom to fit more content
                 height: '297mm',
                 width: '210mm',
                 type: 'pdf',
-                quality: '75'
+                quality: '75',
+                // Force single page layout
+                dpi: 96,
+                phantomPath: undefined,
+                orientation: 'portrait'
             };
 
             const pdfBuffer = await new Promise((resolve, reject) => {
@@ -300,15 +304,19 @@ async function generateInvoicePDF(invoiceData) {
                 const options = {
                     format: 'A4',
                     margin: {
-                        top: '3mm',
-                        bottom: '3mm',
-                        left: '3mm',
-                        right: '3mm'
+                        top: '2mm',
+                        bottom: '2mm',
+                        left: '2mm',
+                        right: '2mm'
                     },
                     printBackground: true,
                     displayHeaderFooter: false,
                     timeout: 30000,
-                    preferCSSPageSize: true
+                    preferCSSPageSize: true,
+                    // Optimize for single page
+                    scale: 0.65, // Reduce scale to fit more content
+                    width: '210mm',
+                    height: '297mm'
                 };
 
                 const file = { content: html };

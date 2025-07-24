@@ -1,4 +1,4 @@
-// Enhanced Dashboard with modern responsive design and animations
+// Complete Single-Page Business Dashboard - All Information in One View
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -30,6 +30,9 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
+  const [allInvoices, setAllInvoices] = useState([]);
+  const [allCustomers, setAllCustomers] = useState([]);
+  const [allItems, setAllItems] = useState([]);
   const [gstReportLoading, setGstReportLoading] = useState(false);
   const [showMonthModal, setShowMonthModal] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -111,7 +114,35 @@ const Dashboard = () => {
     }
   };
 
-  const formatTimeAgo = (date) => {
+  // Fetch all data for complete dashboard view
+  const fetchAllData = async () => {
+    try {
+      // Fetch all invoices
+      const invoicesData = await billingAPI.getInvoices();
+      setAllInvoices(invoicesData);
+
+      // Fetch all customers
+      const customersResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/customers`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const customersData = await customersResponse.json();
+      setAllCustomers(customersData);
+
+      // Fetch all items
+      const itemsResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/items`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const itemsData = await itemsResponse.json();
+      setAllItems(itemsData);
+
+    } catch (error) {
+      console.error('Error fetching complete data:', error);
+    }
+  }; const formatTimeAgo = (date) => {
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
 
@@ -124,6 +155,7 @@ const Dashboard = () => {
   useEffect(() => {
     fetchStats(false); // Don't show toast on initial load
     fetchRecentActivity();
+    fetchAllData(); // Fetch complete data for single-page view
   }, []); // Remove dateRange dependency to prevent auto-filtering
 
   const handleDateChange = (e) => {
