@@ -376,29 +376,21 @@ const getDashboardStats = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
 
-        // Build the date range query for aggregations
+        // Build the date range query for aggregations using invoiceDate field
         let dateQuery = {};
         let hasDateFilter = false;
 
         if (startDate || endDate) {
             hasDateFilter = true;
-            // Check if any invoices have createdAt field
-            const sampleInvoice = await Invoice.findOne({}, { createdAt: 1 });
-            console.log('Sample invoice createdAt check:', sampleInvoice?.createdAt);
+            console.log(`Applying date filter: startDate=${startDate}, endDate=${endDate}`);
 
-            if (sampleInvoice?.createdAt) {
-                // Only apply date filter if invoices have createdAt
-                if (startDate) {
-                    dateQuery.createdAt = { ...dateQuery.createdAt, $gte: new Date(startDate) };
-                }
-                if (endDate) {
-                    const end = new Date(endDate);
-                    end.setUTCHours(23, 59, 59, 999); // Set to the end of the day
-                    dateQuery.createdAt = { ...dateQuery.createdAt, $lte: end };
-                }
-            } else {
-                console.log('⚠️  No createdAt field found in invoices - ignoring date filter');
-                dateQuery = {}; // Reset to empty query to get all invoices
+            if (startDate) {
+                dateQuery.invoiceDate = { ...dateQuery.invoiceDate, $gte: new Date(startDate) };
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setUTCHours(23, 59, 59, 999); // Set to the end of the day
+                dateQuery.invoiceDate = { ...dateQuery.invoiceDate, $lte: end };
             }
         }
 

@@ -76,4 +76,15 @@ export const billingAPI = {
     const res = await api.delete(`/billing/invoices/${id}`);
     return res.data;
   },
+  // Get GST report data for a date range
+  getGSTReport: async (dateRange) => {
+    console.log('API: Fetching GST report for date range:', dateRange);
+    try {
+      const res = await api.get(`/billing/gst-report`, { params: dateRange });
+      return res.data;
+    } catch (error) {
+      console.error('API: GST report error:', error);
+      throw error;
+    }
+  },
 };

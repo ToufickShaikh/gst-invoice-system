@@ -24,8 +24,19 @@ const InvoiceSuccess = () => {
     console.log('InvoiceSuccess: invoiceId:', invoiceId);
     console.log('InvoiceSuccess: pdfUrl:', pdfUrl);
     console.log('InvoiceSuccess: customerData:', customerData);
+    console.log('InvoiceSuccess: invoiceNumber:', invoiceNumber);
+    console.log('InvoiceSuccess: Full props extracted:', {
+      invoiceId,
+      pdfUrl,
+      upiQr,
+      balance,
+      invoiceNumber,
+      customerData,
+      invoiceData,
+      items
+    });
     setLoading(false);
-  }, [location.state, invoiceId, pdfUrl, customerData]);
+  }, [location.state, invoiceId, pdfUrl, customerData, invoiceNumber]);
 
   // Show loading state while checking data
   if (loading) {
