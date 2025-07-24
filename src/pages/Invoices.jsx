@@ -56,9 +56,9 @@ const Invoices = () => {
         }
     };
 
-    // Navigate to the edit page
+    // Navigate to billing page for editing the invoice
     const handleEdit = (invoiceId) => {
-        navigate(`/edit-invoice/${invoiceId}`);
+        navigate(`/billing?edit=${invoiceId}`);
     };
 
     // Handle reprinting the invoice with automatic PDF download
@@ -125,10 +125,10 @@ const Invoices = () => {
 
                     if (newWindow) {
                         console.log('✅ New window opened successfully');
-                        const successMessage = isPdf ? 
-                            'PDF invoice opened in new tab! 📄' : 
+                        const successMessage = isPdf ?
+                            'PDF invoice opened in new tab! 📄' :
                             'HTML invoice opened in new tab! (Use browser\'s print to PDF for PDF version) 🖨️';
-                        
+
                         toast.success(successMessage, {
                             duration: 5000,
                             icon: '📥'

@@ -4,7 +4,7 @@ const path = require('path');
 
 async function testHtmlPdf() {
     console.log('Testing html-pdf (legacy library)...');
-    
+
     const testHtml = `
     <!DOCTYPE html>
     <html>
@@ -43,7 +43,7 @@ async function testHtmlPdf() {
         };
 
         console.log('Generating PDF with html-pdf...');
-        
+
         const pdfBuffer = await new Promise((resolve, reject) => {
             htmlPdf.create(testHtml, options).toBuffer((err, buffer) => {
                 if (err) {
@@ -60,9 +60,9 @@ async function testHtmlPdf() {
         console.log('✅ SUCCESS: PDF generated with html-pdf');
         console.log(`   File size: ${pdfBuffer.length} bytes`);
         console.log(`   Saved to: ${outputPath}`);
-        
+
         return true;
-        
+
     } catch (error) {
         console.log('❌ FAILED: html-pdf error');
         console.log(`   Error: ${error.message}`);

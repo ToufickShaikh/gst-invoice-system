@@ -4,7 +4,7 @@ const path = require('path');
 
 async function testHtmlPdfNode() {
     console.log('Testing html-pdf-node...');
-    
+
     const testHtml = `
     <!DOCTYPE html>
     <html>
@@ -54,9 +54,9 @@ async function testHtmlPdfNode() {
         console.log('✅ SUCCESS: PDF generated');
         console.log(`   File size: ${pdfBuffer.length} bytes`);
         console.log(`   Saved to: ${outputPath}`);
-        
+
         return true;
-        
+
     } catch (error) {
         console.log('❌ FAILED: html-pdf-node error');
         console.log(`   Error: ${error.message}`);

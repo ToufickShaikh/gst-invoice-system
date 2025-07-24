@@ -45,7 +45,7 @@ const testInvoiceData = {
 async function testPDFGeneration() {
     console.log('🚀 Testing Enhanced PDF Generation System');
     console.log('==========================================');
-    
+
     try {
         console.log('📊 Test Invoice Data:');
         console.log(`   Invoice Number: ${testInvoiceData.invoiceNumber}`);
@@ -53,24 +53,24 @@ async function testPDFGeneration() {
         console.log(`   Total Amount: ₹${testInvoiceData.totals.total.toLocaleString()}`);
         console.log(`   Due Amount: ₹${testInvoiceData.dueAmount.toLocaleString()}`);
         console.log('');
-        
+
         console.log('🔄 Starting PDF generation...');
         const startTime = Date.now();
-        
+
         const result = await generateInvoicePDF(testInvoiceData);
-        
+
         const endTime = Date.now();
         const duration = endTime - startTime;
-        
+
         console.log('');
         console.log('✅ PDF Generation Result:');
         console.log(`   File Path: ${result}`);
         console.log(`   Generation Time: ${duration}ms`);
-        
+
         // Check if it's a PDF or HTML file
         const isPdf = result.toLowerCase().endsWith('.pdf');
         const isHtml = result.toLowerCase().endsWith('.html');
-        
+
         if (isPdf) {
             console.log('   📄 Type: PDF (Success!)');
             console.log('   🎉 PDF generation is working correctly!');
@@ -81,7 +81,7 @@ async function testPDFGeneration() {
             console.log('   📄 Type: Unknown');
             console.log('   ❓ Unexpected file type generated.');
         }
-        
+
         console.log('');
         console.log('💡 Next Steps:');
         if (isPdf) {
@@ -92,7 +92,7 @@ async function testPDFGeneration() {
             console.log('   - HTML fallback is working, but PDF libraries may need additional setup.');
             console.log('   - Consider server environment requirements for PDF generation.');
         }
-        
+
     } catch (error) {
         console.log('');
         console.log('❌ PDF Generation Failed:');

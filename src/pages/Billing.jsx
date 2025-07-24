@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import Layout from '../components/Layout'
 import InputField from '../components/InputField'
@@ -14,6 +14,8 @@ import { formatCurrency } from '../utils/dateHelpers'
 
 const Billing = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const editInvoiceId = searchParams.get('edit')
   const [billingType, setBillingType] = useState('B2B')
   const [customers, setCustomers] = useState([])
   const [items, setItems] = useState([])
@@ -26,6 +28,10 @@ const Billing = () => {
   const [loading, setLoading] = useState(false)
   const [taxType, setTaxType] = useState('CGST_SGST') // 'IGST' or 'CGST_SGST'
   const [companyStateCode, setCompanyStateCode] = useState('27') // Default Maharashtra
+
+  // Edit mode states
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editingInvoice, setEditingInvoice] = useState(null)
 
   // Add Customer Modal states
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
@@ -60,6 +66,14 @@ const Billing = () => {
   useEffect(() => {
     fetchData()
   }, [billingType])
+
+  // Check for edit mode and load invoice data
+  useEffect(() => {
+    if (editInvoiceId && customers.length > 0 && items.length > 0 && !editingInvoice && !loading) {
+      setIsEditMode(true)
+      loadInvoiceForEditing(editInvoiceId)
+    }
+  }, [editInvoiceId, customers, items])
 
   // Filter customers based on search term
   useEffect(() => {
@@ -138,6 +152,146 @@ const Billing = () => {
     }
   }
 
+  // Load invoice data for editing
+  const loadInvoiceForEditing = async (invoiceId) => {
+    if (loading) {
+      console.log('Already loading, skipping...')
+      return
+    }
+
+    try {
+      console.log('Starting to load invoice for editing:', invoiceId)
+      setLoading(true)
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout after 15 seconds')), 15000)
+      )
+
+      console.log('Calling API to get invoice...')
+      const response = await Promise.race([
+        billingAPI.getInvoiceById(invoiceId),
+        timeoutPromise
+      ])
+      console.log('API response received:', response)
+
+      const invoice = response.data || response
+
+      if (invoice) {
+        console.log('Invoice data found:', invoice)
+        setEditingInvoice(invoice)
+
+        // Find and set customer (check both local customers and invoice customer data)
+        console.log('Looking for customer in:', customers.length, 'customers')
+        console.log('Invoice customer data:', invoice.customer)
+
+        let customer = customers.find(c => c._id === invoice.customer || c._id === invoice.customer?._id)
+
+        // If not found in local customers, use the customer data from invoice
+        if (!customer && invoice.customer) {
+          console.log('Customer not found in local list, using invoice customer data')
+          customer = typeof invoice.customer === 'object' ? invoice.customer : null
+
+          // Add to local customers list if it's a full customer object
+          if (customer && customer._id) {
+            setCustomers(prev => {
+              const exists = prev.find(c => c._id === customer._id)
+              if (!exists) {
+                console.log('Adding customer to local list:', customer)
+                return [...prev, customer]
+              }
+              return prev
+            })
+          }
+        }
+
+        if (customer) {
+          console.log('Customer found/used:', customer)
+          console.log('Setting billing type to:', customer.customerType)
+          setBillingType(customer.customerType)
+          setSelectedCustomer(customer._id)
+
+          // Set customer search display text
+          const displayName = customer.customerType === 'B2B' ? customer.firmName : customer.name
+          const searchText = `${displayName} - ${customer.contact}`
+          console.log('Setting customer search text:', searchText)
+          setCustomerSearch(searchText)
+
+          // Detect tax type for the customer
+          if (customer.customerType === 'B2B') {
+            detectTaxType(customer)
+          }
+        } else {
+          console.warn('Customer not found for invoice.customer:', invoice.customer)
+        }
+
+        // Map items properly with full item details
+        console.log('Mapping invoice items:', invoice.items?.length || 0, 'items')
+        console.log('Available items in store:', items.length)
+
+        const mappedItems = (invoice.items || []).map((invoiceItem, index) => {
+          console.log(`Mapping item ${index + 1}:`, invoiceItem)
+
+          // Find the item in the items list
+          const fullItem = items.find(item =>
+            item._id === invoiceItem.item ||
+            item._id === invoiceItem.item?._id ||
+            item.name === invoiceItem.name
+          )
+
+          console.log(`Found full item for ${invoiceItem.name}:`, fullItem)
+
+          const mappedItem = {
+            item: fullItem || {
+              _id: invoiceItem.item || invoiceItem.item?._id,
+              name: invoiceItem.name,
+              hsnCode: invoiceItem.hsnCode,
+              rate: invoiceItem.originalRate || invoiceItem.rate,
+              taxSlab: invoiceItem.taxSlab,
+              units: invoiceItem.units || 'per piece'
+            },
+            itemId: fullItem?._id || invoiceItem.item || invoiceItem.item?._id,
+            quantity: invoiceItem.quantity || 1,
+            customRate: invoiceItem.rate !== invoiceItem.originalRate ? invoiceItem.rate : '',
+            effectiveRate: invoiceItem.rate,
+            itemDiscountAmount: invoiceItem.itemDiscount || 0
+          }
+
+          console.log(`Mapped item ${index + 1}:`, mappedItem)
+          return mappedItem
+        })
+
+        console.log('All mapped items:', mappedItems)
+        setBillItems(mappedItems)
+        setDiscountAmt(invoice.discountAmt || invoice.discount || 0)
+        setShippingCharges(invoice.shippingCharges || 0)
+        setPaidAmount(invoice.paidAmount || invoice.receivedAmount || 0)
+        setPaymentMethod(invoice.paymentMethod || 'UPI')
+
+        toast.success('Invoice loaded for editing!')
+      } else {
+        console.error('No invoice data received')
+        toast.error('No invoice data found')
+        navigate('/invoices')
+      }
+    } catch (error) {
+      console.error('Failed to load invoice for editing:', error)
+      if (error.message === 'Request timeout after 15 seconds') {
+        toast.error('Request timed out. Please check your connection and try again.')
+      } else if (error.response?.status === 404) {
+        toast.error('Invoice not found')
+      } else if (error.response?.data?.message) {
+        toast.error(`Error: ${error.response.data.message}`)
+      } else {
+        toast.error('Failed to load invoice data')
+      }
+      navigate('/invoices')
+    } finally {
+      console.log('Finished loading invoice data')
+      setLoading(false)
+    }
+  }
+
   const handleCustomerChange = (customerId) => {
     setSelectedCustomer(customerId)
 
@@ -212,7 +366,14 @@ const Billing = () => {
   }
 
   const getCustomerDetails = () => {
-    const customer = customers.find(c => c._id === selectedCustomer)
+    // First try to find customer in local customers array
+    let customer = customers.find(c => c._id === selectedCustomer)
+
+    // If not found and in edit mode, try to get customer from editingInvoice
+    if (!customer && editingInvoice?.customer && isEditMode) {
+      customer = typeof editingInvoice.customer === 'object' ? editingInvoice.customer : null
+    }
+
     return customer
   }
 
@@ -319,17 +480,25 @@ const Billing = () => {
         billingType
       }
 
-      const response = await billingAPI.createInvoice(invoiceData)
-      console.log('Invoice creation response:', response); // Debug log
+      let response
+      if (isEditMode && editingInvoice) {
+        // Update existing invoice
+        response = await billingAPI.updateInvoice(editingInvoice._id, invoiceData)
+        toast.success('Invoice updated successfully!')
+      } else {
+        // Create new invoice
+        response = await billingAPI.createInvoice(invoiceData)
+        toast.success('Invoice generated successfully!')
+      }
 
-      toast.success('Invoice generated successfully!')
+      console.log('Invoice operation response:', response); // Debug log
 
       // Get customer details for WhatsApp
       const customerDetails = customers.find(c => c._id === selectedCustomer)
 
       // Create state object with fallback values
       const successState = {
-        invoiceId: response.invoice?._id || response.invoiceId || response._id,
+        invoiceId: response.invoice?._id || response.invoiceId || response._id || editingInvoice?._id,
         invoiceNumber: response.invoice?.invoiceNumber || response.invoiceNumber,
         pdfUrl: response.pdfPath || response.pdfUrl || response.invoice?.pdfPath,
         upiQr: response.upiQr,
@@ -554,7 +723,25 @@ const Billing = () => {
     <Layout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Generate Invoice</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold">
+              {isEditMode ? 'Edit Invoice' : 'Generate Invoice'}
+            </h1>
+            {isEditMode && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsEditMode(false)
+                  setEditingInvoice(null)
+                  navigate('/invoices')
+                }}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                ← Back to Invoices
+              </Button>
+            )}
+          </div>
 
           {/* Assignment Quick Actions */}
           <div className="flex gap-3">
@@ -590,142 +777,187 @@ const Billing = () => {
           </div>
         </div>
 
-        {/* Billing Type Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => {
-                setBillingType('B2B')
-                clearCustomerSelection() // Clear search when switching billing type
-              }}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${billingType === 'B2B'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-            >
-              B2B Invoice
-            </button>
-            <button
-              onClick={() => {
-                setBillingType('B2C')
-                clearCustomerSelection() // Clear search when switching billing type
-              }}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${billingType === 'B2C'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-            >
-              B2C Invoice
-            </button>
-          </nav>
-        </div>
+        {/* Billing Type Tabs - Hide in edit mode */}
+        {!isEditMode && (
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => {
+                  setBillingType('B2B')
+                  clearCustomerSelection() // Clear search when switching billing type
+                }}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${billingType === 'B2B'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+              >
+                B2B Invoice
+              </button>
+              <button
+                onClick={() => {
+                  setBillingType('B2C')
+                  clearCustomerSelection() // Clear search when switching billing type
+                }}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${billingType === 'B2C'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+              >
+                B2C Invoice
+              </button>
+            </nav>
+          </div>
+        )}
+
+        {/* Edit Mode Indicator */}
+        {isEditMode && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-amber-800">
+                  Editing Invoice: {editingInvoice?.invoiceNumber || 'Unknown'}
+                </h3>
+                <p className="text-sm text-amber-700 mt-1">
+                  You are editing an existing {billingType} invoice. Make your changes and click "Update Invoice" to save.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-lg shadow p-6">
           {/* Customer Selection */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Select Customer <span className="text-red-500">*</span>
+              {isEditMode ? 'Customer (Read-only)' : 'Select Customer'} <span className="text-red-500">*</span>
             </label>
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={customerSearch}
-                    onChange={(e) => handleCustomerSearchChange(e.target.value)}
-                    onFocus={() => setShowCustomerDropdown(true)}
-                    placeholder={`Search customers by ${billingType === 'B2B' ? 'firm name' : 'name'}, contact, or email...`}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {selectedCustomer && (
-                    <button
-                      onClick={clearCustomerSelection}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                  {!selectedCustomer && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
+            {isEditMode ? (
+              // Read-only customer display in edit mode
+              <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
+                {(() => {
+                  // First try to find customer in local customers array
+                  let customer = customers.find(c => c._id === selectedCustomer)
+
+                  // If not found, try to get customer from editingInvoice
+                  if (!customer && editingInvoice?.customer) {
+                    customer = typeof editingInvoice.customer === 'object' ? editingInvoice.customer : null
+                  }
+
+                  if (customer) {
+                    const displayName = billingType === 'B2B' ? customer.firmName : customer.name
+                    return `${displayName} ${customer.contact ? `• ${customer.contact}` : ''} ${billingType === 'B2B' && customer.gstNo ? `• GST: ${customer.gstNo}` : ''}`
+                  }
+                  return editingInvoice ? 'Loading customer information...' : 'Loading invoice data...'
+                })()}
+              </div>
+            ) : (
+              // Regular customer selection for new invoices
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => handleCustomerSearchChange(e.target.value)}
+                      onFocus={() => setShowCustomerDropdown(true)}
+                      placeholder={`Search customers by ${billingType === 'B2B' ? 'firm name' : 'name'}, contact, or email...`}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {selectedCustomer && (
+                      <button
+                        onClick={clearCustomerSelection}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                    {!selectedCustomer && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dropdown */}
+                  {showCustomerDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredCustomers.length > 0 ? (
+                        filteredCustomers.map((customer) => {
+                          const displayName = billingType === 'B2B' ? customer.firmName : customer.name
+                          const isSelected = selectedCustomer === customer._id
+
+                          return (
+                            <div
+                              key={customer._id}
+                              onClick={() => handleCustomerSelect(customer)}
+                              className={`px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${isSelected ? 'bg-blue-50 text-blue-700' : ''
+                                }`}
+                            >
+                              <div className="font-medium">{displayName}</div>
+                              <div className="text-sm text-gray-500">
+                                {customer.contact}
+                                {customer.email && ` • ${customer.email}`}
+                                {billingType === 'B2B' && customer.gstNo && ` • GST: ${customer.gstNo}`}
+                              </div>
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <div className="px-3 py-4 text-center text-gray-500">
+                          {customerSearch.trim() ? 'No customers found' : 'Start typing to search customers'}
+                        </div>
+                      )}
+
+                      {/* Add Customer Option */}
+                      <div
+                        onClick={() => {
+                          setShowCustomerDropdown(false)
+                          handleOpenAddCustomerModal()
+                        }}
+                        className="px-3 py-2 cursor-pointer hover:bg-gray-50 border-t border-gray-200 text-blue-600 font-medium"
+                      >
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Add New Customer
+                        </div>
+                      </div>
                     </div>
+                  )}
+
+                  {/* Click outside handler */}
+                  {showCustomerDropdown && (
+                    <div
+                      className="fixed inset-0 z-0"
+                      onClick={() => setShowCustomerDropdown(false)}
+                    />
                   )}
                 </div>
 
-                {/* Dropdown */}
-                {showCustomerDropdown && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filteredCustomers.length > 0 ? (
-                      filteredCustomers.map((customer) => {
-                        const displayName = billingType === 'B2B' ? customer.firmName : customer.name
-                        const isSelected = selectedCustomer === customer._id
-
-                        return (
-                          <div
-                            key={customer._id}
-                            onClick={() => handleCustomerSelect(customer)}
-                            className={`px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${isSelected ? 'bg-blue-50 text-blue-700' : ''
-                              }`}
-                          >
-                            <div className="font-medium">{displayName}</div>
-                            <div className="text-sm text-gray-500">
-                              {customer.contact}
-                              {customer.email && ` • ${customer.email}`}
-                              {billingType === 'B2B' && customer.gstNo && ` • GST: ${customer.gstNo}`}
-                            </div>
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <div className="px-3 py-4 text-center text-gray-500">
-                        {customerSearch.trim() ? 'No customers found' : 'Start typing to search customers'}
-                      </div>
-                    )}
-
-                    {/* Add Customer Option */}
-                    <div
-                      onClick={() => {
-                        setShowCustomerDropdown(false)
-                        handleOpenAddCustomerModal()
-                      }}
-                      className="px-3 py-2 cursor-pointer hover:bg-gray-50 border-t border-gray-200 text-blue-600 font-medium"
-                    >
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        Add New Customer
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Click outside handler */}
-                {showCustomerDropdown && (
-                  <div
-                    className="fixed inset-0 z-0"
-                    onClick={() => setShowCustomerDropdown(false)}
-                  />
-                )}
+                <Button
+                  onClick={handleOpenAddCustomerModal}
+                  variant="primary"
+                  size="sm"
+                  leftIcon={
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12h18M12 3v18" />
+                    </svg>
+                  }
+                >
+                  Add Customer
+                </Button>
               </div>
-
-              <Button
-                onClick={handleOpenAddCustomerModal}
-                variant="primary"
-                size="sm"
-                leftIcon={
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12h18M12 3v18" />
-                  </svg>
-                }
-              >
-                Add Customer
-              </Button>
-            </div>
+            )}
 
             {/* Selected Customer Info */}
             {selectedCustomer && (
@@ -1078,7 +1310,7 @@ const Billing = () => {
               size="lg"
               disabled={loading}
             >
-              {loading ? 'Generating...' : 'Generate Invoice'}
+              {loading ? (isEditMode ? 'Updating...' : 'Generating...') : (isEditMode ? 'Update Invoice' : 'Generate Invoice')}
             </Button>
           </div>
         </div>

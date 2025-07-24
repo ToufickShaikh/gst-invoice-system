@@ -36,7 +36,7 @@ const testInvoiceData = {
 
 async function testPDFGeneration() {
     console.log('Testing PDF generation with sample invoice data...');
-    
+
     try {
         const result = await generateInvoicePDF(testInvoiceData);
         console.log('SUCCESS: PDF generated at:', result);
