@@ -12,32 +12,30 @@
             box-sizing: border-box;
         }
 
+        /* A4 Paper Optimization - Enhanced for better content fitting */
+        @page {
+            size: A4;
+            margin: 8mm;
+        }
+
         body {
-            font-family: 'Segoe UI', 'Arial', sans-serif;
-            line-height: 1.0;
-            color: #1a1a1a;
-            background: #f5f5f0;
-            padding: 2mm;
-            font-size: 8px;
+            font-family: Arial, sans-serif;
             margin: 0;
-            height: 297mm;
-            max-height: 297mm;
-            overflow: hidden;
+            padding: 0;
+            background: #fff;
+            font-size: 10px;
+            line-height: 1.3;
+            color: #000;
         }
 
         .invoice-container {
-            width: 210mm;
-            height: 291mm;
-            max-width: 210mm;
-            max-height: 291mm;
-            margin: 0 auto;
+            max-width: 100%;
+            width: 100%;
             background: #ffffff;
-            border: 1px solid #2c2c2c;
-            box-shadow: 0 0 8px rgba(218, 165, 32, 0.1);
-            position: relative;
-            overflow: hidden;
+            border: 2px solid #2c2c2c;
             display: flex;
             flex-direction: column;
+            min-height: calc(100vh - 16mm);
             page-break-inside: avoid;
         }
 
@@ -52,112 +50,91 @@
             z-index: 1;
         }
 
-        /* Header Styles */
+        /* Header Section - Compact */
         .invoice-header {
             background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
-            color: #DAA520;
-            border-bottom: 2px solid #DAA520;
-            padding: 3mm;
-            position: relative;
-            z-index: 2;
+            color: #ffffff;
+            padding: 8mm;
+            border-bottom: 3px solid #DAA520;
             flex-shrink: 0;
         }
 
-        .invoice-header::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent 0%, #DAA520 50%, transparent 100%);
-            z-index: 1;
-        }
-
         .invoice-title {
-            font-size: 22px;
-            font-weight: bold;
             text-align: center;
-            margin-bottom: 5mm;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 6mm;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
             color: #DAA520;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-            letter-spacing: 2px;
-            border-bottom: 2px solid #DAA520;
-            padding-bottom: 4px;
         }
 
         .company-section {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 5mm;
+            gap: 10px;
             flex-wrap: wrap;
-            gap: 8px;
-            position: relative;
-            z-index: 3;
         }
 
         .company-info {
             flex: 1 1 60%;
-            min-width: 280px;
-            display: flex;
-            align-items: flex-start;
-        }
-
-        .company-logo {
-            width: 80px;
-            height: 80px;
-            margin-right: 15px;
-            border: 2px solid #DAA520;
-            border-radius: 4px;
-            flex-shrink: 0;
-            box-shadow: 0 2px 6px rgba(218, 165, 32, 0.2);
+            min-width: 300px;
         }
 
         .company-details h2 {
             font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 3px;
+            margin-bottom: 4px;
             color: #DAA520;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
         }
 
         .company-details p {
+            margin-bottom: 2px;
             font-size: 9px;
-            margin-bottom: 1px;
-            color: #f5f5f0;
-            line-height: 1.2;
+            color: #ffffff;
+        }
+
+        .company-logo {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #DAA520;
+            border-radius: 8px;
+            object-fit: contain;
+            background: #ffffff;
+            padding: 2px;
         }
 
         .invoice-meta {
             flex: 0 1 35%;
-            min-width: 230px;
-            max-width: 280px;
-            text-align: right;
-            border: 2px solid #DAA520;
-            padding: 8px;
+            min-width: 200px;
+            max-width: 300px;
             background: rgba(218, 165, 32, 0.1);
-            border-radius: 3px;
-            position: relative;
+            border: 2px solid #DAA520;
+            border-radius: 6px;
+            padding: 6px;
+            margin-left: auto;
         }
 
         .invoice-meta h3 {
-            font-size: 12px;
             margin-bottom: 6px;
+            font-size: 10px;
+            text-align: center;
             color: #DAA520;
             text-decoration: underline;
             font-weight: bold;
         }
 
         .invoice-meta p {
-            font-size: 9px;
-            margin-bottom: 2px;
+            font-size: 8px;
+            margin-bottom: 1px;
             color: #2c2c2c;
         }
 
-        /* Main Content */
+        /* Main Content - Compact */
         .invoice-body {
-            padding: 3mm;
+            padding: 2mm;
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -167,8 +144,8 @@
         .billing-section {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 3mm;
-            gap: 6px;
+            margin-bottom: 2mm;
+            gap: 4px;
             flex-wrap: wrap;
             flex-shrink: 0;
         }
@@ -176,51 +153,38 @@
         .bill-to,
         .invoice-details {
             flex: 1 1 45%;
-            min-width: 260px;
-            padding: 8px;
+            min-width: 200px;
+            padding: 6px;
             border: 2px solid #DAA520;
             background: rgba(218, 165, 32, 0.05);
             border-radius: 3px;
             position: relative;
-            margin-bottom: 6px;
-        }
-
-        .bill-to::before,
-        .invoice-details::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #DAA520 0%, #B8860B 50%, #DAA520 100%);
-            border-radius: 2px 2px 0 0;
-            z-index: 1;
+            margin-bottom: 4px;
         }
 
         .section-header {
-            font-size: 11px;
+            font-size: 9px;
             font-weight: bold;
             color: #1a1a1a;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
             text-decoration: underline;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
         .detail-item {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 2px;
-            font-size: 9px;
-            padding: 1px 0;
+            margin-bottom: 1px;
+            font-size: 7px;
+            padding: 0.5px 0;
         }
 
         .detail-label {
             font-weight: bold;
             color: #2c2c2c;
             min-width: 35%;
-            margin-right: 10px;
+            margin-right: 8px;
             flex-shrink: 0;
         }
 
@@ -232,25 +196,9 @@
             max-width: 60%;
         }
 
-        .detail-label {
-            font-weight: bold;
-            color: #2c2c2c;
-            min-width: 35%;
-            margin-right: 10px;
-            flex-shrink: 0;
-        }
-
-        .detail-value {
-            color: #1a1a1a;
-            text-align: right;
-            word-break: break-word;
-            flex: 1;
-            max-width: 60%;
-        }
-
-        /* Items Table */
+        /* Items Table - Optimized for better space usage */
         .items-section {
-            margin: 3mm 0;
+            margin: 2mm 0;
             overflow-x: auto;
             flex: 1;
             display: flex;
@@ -261,7 +209,7 @@
             width: 100%;
             border-collapse: collapse;
             border: 2px solid #2c2c2c;
-            font-size: 7px;
+            font-size: 6px;
             box-shadow: 0 2px 6px rgba(218, 165, 32, 0.1);
             flex: 1;
         }
@@ -269,22 +217,22 @@
         .items-table th {
             background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
             color: #DAA520;
-            padding: 3px 2px;
+            padding: 2px 1px;
             font-weight: bold;
             text-align: center;
             border: 1px solid #DAA520;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-size: 6px;
+            letter-spacing: 0.2px;
+            font-size: 5px;
         }
 
         .items-table td {
-            padding: 2px 1px;
+            padding: 1px;
             border: 1px solid #DAA520;
             text-align: center;
             vertical-align: middle;
             background: #ffffff;
-            font-size: 6px;
+            font-size: 5px;
         }
 
         .items-table td.text-left {
@@ -322,113 +270,82 @@
             font-weight: bold;
         }
 
-        /* Tax Summary */
+        /* Tax Summary - Compact */
         .tax-summary-section {
             display: flex;
-            gap: 10px;
-            margin: 8mm 0;
+            gap: 6px;
+            margin: 4mm 0;
             flex-wrap: wrap;
             align-items: flex-start;
         }
 
         .tax-summary-left {
             flex: 2 1 60%;
-            min-width: 500px;
-            margin-bottom: 10px;
+            min-width: 400px;
+            margin-bottom: 6px;
         }
 
         .tax-summary-right {
             flex: 1 1 35%;
-            min-width: 300px;
-            margin-bottom: 10px;
+            min-width: 250px;
+            margin-bottom: 6px;
         }
 
         .tax-table {
             width: 100%;
             border-collapse: collapse;
             border: 2px solid #2c2c2c;
-            font-size: 8px;
+            font-size: 6px;
             box-shadow: 0 2px 6px rgba(218, 165, 32, 0.15);
         }
 
         .tax-table th {
             background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
             color: #DAA520;
-            padding: 4px 2px;
+            padding: 2px 1px;
             font-weight: bold;
             text-align: center;
             border: 1px solid #DAA520;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-size: 7px;
+            letter-spacing: 0.2px;
+            font-size: 5px;
         }
 
         .tax-table td {
-            padding: 3px 2px;
+            padding: 1px;
             border: 1px solid #DAA520;
             text-align: center;
             background: #ffffff;
-            font-size: 7px;
-        }
-
-        .tax-table td.text-left {
-            text-align: left;
-        }
-
-        .tax-table td.text-right {
-            text-align: right;
-        }
-
-        .tax-table tbody tr:nth-child(even) {
-            background: rgba(218, 165, 32, 0.05);
-        }
-
-        .tax-table tfoot tr {
-            background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
-            color: #DAA520;
-            font-weight: bold;
-            border-top: 2px solid #DAA520;
+            font-size: 5px;
         }
 
         .summary-panel {
             background: linear-gradient(135deg, rgba(218, 165, 32, 0.1) 0%, rgba(184, 134, 11, 0.1) 100%);
             border: 2px solid #DAA520;
-            padding: 6px;
+            padding: 4px;
             border-radius: 3px;
             box-shadow: 0 2px 6px rgba(218, 165, 32, 0.15);
             position: relative;
         }
 
-        .summary-panel::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #DAA520 0%, #B8860B 50%, #DAA520 100%);
-            border-radius: 2px 2px 0 0;
-            z-index: 1;
-        }
-
         .summary-panel h3 {
-            margin-bottom: 4px;
-            font-size: 11px;
+            margin-bottom: 3px;
+            font-size: 9px;
             text-align: center;
             color: #1a1a1a;
             text-decoration: underline;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
         .summary-item {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 2px;
-            padding: 1px 0;
+            margin-bottom: 1px;
+            padding: 0.5px 0;
             border-bottom: 1px solid rgba(218, 165, 32, 0.3);
-            font-size: 9px;
+            font-size: 7px;
         }
 
         .summary-item span:first-child {
@@ -443,20 +360,20 @@
 
         .summary-item:last-child {
             border-bottom: 2px solid #DAA520;
-            font-size: 11px;
+            font-size: 9px;
             font-weight: bold;
-            margin-top: 4px;
+            margin-top: 2px;
             background: rgba(218, 165, 32, 0.2);
-            padding: 4px 2px;
-            border-radius: 2px;
+            padding: 2px 1px;
+            border-radius: 1px;
         }
 
-        /* Footer Section */
+        /* Footer Section - Compact */
         .invoice-footer {
             display: flex;
-            gap: 4px;
-            margin-top: 3mm;
-            padding-top: 2mm;
+            gap: 3px;
+            margin-top: 2mm;
+            padding-top: 1mm;
             border-top: 2px solid #DAA520;
             flex-wrap: wrap;
             align-items: flex-start;
@@ -465,67 +382,43 @@
 
         .bank-details {
             flex: 1 1 55%;
-            min-width: 300px;
+            min-width: 250px;
             background: rgba(218, 165, 32, 0.05);
-            padding: 4px;
+            padding: 3px;
             border: 2px solid #DAA520;
             border-radius: 3px;
             position: relative;
-            margin-bottom: 4px;
-        }
-
-        .bank-details::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #DAA520 0%, #B8860B 50%, #DAA520 100%);
-            border-radius: 2px 2px 0 0;
-            z-index: 1;
+            margin-bottom: 3px;
         }
 
         .signature-section {
             flex: 0 1 40%;
-            min-width: 220px;
+            min-width: 180px;
             text-align: center;
-            padding: 4px;
+            padding: 3px;
             border: 2px solid #DAA520;
             border-radius: 3px;
             background: rgba(218, 165, 32, 0.05);
             position: relative;
-            margin-bottom: 4px;
-        }
-
-        .signature-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #DAA520 0%, #B8860B 50%, #DAA520 100%);
-            border-radius: 2px 2px 0 0;
-            z-index: 1;
+            margin-bottom: 3px;
         }
 
         .bank-details h4,
         .signature-section h4 {
             color: #1a1a1a;
-            margin-bottom: 3px;
-            font-size: 11px;
+            margin-bottom: 2px;
+            font-size: 9px;
             font-weight: bold;
             text-decoration: underline;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
         .bank-info-item {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 1px;
-            font-size: 9px;
+            margin-bottom: 0.5px;
+            font-size: 7px;
             flex-wrap: wrap;
         }
 
@@ -541,31 +434,31 @@
         }
 
         .qr-code {
-            width: 50px;
-            height: 50px;
-            margin: 4px auto;
+            width: 40px;
+            height: 40px;
+            margin: 2px auto;
             display: block;
-            border: 2px solid #DAA520;
-            border-radius: 3px;
-        }
-
-        .signature-image {
-            width: 80px;
-            height: 30px;
-            margin-bottom: 4px;
             border: 1px solid #DAA520;
             border-radius: 2px;
         }
 
-        /* Developer Credit */
+        .signature-image {
+            width: 60px;
+            height: 20px;
+            margin-bottom: 2px;
+            border: 1px solid #DAA520;
+            border-radius: 1px;
+        }
+
+        /* Developer Credit - Minimal */
         .developer-credit {
             text-align: center;
-            margin-top: 4px;
-            padding: 3px;
+            margin-top: 2mm;
+            padding: 1px;
             background: rgba(218, 165, 32, 0.05);
             border: 1px solid #DAA520;
-            border-radius: 3px;
-            font-size: 8px;
+            border-radius: 2px;
+            font-size: 6px;
             color: #2c2c2c;
         }
 
@@ -578,10 +471,6 @@
             color: #DAA520;
             text-decoration: none;
             font-weight: bold;
-        }
-
-        .developer-credit a:hover {
-            text-decoration: underline;
         }
 
         /* Page Break Control */
