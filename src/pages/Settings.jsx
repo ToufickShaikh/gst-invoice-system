@@ -13,30 +13,23 @@ const Settings = () => {
     language: userProfile?.preferences?.language || 'en',
     currency: 'INR',
     dateFormat: 'DD/MM/YYYY',
+    timezone: 'Asia/Kolkata',
     
     // Business Settings
-    companyName: 'Your Company Name',
+    companyName: userProfile?.companyName || 'Your Company Name',
     companyEmail: userProfile?.email || '',
-    companyPhone: '',
-    companyAddress: '',
-    gstNumber: '',
-    
-    // Invoice Settings
-    invoicePrefix: 'INV',
-    defaultTaxRate: 18,
-    autoSaveInterval: 5,
-    enableWhatsApp: true,
-    enableAutoPrint: true,
-    
-    // Notification Settings
-    emailNotifications: userProfile?.preferences?.notifications || true,
-    soundNotifications: true,
-    desktopNotifications: false,
+    companyPhone: userProfile?.phone || '',
+    companyAddress: userProfile?.address || '',
+    gstNumber: userProfile?.gstNumber || '',
+    logo: userProfile?.logo || '',
     
     // Advanced Settings
     backupEnabled: false,
     debugMode: false,
-    enableAnalytics: true
+    enableAnalytics: true,
+    autoBackupInterval: 24, // hours
+    maxBackupFiles: 10,
+    enableApiLogging: false
   })
 
   const [activeTab, setActiveTab] = useState('general')
@@ -73,13 +66,16 @@ const Settings = () => {
       // Update user preferences in AuthContext
       updatePreferences({
         theme: settings.theme,
-        language: settings.language,
-        notifications: settings.emailNotifications
+        language: settings.language
       })
       
       // Update profile information
       updateProfile({
-        email: settings.companyEmail
+        email: settings.companyEmail,
+        companyName: settings.companyName,
+        phone: settings.companyPhone,
+        address: settings.companyAddress,
+        gstNumber: settings.gstNumber
       })
       
       // Here you could also save to backend if needed
@@ -117,8 +113,6 @@ const Settings = () => {
   const tabs = [
     { id: 'general', label: 'General', icon: '⚙️' },
     { id: 'business', label: 'Business', icon: '🏢' },
-    { id: 'invoice', label: 'Invoice', icon: '📄' },
-    { id: 'notifications', label: 'Notifications', icon: '🔔' },
     { id: 'advanced', label: 'Advanced', icon: '🔧' }
   ]
 
@@ -135,6 +129,7 @@ const Settings = () => {
           <option value="dark">Dark</option>
           <option value="auto">Auto (System)</option>
         </select>
+        <p className="text-xs text-gray-500 mt-1">Choose your preferred color scheme</p>
       </div>
 
       <div>
@@ -145,9 +140,11 @@ const Settings = () => {
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="en">English</option>
-          <option value="hi">Hindi</option>
-          <option value="gu">Gujarati</option>
+          <option value="hi">हिंदी (Hindi)</option>
+          <option value="gu">ગુજરાતી (Gujarati)</option>
+          <option value="mr">मराठी (Marathi)</option>
         </select>
+        <p className="text-xs text-gray-500 mt-1">Select your preferred interface language</p>
       </div>
 
       <div>
@@ -157,10 +154,12 @@ const Settings = () => {
           onChange={(e) => handleSettingChange('currency', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="INR">INR (₹)</option>
-          <option value="USD">USD ($)</option>
-          <option value="EUR">EUR (€)</option>
+          <option value="INR">INR (₹) - Indian Rupee</option>
+          <option value="USD">USD ($) - US Dollar</option>
+          <option value="EUR">EUR (€) - Euro</option>
+          <option value="GBP">GBP (£) - British Pound</option>
         </select>
+        <p className="text-xs text-gray-500 mt-1">Default currency for all transactions</p>
       </div>
 
       <div>
@@ -170,10 +169,28 @@ const Settings = () => {
           onChange={(e) => handleSettingChange('dateFormat', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-          <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-          <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+          <option value="DD/MM/YYYY">DD/MM/YYYY (31/12/2023)</option>
+          <option value="MM/DD/YYYY">MM/DD/YYYY (12/31/2023)</option>
+          <option value="YYYY-MM-DD">YYYY-MM-DD (2023-12-31)</option>
+          <option value="DD-MM-YYYY">DD-MM-YYYY (31-12-2023)</option>
         </select>
+        <p className="text-xs text-gray-500 mt-1">How dates will be displayed throughout the application</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
+        <select
+          value={settings.timezone}
+          onChange={(e) => handleSettingChange('timezone', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+          <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+          <option value="America/New_York">America/New_York (EST)</option>
+          <option value="Europe/London">Europe/London (GMT)</option>
+          <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+        </select>
+        <p className="text-xs text-gray-500 mt-1">Your business timezone for timestamps</p>
       </div>
     </div>
   )
@@ -181,25 +198,29 @@ const Settings = () => {
   const renderBusinessSettings = () => (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Company Name *</label>
         <input
           type="text"
           value={settings.companyName}
           onChange={(e) => handleSettingChange('companyName', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Enter your company name"
+          required
         />
+        <p className="text-xs text-gray-500 mt-1">This will appear on all invoices and documents</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Company Email</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Company Email *</label>
         <input
           type="email"
           value={settings.companyEmail}
           onChange={(e) => handleSettingChange('companyEmail', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="company@example.com"
+          required
         />
+        <p className="text-xs text-gray-500 mt-1">Official business email address</p>
       </div>
 
       <div>
@@ -211,17 +232,20 @@ const Settings = () => {
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="+91 9876543210"
         />
+        <p className="text-xs text-gray-500 mt-1">Primary contact number for business</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Company Address</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Company Address *</label>
         <textarea
           value={settings.companyAddress}
           onChange={(e) => handleSettingChange('companyAddress', e.target.value)}
-          rows={3}
+          rows={4}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Enter your complete business address"
+          placeholder="Enter your complete business address including city, state, and PIN code"
+          required
         />
+        <p className="text-xs text-gray-500 mt-1">Complete registered business address</p>
       </div>
 
       <div>
@@ -229,175 +253,215 @@ const Settings = () => {
         <input
           type="text"
           value={settings.gstNumber}
-          onChange={(e) => handleSettingChange('gstNumber', e.target.value)}
+          onChange={(e) => handleSettingChange('gstNumber', e.target.value.toUpperCase())}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="22AAAAA0000A1Z5"
+          maxLength={15}
         />
-      </div>
-    </div>
-  )
-
-  const renderInvoiceSettings = () => (
-    <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Invoice Prefix</label>
-        <input
-          type="text"
-          value={settings.invoicePrefix}
-          onChange={(e) => handleSettingChange('invoicePrefix', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="INV"
-        />
-        <p className="text-xs text-gray-500 mt-1">Invoice numbers will be formatted as: {settings.invoicePrefix}-001</p>
+        <p className="text-xs text-gray-500 mt-1">15-character GST identification number (if registered)</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Default Tax Rate (%)</label>
-        <input
-          type="number"
-          value={settings.defaultTaxRate}
-          onChange={(e) => handleSettingChange('defaultTaxRate', parseFloat(e.target.value) || 0)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          min="0"
-          max="100"
-          step="0.1"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Auto-save Interval (minutes)</label>
-        <select
-          value={settings.autoSaveInterval}
-          onChange={(e) => handleSettingChange('autoSaveInterval', parseInt(e.target.value))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value={1}>1 minute</option>
-          <option value={5}>5 minutes</option>
-          <option value={10}>10 minutes</option>
-          <option value={0}>Disabled</option>
-        </select>
-      </div>
-
-      <div className="space-y-4">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.enableWhatsApp}
-            onChange={(e) => handleSettingChange('enableWhatsApp', e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm text-gray-700">Enable WhatsApp integration</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.enableAutoPrint}
-            onChange={(e) => handleSettingChange('enableAutoPrint', e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm text-gray-700">Enable automatic PDF printing</span>
-        </label>
-      </div>
-    </div>
-  )
-
-  const renderNotificationSettings = () => (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.emailNotifications}
-            onChange={(e) => handleSettingChange('emailNotifications', e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm text-gray-700">Email notifications</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.soundNotifications}
-            onChange={(e) => handleSettingChange('soundNotifications', e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm text-gray-700">Sound notifications</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.desktopNotifications}
-            onChange={(e) => handleSettingChange('desktopNotifications', e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm text-gray-700">Desktop notifications</span>
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+          <div className="text-center">
+            <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <div className="mt-2">
+              <button
+                type="button"
+                className="bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Upload company logo
+              </button>
+              <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">Optional logo to appear on invoices</p>
       </div>
     </div>
   )
 
   const renderAdvancedSettings = () => (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.backupEnabled}
-            onChange={(e) => handleSettingChange('backupEnabled', e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm text-gray-700">Enable automatic backups</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.debugMode}
-            onChange={(e) => handleSettingChange('debugMode', e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm text-gray-700">Debug mode (for developers)</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.enableAnalytics}
-            onChange={(e) => handleSettingChange('enableAnalytics', e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm text-gray-700">Enable usage analytics</span>
-        </label>
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div className="flex">
+          <svg className="flex-shrink-0 w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-yellow-800">Advanced Settings</h3>
+            <p className="text-sm text-yellow-700 mt-1">These settings are for advanced users. Change them only if you understand their implications.</p>
+          </div>
+        </div>
       </div>
 
-      <div className="border-t pt-6">
-        <h4 className="text-sm font-medium text-gray-900 mb-4">Data Management</h4>
-        <div className="space-y-3">
-          <Button
-            variant="outline"
-            onClick={exportSettings}
-            leftIcon={
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            }
-          >
-            Export Settings
-          </Button>
-          
-          <Button
-            variant="danger"
-            onClick={resetSettings}
-            leftIcon={
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            }
-          >
-            Reset All Settings
-          </Button>
+      <div className="space-y-6">
+        <div>
+          <h4 className="text-sm font-medium text-gray-900 mb-4">Data & Backup</h4>
+          <div className="space-y-4">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={settings.backupEnabled}
+                onChange={(e) => handleSettingChange('backupEnabled', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-3 text-sm text-gray-700">Enable automatic backups</span>
+            </label>
+            
+            {settings.backupEnabled && (
+              <div className="ml-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Backup Interval</label>
+                  <select
+                    value={settings.autoBackupInterval}
+                    onChange={(e) => handleSettingChange('autoBackupInterval', parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value={1}>Every hour</option>
+                    <option value={6}>Every 6 hours</option>
+                    <option value={12}>Every 12 hours</option>
+                    <option value={24}>Daily</option>
+                    <option value={168}>Weekly</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Max Backup Files</label>
+                  <input
+                    type="number"
+                    value={settings.maxBackupFiles}
+                    onChange={(e) => handleSettingChange('maxBackupFiles', parseInt(e.target.value) || 5)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="5"
+                    max="50"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Number of backup files to keep (older files will be deleted)</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t pt-6">
+          <h4 className="text-sm font-medium text-gray-900 mb-4">System</h4>
+          <div className="space-y-4">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={settings.debugMode}
+                onChange={(e) => handleSettingChange('debugMode', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-3 text-sm text-gray-700">Debug mode</span>
+            </label>
+            <p className="text-xs text-gray-500 ml-6">Shows detailed error messages and logs (for developers)</p>
+
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={settings.enableApiLogging}
+                onChange={(e) => handleSettingChange('enableApiLogging', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-3 text-sm text-gray-700">Enable API request logging</span>
+            </label>
+            <p className="text-xs text-gray-500 ml-6">Log all API requests for debugging purposes</p>
+
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={settings.enableAnalytics}
+                onChange={(e) => handleSettingChange('enableAnalytics', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-3 text-sm text-gray-700">Enable usage analytics</span>
+            </label>
+            <p className="text-xs text-gray-500 ml-6">Help improve the application by sharing anonymous usage data</p>
+          </div>
+        </div>
+
+        <div className="border-t pt-6">
+          <h4 className="text-sm font-medium text-gray-900 mb-4">Data Management</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              variant="outline"
+              onClick={exportSettings}
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              }
+            >
+              Export Settings
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={() => {
+                const input = document.createElement('input')
+                input.type = 'file'
+                input.accept = '.json'
+                input.onchange = (e) => {
+                  const file = e.target.files[0]
+                  if (file) {
+                    const reader = new FileReader()
+                    reader.onload = (e) => {
+                      try {
+                        const importedSettings = JSON.parse(e.target.result)
+                        setSettings(prev => ({ ...prev, ...importedSettings }))
+                        setHasChanges(true)
+                        toast.success('Settings imported successfully!')
+                      } catch (error) {
+                        toast.error('Invalid settings file format')
+                      }
+                    }
+                    reader.readAsText(file)
+                  }
+                }
+                input.click()
+              }}
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+              }
+            >
+              Import Settings
+            </Button>
+            
+            <Button
+              variant="danger"
+              onClick={resetSettings}
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              }
+            >
+              Reset All Settings
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (window.confirm('This will clear all application data including invoices, customers, and items. This action cannot be undone. Are you sure?')) {
+                  localStorage.clear()
+                  window.location.reload()
+                }
+              }}
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              }
+            >
+              Clear All Data
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -407,8 +471,6 @@ const Settings = () => {
     switch (activeTab) {
       case 'general': return renderGeneralSettings()
       case 'business': return renderBusinessSettings()
-      case 'invoice': return renderInvoiceSettings()
-      case 'notifications': return renderNotificationSettings()
       case 'advanced': return renderAdvancedSettings()
       default: return renderGeneralSettings()
     }
