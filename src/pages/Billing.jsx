@@ -817,7 +817,6 @@ const Billing = () => {
             )}
           </div>
         </div>
-        </div>
 
         {/* Billing Type Tabs - Hide in edit mode - Mobile optimized */}
         {!isEditMode && (
