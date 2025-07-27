@@ -36,16 +36,19 @@ const Billing = () => {
   // Add Customer Modal states
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
   const [newCustomer, setNewCustomer] = useState({
+    customerType: 'B2C',
     name: '',
     firmName: '',
     firmAddress: '',
     contact: '',
     email: '',
     gstNo: '',
-    state: '',
-    customerType: 'B2C'
+    state: '33-Tamil Nadu' // Default state
   })
   const [addingCustomer, setAddingCustomer] = useState(false)
+  const [gstinValidating, setGstinValidating] = useState(false)
+  const [gstinValid, setGstinValid] = useState(null)
+  const [gstinDetails, setGstinDetails] = useState(null)
 
   // Add Item Modal states
   const [showAddItemModal, setShowAddItemModal] = useState(false)
@@ -622,30 +625,36 @@ const Billing = () => {
   // Add Customer functions
   const handleOpenAddCustomerModal = () => {
     setNewCustomer({
+      customerType: billingType,
       name: '',
       firmName: '',
       firmAddress: '',
       contact: '',
       email: '',
       gstNo: '',
-      state: '',
-      customerType: billingType
+      state: '33-Tamil Nadu'
     })
+    setGstinValidating(false)
+    setGstinValid(null)
+    setGstinDetails(null)
     setShowAddCustomerModal(true)
   }
 
   const handleCloseAddCustomerModal = () => {
     setShowAddCustomerModal(false)
     setNewCustomer({
+      customerType: 'B2C',
       name: '',
       firmName: '',
       firmAddress: '',
       contact: '',
       email: '',
       gstNo: '',
-      state: '',
-      customerType: 'B2C'
+      state: '33-Tamil Nadu'
     })
+    setGstinValidating(false)
+    setGstinValid(null)
+    setGstinDetails(null)
   }
 
   const handleNewCustomerChange = (field, value) => {
@@ -653,6 +662,60 @@ const Billing = () => {
       ...prev,
       [field]: value
     }))
+
+    // Handle GSTIN validation for B2B customers
+    if (field === 'gstNo' && billingType === 'B2B' && value.length >= 15) {
+      validateAndVerifyGSTIN(value)
+    } else if (field === 'gstNo') {
+      // Reset validation state if GSTIN is incomplete
+      setGstinValid(null)
+      setGstinDetails(null)
+    }
+  }
+
+  const validateAndVerifyGSTIN = async (gstin) => {
+    setGstinValidating(true)
+    setGstinValid(null)
+    setGstinDetails(null)
+
+    try {
+      // First validate format
+      const validationResult = await gstAPI.validateGSTIN(gstin)
+
+      if (validationResult.valid) {
+        setGstinValid(true)
+
+        // Then verify and get details
+        const verificationResult = await gstAPI.verifyGSTIN(gstin)
+
+        if (verificationResult.verified && verificationResult.companyDetails) {
+          const details = verificationResult.companyDetails
+          setGstinDetails(details)
+
+          // Auto-fill customer form with verified details
+          setNewCustomer(prev => ({
+            ...prev,
+            firmName: details.legalName || prev.firmName,
+            firmAddress: details.principalPlaceOfBusiness || prev.firmAddress,
+            state: details.state || prev.state
+          }))
+
+          toast.success('GSTIN verified successfully!')
+        } else {
+          setGstinValid(false)
+          toast.error(verificationResult.error || 'GSTIN verification failed')
+        }
+      } else {
+        setGstinValid(false)
+        toast.error(validationResult.error || 'Invalid GSTIN format')
+      }
+    } catch (error) {
+      console.error('GSTIN validation error:', error)
+      setGstinValid(false)
+      toast.error('Failed to validate GSTIN')
+    } finally {
+      setGstinValidating(false)
+    }
   }
 
   const handleAddNewCustomer = async () => {

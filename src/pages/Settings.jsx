@@ -10,7 +10,6 @@ const Settings = () => {
   const [settings, setSettings] = useState({
     // App Settings
     theme: userProfile?.preferences?.theme || 'light',
-    language: userProfile?.preferences?.language || 'en',
     currency: 'INR',
     dateFormat: 'DD/MM/YYYY',
     timezone: 'Asia/Kolkata',
@@ -49,6 +48,56 @@ const Settings = () => {
     }
   }, [])
 
+  // Apply theme changes immediately
+  useEffect(() => {
+    const applyTheme = () => {
+      const root = document.documentElement
+      
+      if (settings.theme === 'dark') {
+        root.classList.add('dark')
+      } else if (settings.theme === 'light') {
+        root.classList.remove('dark')
+      } else if (settings.theme === 'auto') {
+        // Auto theme based on system preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (prefersDark) {
+          root.classList.add('dark')
+        } else {
+          root.classList.remove('dark')
+        }
+      }
+    }
+
+    applyTheme()
+
+    // Listen for system theme changes if auto mode is selected
+    if (settings.theme === 'auto') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      const handleChange = () => applyTheme()
+      mediaQuery.addEventListener('change', handleChange)
+      
+      return () => mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [settings.theme])
+
+  // Apply timezone and other settings
+  useEffect(() => {
+    // Set global timezone for date formatting
+    if (settings.timezone) {
+      localStorage.setItem('appTimezone', settings.timezone)
+    }
+    
+    // Set global currency for formatting
+    if (settings.currency) {
+      localStorage.setItem('appCurrency', settings.currency)
+    }
+
+    // Set global date format
+    if (settings.dateFormat) {
+      localStorage.setItem('appDateFormat', settings.dateFormat)
+    }
+  }, [settings.timezone, settings.currency, settings.dateFormat])
+
   const handleSettingChange = (key, value) => {
     setSettings(prev => ({
       ...prev,
@@ -60,13 +109,42 @@ const Settings = () => {
   const saveSettings = async () => {
     setLoading(true)
     try {
+      // Validate required business fields
+      if (!settings.companyName.trim()) {
+        toast.error('Company name is required')
+        setLoading(false)
+        return
+      }
+      
+      if (!settings.companyEmail.trim()) {
+        toast.error('Company email is required')
+        setLoading(false)
+        return
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(settings.companyEmail)) {
+        toast.error('Please enter a valid email address')
+        setLoading(false)
+        return
+      }
+
+      // Validate GST number if provided
+      if (settings.gstNumber && settings.gstNumber.length > 0) {
+        if (settings.gstNumber.length !== 15) {
+          toast.error('GST number must be exactly 15 characters')
+          setLoading(false)
+          return
+        }
+      }
+
       // Save to localStorage
       localStorage.setItem('appSettings', JSON.stringify(settings))
       
       // Update user preferences in AuthContext
       updatePreferences({
-        theme: settings.theme,
-        language: settings.language
+        theme: settings.theme
       })
       
       // Update profile information
@@ -77,6 +155,9 @@ const Settings = () => {
         address: settings.companyAddress,
         gstNumber: settings.gstNumber
       })
+      
+      // Handle auto backup setup
+      enableAutoBackup()
       
       // Here you could also save to backend if needed
       // await billingAPI.saveSettings(settings)
@@ -110,6 +191,180 @@ const Settings = () => {
     toast.success('Settings exported successfully!')
   }
 
+  const performFullBackup = () => {
+    try {
+      // Collect all application data
+      const backupData = {
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        settings: settings,
+        invoices: JSON.parse(localStorage.getItem('invoices') || '[]'),
+        customers: JSON.parse(localStorage.getItem('customers') || '[]'),
+        items: JSON.parse(localStorage.getItem('items') || '[]'),
+        userProfile: JSON.parse(localStorage.getItem('userProfile') || '{}'),
+        appState: {
+          theme: settings.theme,
+          currency: settings.currency,
+          dateFormat: settings.dateFormat
+        }
+      }
+
+      const dataStr = JSON.stringify(backupData, null, 2)
+      const dataBlob = new Blob([dataStr], { type: 'application/json' })
+      const url = URL.createObjectURL(dataBlob)
+      const link = document.createElement('a')
+      link.href = url
+      
+      const timestamp = new Date().toISOString().split('T')[0]
+      link.download = `gst-invoice-backup-${timestamp}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+      
+      toast.success('Full backup created successfully!')
+      
+      // Update last backup timestamp
+      localStorage.setItem('lastBackupTimestamp', new Date().toISOString())
+      
+    } catch (error) {
+      console.error('Backup failed:', error)
+      toast.error('Failed to create backup')
+    }
+  }
+
+  const restoreFromBackup = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = (e) => {
+      const file = e.target.files[0]
+      if (file) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          try {
+            const backupData = JSON.parse(e.target.result)
+            
+            // Validate backup data structure
+            if (!backupData.timestamp || !backupData.settings) {
+              toast.error('Invalid backup file format')
+              return
+            }
+
+            if (window.confirm('This will restore all data from the backup and overwrite current data. Are you sure?')) {
+              // Restore all data
+              if (backupData.settings) {
+                localStorage.setItem('appSettings', JSON.stringify(backupData.settings))
+                setSettings(backupData.settings)
+              }
+              if (backupData.invoices) {
+                localStorage.setItem('invoices', JSON.stringify(backupData.invoices))
+              }
+              if (backupData.customers) {
+                localStorage.setItem('customers', JSON.stringify(backupData.customers))
+              }
+              if (backupData.items) {
+                localStorage.setItem('items', JSON.stringify(backupData.items))
+              }
+              if (backupData.userProfile) {
+                localStorage.setItem('userProfile', JSON.stringify(backupData.userProfile))
+              }
+
+              toast.success('Data restored successfully from backup!')
+              setHasChanges(false)
+              
+              // Refresh page to apply changes
+              setTimeout(() => {
+                window.location.reload()
+              }, 1500)
+            }
+          } catch (error) {
+            console.error('Restore failed:', error)
+            toast.error('Failed to restore from backup - Invalid file format')
+          }
+        }
+        reader.readAsText(file)
+      }
+    }
+    input.click()
+  }
+
+  const enableAutoBackup = () => {
+    if (settings.backupEnabled) {
+      // Set up automatic backup
+      const interval = settings.autoBackupInterval * 60 * 60 * 1000 // Convert hours to milliseconds
+      
+      // Clear any existing interval
+      const existingInterval = localStorage.getItem('autoBackupInterval')
+      if (existingInterval) {
+        clearInterval(parseInt(existingInterval))
+      }
+
+      // Set new interval
+      const intervalId = setInterval(() => {
+        performAutoBackup()
+      }, interval)
+
+      localStorage.setItem('autoBackupInterval', intervalId.toString())
+      toast.success(`Auto backup enabled - every ${settings.autoBackupInterval} hours`)
+    } else {
+      // Disable auto backup
+      const existingInterval = localStorage.getItem('autoBackupInterval')
+      if (existingInterval) {
+        clearInterval(parseInt(existingInterval))
+        localStorage.removeItem('autoBackupInterval')
+      }
+      toast.success('Auto backup disabled')
+    }
+  }
+
+  const performAutoBackup = () => {
+    try {
+      const backupData = {
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        settings: settings,
+        invoices: JSON.parse(localStorage.getItem('invoices') || '[]'),
+        customers: JSON.parse(localStorage.getItem('customers') || '[]'),
+        items: JSON.parse(localStorage.getItem('items') || '[]'),
+        userProfile: JSON.parse(localStorage.getItem('userProfile') || '{}')
+      }
+
+      // Store backup in localStorage with rotation
+      const backupKey = `autoBackup_${Date.now()}`
+      localStorage.setItem(backupKey, JSON.stringify(backupData))
+
+      // Manage backup file count
+      manageBackupFiles()
+      
+      console.log('Auto backup completed:', backupKey)
+      
+    } catch (error) {
+      console.error('Auto backup failed:', error)
+    }
+  }
+
+  const manageBackupFiles = () => {
+    try {
+      // Get all auto backup keys
+      const backupKeys = Object.keys(localStorage)
+        .filter(key => key.startsWith('autoBackup_'))
+        .sort((a, b) => {
+          const timeA = parseInt(a.split('_')[1])
+          const timeB = parseInt(b.split('_')[1])
+          return timeB - timeA // Sort newest first
+        })
+
+      // Remove excess backup files
+      if (backupKeys.length > settings.maxBackupFiles) {
+        const keysToRemove = backupKeys.slice(settings.maxBackupFiles)
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key)
+        })
+      }
+    } catch (error) {
+      console.error('Failed to manage backup files:', error)
+    }
+  }
+
   const tabs = [
     { id: 'general', label: 'General', icon: '⚙️' },
     { id: 'business', label: 'Business', icon: '🏢' },
@@ -130,21 +385,6 @@ const Settings = () => {
           <option value="auto">Auto (System)</option>
         </select>
         <p className="text-xs text-gray-500 mt-1">Choose your preferred color scheme</p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
-        <select
-          value={settings.language}
-          onChange={(e) => handleSettingChange('language', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="en">English</option>
-          <option value="hi">हिंदी (Hindi)</option>
-          <option value="gu">ગુજરાતી (Gujarati)</option>
-          <option value="mr">मराठी (Marathi)</option>
-        </select>
-        <p className="text-xs text-gray-500 mt-1">Select your preferred interface language</p>
       </div>
 
       <div>
@@ -216,11 +456,20 @@ const Settings = () => {
           type="email"
           value={settings.companyEmail}
           onChange={(e) => handleSettingChange('companyEmail', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            settings.companyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.companyEmail) 
+              ? 'border-red-300' 
+              : 'border-gray-300'
+          }`}
           placeholder="company@example.com"
           required
         />
-        <p className="text-xs text-gray-500 mt-1">Official business email address</p>
+        {settings.companyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.companyEmail) && (
+          <p className="text-xs text-red-500 mt-1">Please enter a valid email address</p>
+        )}
+        {!settings.companyEmail || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.companyEmail) ? (
+          <p className="text-xs text-gray-500 mt-1">Official business email address</p>
+        ) : null}
       </div>
 
       <div>
@@ -254,29 +503,110 @@ const Settings = () => {
           type="text"
           value={settings.gstNumber}
           onChange={(e) => handleSettingChange('gstNumber', e.target.value.toUpperCase())}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            settings.gstNumber && settings.gstNumber.length > 0 && settings.gstNumber.length !== 15
+              ? 'border-red-300' 
+              : 'border-gray-300'
+          }`}
           placeholder="22AAAAA0000A1Z5"
           maxLength={15}
         />
-        <p className="text-xs text-gray-500 mt-1">15-character GST identification number (if registered)</p>
+        {settings.gstNumber && settings.gstNumber.length > 0 && settings.gstNumber.length !== 15 && (
+          <p className="text-xs text-red-500 mt-1">GST number must be exactly 15 characters</p>
+        )}
+        {!settings.gstNumber || settings.gstNumber.length === 0 || settings.gstNumber.length === 15 ? (
+          <p className="text-xs text-gray-500 mt-1">15-character GST identification number (if registered)</p>
+        ) : null}
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors">
           <div className="text-center">
-            <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <div className="mt-2">
-              <button
-                type="button"
-                className="bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Upload company logo
-              </button>
-              <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
-            </div>
+            {settings.logo ? (
+              <div className="space-y-2">
+                <img 
+                  src={settings.logo} 
+                  alt="Company Logo" 
+                  className="mx-auto h-16 w-16 object-contain rounded-lg border"
+                />
+                <div className="flex justify-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const input = document.createElement('input')
+                      input.type = 'file'
+                      input.accept = 'image/*'
+                      input.onchange = (e) => {
+                        const file = e.target.files[0]
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            toast.error('File size must be less than 2MB')
+                            return
+                          }
+                          const reader = new FileReader()
+                          reader.onload = (e) => {
+                            handleSettingChange('logo', e.target.result)
+                            toast.success('Logo uploaded successfully!')
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }
+                      input.click()
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+                  >
+                    Change Logo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSettingChange('logo', '')
+                      toast.success('Logo removed successfully!')
+                    }}
+                    className="text-sm text-red-600 hover:text-red-500 font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const input = document.createElement('input')
+                      input.type = 'file'
+                      input.accept = 'image/*'
+                      input.onchange = (e) => {
+                        const file = e.target.files[0]
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            toast.error('File size must be less than 2MB')
+                            return
+                          }
+                          const reader = new FileReader()
+                          reader.onload = (e) => {
+                            handleSettingChange('logo', e.target.result)
+                            toast.success('Logo uploaded successfully!')
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }
+                      input.click()
+                    }}
+                    className="bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Upload company logo
+                  </button>
+                  <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 2MB</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
         <p className="text-xs text-gray-500 mt-1">Optional logo to appear on invoices</p>
@@ -432,6 +762,30 @@ const Settings = () => {
             >
               Import Settings
             </Button>
+
+            <Button
+              variant="primary"
+              onClick={performFullBackup}
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              }
+            >
+              Create Backup
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={restoreFromBackup}
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              }
+            >
+              Restore Backup
+            </Button>
             
             <Button
               variant="danger"
@@ -450,7 +804,8 @@ const Settings = () => {
               onClick={() => {
                 if (window.confirm('This will clear all application data including invoices, customers, and items. This action cannot be undone. Are you sure?')) {
                   localStorage.clear()
-                  window.location.reload()
+                  toast.success('All data cleared successfully!')
+                  setTimeout(() => window.location.reload(), 1500)
                 }
               }}
               leftIcon={
@@ -461,6 +816,59 @@ const Settings = () => {
             >
               Clear All Data
             </Button>
+          </div>
+        </div>
+
+        <div className="border-t pt-6">
+          <h4 className="text-sm font-medium text-gray-900 mb-4">Developer Credits</h4>
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6">
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h5 className="text-lg font-semibold text-gray-900">GST Invoice System</h5>
+                <p className="text-sm text-gray-600 mt-1">
+                  Developed with ❤️ by <span className="font-medium text-blue-600">ToufickShaikh</span>
+                </p>
+                <div className="flex items-center space-x-4 mt-3">
+                  <div className="flex items-center text-xs text-gray-500">
+                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                      <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
+                    </svg>
+                    Version 1.0.0
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500">
+                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd"/>
+                    </svg>
+                    Built in 2025
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  React
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Node.js
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  MongoDB
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  Express.js
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800">
+                  Tailwind CSS
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
