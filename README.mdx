@@ -1,0 +1,411 @@
+---
+title: GST Invoice System Documentation
+author: GitHub Copilot
+---
+
+# GST Invoice System
+
+A full-stack GST Invoice Management System for Indian businesses. Built with React, Node.js, Express, MongoDB, and generates professional GST-compliant PDF invoices.
+
+## 🚀 Getting Started
+
+### 1. Clone & Install
+```bash
+# Clone the repo
+$ git clone <your-repo-url>
+$ cd gst-invoice-system
+
+# Install backend dependencies
+$ cd backend && npm install
+
+# Install frontend dependencies
+$ cd ../ && npm install
+```
+
+### 2. Configure Environment
+- **Backend:**
+  - `backend/config/db.js` – Set your MongoDB URI
+  - `.env` (optional) – Set `MONGO_URI`, `JWT_SECRET`, `PORT`
+- **Frontend:**
+  - `.env` or `vite.config.js` – Set `VITE_API_BASE_URL`
+
+### 3. Run the App
+```bash
+# Start backend
+$ cd backend && npm start
+
+# Start frontend
+$ npm run dev
+```
+
+---
+
+## 🏢 Customizing for Your Company
+
+### Company Details
+- Edit `backend/utils/pdfGenerator.js`:
+  - Update all `html.replace(/{{company...}}/g, ...)` lines with your company info.
+- Edit `backend/templates/invoiceTemplate.html` for static text (tagline, footer, etc).
+
+### Logo & Signature
+- Place your logo/signature in a public folder or use base64.
+- Update the template and PDF generator to use your image URLs or base64 data.
+
+### Bank & UPI Details
+- Update bank account, IFSC, holder name, and UPI ID in `pdfGenerator.js` and template.
+
+---
+
+## 🖨️ Customizing Invoice Format
+- Edit `backend/templates/invoiceTemplate.html` for layout, fields, and styles.
+- Edit `backend/utils/pdfGenerator.js` to inject new data fields.
+- Test PDF output to ensure it fits on one A4 page.
+
+---
+
+## 🌐 Changing Server/Deployment
+
+### Backend
+- Change port in `backend/server.js` (default: 5000)
+- Change MongoDB URI in `backend/config/db.js`
+- Update CORS in `backend/server.js` if needed
+
+### Frontend
+- Change API base URL in `.env` or `vite.config.js`
+- Change port in `vite.config.js` (default: 5173)
+
+### Production
+- Use PM2, Docker, or your preferred Node.js process manager
+- Set environment variables for production
+- Serve React build with Nginx or use Vercel/Netlify for frontend
+
+---
+
+## ☁️ Migrating to a Virtual Server (Cloud VPS)
+
+### Scenario: Moving from Local/Shared Hosting to a Cloud Virtual Server
+
+Suppose you want to move your GST Invoice System from your current setup (local PC or shared hosting) to a dedicated virtual server (e.g., AWS EC2, DigitalOcean Droplet, Azure VM, etc.).
+
+### Steps:
+
+1. **Provision a Virtual Server**
+   - Choose a provider (AWS, DigitalOcean, Azure, Google Cloud, etc.)
+   - Select an OS (Ubuntu 22.04 LTS recommended)
+   - Set up SSH access and open necessary ports (e.g., 22 for SSH, 80/443 for HTTP/HTTPS, 5000 for backend, 5173 for frontend)
+
+2. **Install Dependencies**
+   - Update the server: `sudo apt update && sudo apt upgrade -y`
+   - Install Node.js, npm, and MongoDB (or connect to a managed MongoDB like Atlas)
+   - Install Git, Nginx (for reverse proxy), and PM2 (for process management)
+
+3. **Clone Your Project**
+   ```bash
+   git clone <your-repo-url>
+   cd gst-invoice-system
+   ```
+
+4. **Configure Environment Variables**
+   - Set up `.env` files for backend and frontend as needed
+   - Update `MONGO_URI` to point to your production database
+   - Update `VITE_API_BASE_URL` to your server's public IP or domain
+
+5. **Install & Build**
+   ```bash
+   # Backend
+   cd backend && npm install
+   # Frontend
+   cd ../ && npm install && npm run build
+   ```
+
+6. **Start Services**
+   - Use PM2 to run backend: `pm2 start backend/server.js --name gst-backend`
+   - Serve frontend build with Nginx or a static server
+
+7. **Set Up Nginx (Recommended)**
+   - Configure Nginx as a reverse proxy for Node.js and to serve the React build
+   - Example Nginx config:
+     ```nginx
+     server {
+       listen 80;
+       server_name yourdomain.com;
+
+       location /api/ {
+         proxy_pass http://localhost:5000/;
+         proxy_set_header Host $host;
+         proxy_set_header X-Real-IP $remote_addr;
+       }
+
+       location / {
+         root /path/to/gst-invoice-system/dist;
+         try_files $uri /index.html;
+       }
+     }
+     ```
+
+8. **Secure Your Server**
+   - Set up a firewall (UFW)
+   - Use HTTPS (Let's Encrypt)
+   - Regularly update and backup
+
+9. **Test Everything**
+   - Access your app via the public IP or domain
+   - Test PDF generation, API, and UI
+
+---
+
+## 📡 API Routes Reference
+
+Below are the main backend API routes, their HTTP methods, endpoints, and what they do. Use these to integrate, debug, or extend the system.
+
+### Auth Routes (`/api/auth`)
+| Method | Endpoint         | Description                       |
+|--------|------------------|-----------------------------------|
+| POST   | `/register`      | Register a new user (admin only)  |
+| POST   | `/login`         | Login and get JWT token           |
+
+### Customer Routes (`/api/customers`)
+| Method | Endpoint         | Description                       |
+|--------|------------------|-----------------------------------|
+| GET    | `/`              | List all customers                |
+| POST   | `/`              | Add a new customer                |
+| GET    | `/:id`           | Get a customer by ID              |
+| PUT    | `/:id`           | Update a customer by ID           |
+| DELETE | `/:id`           | Delete a customer by ID           |
+
+### Item Routes (`/api/items`)
+| Method | Endpoint         | Description                       |
+|--------|------------------|-----------------------------------|
+| GET    | `/`              | List all items                    |
+| POST   | `/`              | Add a new item                    |
+| GET    | `/:id`           | Get an item by ID                 |
+| PUT    | `/:id`           | Update an item by ID              |
+| DELETE | `/:id`           | Delete an item by ID              |
+
+### Invoice/Billing Routes (`/api/billing`)
+| Method | Endpoint                | Description                                 |
+|--------|-------------------------|---------------------------------------------|
+| GET    | `/dashboard-stats`      | Get dashboard summary stats                 |
+| GET    | `/invoices`             | List all invoices                           |
+| POST   | `/invoices`             | Create a new invoice                        |
+| GET    | `/invoices/:id`         | Get invoice by ID                           |
+| PUT    | `/invoices/:id`         | Update invoice by ID                        |
+| DELETE | `/invoices/:id`         | Delete invoice by ID                        |
+| GET    | `/invoices/:id/pdf`     | Download invoice PDF                        |
+| GET    | `/gst-report`           | Download GST report for a date range        |
+
+### User Routes (`/api/users`)
+| Method | Endpoint         | Description                       |
+|--------|------------------|-----------------------------------|
+| GET    | `/me`            | Get current user info (JWT needed)|
+| PUT    | `/me`            | Update current user profile       |
+
+---
+
+## 📄 Document Endpoints
+
+- **Invoice PDF:**
+  - `GET /api/billing/invoices/:id/pdf` – Returns the generated PDF for the invoice.
+- **GST Report:**
+  - `GET /api/billing/gst-report?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` – Returns GST report (JSON or file).
+
+---
+
+> For more details, see the code in `/backend/routes/`, `/backend/controllers/`, and `/backend/models/`.
+
+---
+
+## 🛠️ Adding/Removing Features
+- **Frontend:** Add pages/components in `/src/pages` and `/src/components`
+- **Backend:** Add routes/controllers in `/backend/routes` and `/backend/controllers`
+- **Database:** Update Mongoose models in `/backend/models` for new fields
+
+---
+
+## 🔒 Security & Best Practices
+- Change all default passwords and secrets before going live
+- Use HTTPS in production
+- Regularly update dependencies (`npm update`)
+
+---
+
+## 🧩 Useful Customization Examples
+- **Change Invoice Number Format:** Edit logic in `backend/controllers/billingController.js`
+- **Add New Tax Types:** Update `backend/utils/taxHelpers.js` and template
+- **Change Currency:** Update currency symbol in template and utility functions
+
+---
+
+## 🆘 Troubleshooting
+- **PDF not generating:** Check Puppeteer/html-pdf installation and server permissions
+- **API errors:** Check MongoDB connection and server logs
+- **UI not updating:** Check API base URL and browser console
+
+---
+
+## 🏁 How to Add a New Company
+1. Update company info in `pdfGenerator.js` and `invoiceTemplate.html`
+2. Change logo/signature images
+3. Update bank/UPI details
+4. Test invoice PDF and dashboard
+5. Deploy!
+
+---
+
+## 🙋‍♂️ Need More Help?
+The code is modular and well-commented. For step-by-step help, open an issue or ask your developer.
+
+---
+
+## 🗂️ Project Structure & File Roles (The Story)
+
+### The Backend: The Engine Room
+
+- **backend/app.js** – The main Express app. It sets up middleware, connects routes, and is the heart of the backend.
+- **backend/server.js** – The entry point. Starts the server and listens for requests.
+- **backend/package.json** – Lists backend dependencies and scripts.
+- **backend/config/db.js** – Handles MongoDB connection logic.
+
+#### Controllers: The Brains
+- **backend/controllers/authController.js** – Handles user authentication (login, register).
+- **backend/controllers/billingController.js** – All invoice and billing logic: create, fetch, PDF, GST report.
+- **backend/controllers/customerController.js** – CRUD for customers.
+- **backend/controllers/itemController.js** – CRUD for items.
+
+#### Models: The Data Blueprints
+- **backend/models/User.js** – User schema (login, JWT, etc).
+- **backend/models/Customer.js** – Customer schema.
+- **backend/models/Item.js** – Item schema.
+- **backend/models/Invoice.js** – Invoice schema (items, taxes, totals).
+
+#### Routes: The Gateways
+- **backend/routes/authRoutes.js** – `/api/auth` endpoints.
+- **backend/routes/billingRoutes.js** – `/api/billing` endpoints.
+- **backend/routes/customerRoutes.js** – `/api/customers` endpoints.
+- **backend/routes/itemRoutes.js** – `/api/items` endpoints.
+
+#### Utilities: The Toolbox
+- **backend/utils/pdfGenerator.js** – Generates invoice PDFs from HTML templates.
+- **backend/utils/taxHelpers.js** – Tax calculation helpers.
+- **backend/utils/upiHelper.js** – Generates UPI QR codes for payment.
+
+#### Templates & Data
+- **backend/templates/invoiceTemplate.html** – The HTML template for invoice PDFs.
+- **backend/invoices/** – Stores generated invoice PDFs.
+- **backend/definitions/**, **handlers/**, **middleware/** – (If present) Extra logic, validation, or middleware.
+- **backend/scripts/** – Utility scripts (e.g., addUser.js, resetAdmin.js).
+
+---
+
+### The Frontend: The Control Room
+
+- **src/main.jsx** – The React entry point. Boots up the app.
+- **src/App.jsx** – The main app layout and router.
+- **src/index.css** – Global styles (Tailwind CSS).
+- **src/api/** – API helper files for talking to the backend (auth.js, billing.js, customers.js, items.js).
+- **src/context/AuthContext.jsx** – React context for authentication state.
+
+#### Pages: The Views
+- **src/pages/Dashboard.jsx** – The business dashboard (stats, analytics, quick links).
+- **src/pages/Billing.jsx** – Invoice creation and management.
+- **src/pages/Customers.jsx** – Customer management.
+- **src/pages/Items.jsx** – Item management.
+- **src/pages/Invoices.jsx** – Invoice list and actions.
+- **src/pages/InvoiceSuccess.jsx** – Success page after invoice creation.
+- **src/pages/Login.jsx** – Login screen.
+
+#### Components: The Building Blocks
+- **src/components/Button.jsx** – Reusable button component.
+- **src/components/Card.jsx** – Card UI wrapper.
+- **src/components/EmptyState.jsx** – Shown when lists are empty.
+- **src/components/InputField.jsx** – Reusable input field.
+- **src/components/Layout.jsx** – Main layout wrapper.
+- **src/components/Loader.jsx** – Loading spinner.
+- **src/components/Modal.jsx** – Modal dialog.
+- **src/components/Table.jsx** – Table UI for lists.
+
+#### Utilities
+- **src/utils/dateHelpers.js** – Date formatting helpers.
+- **src/utils/taxCalculations.js** – Tax calculation helpers for the UI.
+
+#### Assets
+- **src/assets/** – Images, SVGs, and static assets.
+
+#### Routing
+- **routes/AppRoutes.jsx** – Defines all frontend routes/pages.
+
+---
+
+### The Root: The Foundation
+
+- **package.json** – Project dependencies and scripts (frontend).
+- **vite.config.js** – Vite (React) build config.
+- **tailwind.config.js** – Tailwind CSS config.
+- **postcss.config.js** – PostCSS config for Tailwind.
+- **eslint.config.js** – Linting rules.
+- **Dockerfile** – (If present) For containerizing the app.
+- **README.mdx** – This documentation!
+
+---
+
+> Every file and folder has a role in the story: from the backend engine room to the frontend control room, all working together to deliver a seamless GST invoicing experience.
+
+---
+
+## 🛡️ What You Can Touch, What You Shouldn't, and What Can Go
+
+### 🟢 Safe to Customize (Go Ahead!)
+- **Company Info:**
+  - `backend/utils/pdfGenerator.js` (company details, bank, UPI, logo, signature)
+  - `backend/templates/invoiceTemplate.html` (invoice layout, branding)
+- **Frontend UI:**
+  - `src/pages/` (add/remove pages, change layouts)
+  - `src/components/` (customize or add new UI components)
+  - `src/assets/` (replace images, logos)
+- **API Logic:**
+  - `backend/controllers/` (add new business logic, endpoints)
+  - `backend/routes/` (add/remove API routes)
+- **Database Models:**
+  - `backend/models/` (add new fields, change validation)
+- **Styles:**
+  - `src/index.css`, `tailwind.config.js` (change theme, colors)
+- **Environment:**
+  - `.env`, `vite.config.js`, `backend/config/db.js` (change API URLs, DB connection)
+
+### 🟡 Touch With Caution (Know What You're Doing)
+- **Authentication Logic:**
+  - `backend/controllers/authController.js`, `backend/models/User.js`
+- **PDF Generation Logic:**
+  - `backend/utils/pdfGenerator.js` (core logic, not just placeholders)
+- **Core App Entrypoints:**
+  - `backend/app.js`, `backend/server.js`, `src/main.jsx`, `src/App.jsx`
+- **Build Configs:**
+  - `vite.config.js`, `Dockerfile`, `postcss.config.js`
+- **Scripts:**
+  - `backend/scripts/` (utility scripts, only if you know their purpose)
+
+### 🔴 Do Not Touch (Unless You Really Know)
+- **Node Modules:**
+  - `node_modules/` (never edit directly)
+- **Lock Files:**
+  - `package-lock.json`, `yarn.lock` (only update via package manager)
+- **System/Config Files:**
+  - `.gitignore`, `.eslintrc`, `.env.example` (unless you know the impact)
+- **Database Internals:**
+  - MongoDB data files (managed by MongoDB, not the app)
+
+### 🗑️ What Can Be Removed (If Not Needed)
+- **Sample/Unused Scripts:**
+  - `backend/scripts/addUser.js`, `backend/scripts/resetAdmin.js` (if you don't use them)
+- **Definitions/Handlers:**
+  - `backend/definitions/`, `backend/handlers/` (if empty or unused)
+- **Demo Assets:**
+  - Any placeholder images in `src/assets/` not used in your branding
+- **README.md** (if you use `README.mdx` for docs)
+
+---
+
+> **Tip:**
+> - Always back up before making big changes.
+> - Use version control (git) to track your edits.
+> - When in doubt, ask or check the docs/code comments!
