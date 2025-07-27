@@ -9,6 +9,7 @@ import InvoiceSuccess from '../src/pages/InvoiceSuccess'
 import Invoices from '../src/pages/Invoices'
 import Login from '../src/pages/Login'
 import EditInvoice from '../src/pages/EditInvoice'
+import Settings from '../src/pages/Settings'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -40,6 +41,7 @@ const AppRoutes = () => {
       <Route path="/invoice-success" element={<PrivateRoute><InvoiceSuccess /></PrivateRoute>} />
       <Route path="/invoices" element={<PrivateRoute><Invoices /></PrivateRoute>} />
       <Route path="/edit-invoice/:id" element={<PrivateRoute><EditInvoice /></PrivateRoute>} />
+      <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   )

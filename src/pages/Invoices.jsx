@@ -214,22 +214,8 @@ const Invoices = () => {
                 <div className="flex justify-between items-center">
                     <h1 className="text-2xl font-bold">Invoices</h1>
 
-                    {/* Assignment Actions */}
+                    {/* Quick Actions */}
                     <div className="flex gap-3">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            leftIcon={
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            }
-                            onClick={() => {
-                                toast.info('Assignment feature has been removed');
-                            }}
-                        >
-                            Assign Follow-up
-                        </Button>
                         <Button
                             variant="success"
                             size="sm"
