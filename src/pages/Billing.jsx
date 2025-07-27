@@ -589,7 +589,22 @@ const Billing = () => {
 
       console.log('Navigating to invoice-success with state:', successState); // Debug log
 
-      navigate('/invoice-success', { state: successState })
+      // Show success message and give user option to stay or go to success page
+      toast.success(
+        <div className="text-sm">
+          <p className="font-semibold">Invoice #{response.invoiceNumber} generated successfully!</p>
+          <p className="text-xs mt-1">PDF download should start automatically.</p>
+        </div>,
+        { 
+          duration: 4000,
+          icon: '🎉'
+        }
+      );
+
+      // Auto-redirect to success page after a short delay
+      setTimeout(() => {
+        navigate('/invoice-success', { state: successState })
+      }, 1500)
     } catch (error) {
       // Log error details for debugging
       if (error.response) {
