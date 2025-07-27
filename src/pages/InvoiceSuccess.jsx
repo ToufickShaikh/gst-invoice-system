@@ -99,7 +99,7 @@ const InvoiceSuccess = () => {
     )
   }
 
-  // Auto-download PDF when component mounts
+  // Auto-download and print PDF when component mounts
   useEffect(() => {
     if (pdfUrl) {
       const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
@@ -113,6 +113,11 @@ const InvoiceSuccess = () => {
             toast.success('Invoice downloaded automatically', { duration: 3000 });
             setDownloadComplete(true);
 
+            // Auto-print PDF after successful download
+            setTimeout(() => {
+              printPDF(pdfUrl, fileName);
+            }, 1000);
+
             // After successful download, focus on the WhatsApp button if customer contact exists
             if (customerData?.contact) {
               setTimeout(() => {
@@ -123,7 +128,7 @@ const InvoiceSuccess = () => {
                   'Send this invoice to your customer via WhatsApp with one click!',
                   { duration: 6000, icon: '📱' }
                 );
-              }, 1500);
+              }, 2500);
             }
           } else {
             toast.info('Auto-download failed. Use the download button below.', { duration: 5000 });
@@ -137,6 +142,84 @@ const InvoiceSuccess = () => {
         });
     }
   }, [pdfUrl, invoiceId, invoiceNumber, customerData]);
+
+  // Function to automatically print PDF
+  const printPDF = async (pdfUrl, fileName) => {
+    try {
+      // Method 1: Try printing in hidden iframe (works best for PDFs)
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = pdfUrl;
+      
+      iframe.onload = () => {
+        try {
+          // Wait for PDF to load then print
+          setTimeout(() => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            toast.success('PDF sent to printer automatically', { 
+              duration: 4000, 
+              icon: '🖨️' 
+            });
+          }, 1500);
+        } catch (printError) {
+          console.warn('Print via iframe failed:', printError);
+          // Fallback to opening in new window
+          printPDFFallback(pdfUrl);
+        }
+      };
+
+      iframe.onerror = () => {
+        console.warn('PDF iframe loading failed');
+        printPDFFallback(pdfUrl);
+      };
+
+      document.body.appendChild(iframe);
+      
+      // Clean up iframe after printing
+      setTimeout(() => {
+        try {
+          document.body.removeChild(iframe);
+        } catch (e) {
+          console.warn('Iframe cleanup error:', e);
+        }
+      }, 10000);
+
+    } catch (error) {
+      console.error('Print setup error:', error);
+      printPDFFallback(pdfUrl);
+    }
+  };
+
+  // Fallback printing method
+  const printPDFFallback = (pdfUrl) => {
+    try {
+      const printWindow = window.open(pdfUrl, '_blank');
+      
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+            toast.success('PDF opened for printing (print dialog should appear)', { 
+              duration: 5000, 
+              icon: '🖨️' 
+            });
+          }, 2000);
+        };
+      } else {
+        toast.info('Please allow popups to enable automatic printing', { 
+          duration: 6000, 
+          icon: '⚠️' 
+        });
+      }
+    } catch (error) {
+      console.error('Fallback print error:', error);
+      toast.error('Automatic printing failed. Please download and print manually.', { 
+        duration: 5000 
+      });
+    }
+  };
 
   const handleWhatsAppSend = async () => {
     setSendingWhatsApp(true);
@@ -197,10 +280,18 @@ const InvoiceSuccess = () => {
             </svg>
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Invoice Generated Successfully!</h2>
-          <p className="text-gray-600 mb-4 text-sm sm:text-base">
+          <h2 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Invoice Generated Successfully! 🎉</h2>
+          <p className="text-gray-600 mb-2 text-sm sm:text-base">
             Invoice <span className="font-medium">#{invoiceNumber || invoiceId}</span>
           </p>
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-center text-blue-800 text-sm">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              <span className="font-medium">Auto-downloading and printing PDF...</span>
+            </div>
+          </div>
 
           {/* Show prompt banner if customer has phone number */}
           {customerData?.contact && showSendPrompt && (
@@ -295,6 +386,7 @@ const InvoiceSuccess = () => {
                 }}
                 variant="primary"
                 size="lg"
+                className="mb-3"
                 leftIcon={
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -302,6 +394,24 @@ const InvoiceSuccess = () => {
                 }
               >
                 Download PDF Again
+              </Button>
+
+              {/* Print PDF Button */}
+              <Button
+                onClick={() => {
+                  const fileName = invoiceNumber ? `invoice-${invoiceNumber}.pdf` : `invoice-${invoiceId}.pdf`;
+                  toast.success('Sending to printer...', { duration: 2000 });
+                  printPDF(pdfUrl, fileName);
+                }}
+                variant="secondary"
+                size="lg"
+                leftIcon={
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                }
+              >
+                Print Invoice
               </Button>
             </div>
 
