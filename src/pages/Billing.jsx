@@ -275,7 +275,8 @@ const Billing = () => {
             quantity: invoiceItem.quantity || 1,
             customRate: invoiceItem.rate !== invoiceItem.originalRate ? invoiceItem.rate : '',
             effectiveRate: invoiceItem.rate,
-            itemDiscountAmount: invoiceItem.itemDiscount || 0
+            itemDiscountAmount: invoiceItem.itemDiscount || 0,
+            searchValue: '' // Initialize search value for existing items
           }
 
           console.log(`Mapped item ${index + 1}:`, mappedItem)
@@ -334,6 +335,42 @@ const Billing = () => {
     }
   }
 
+  const handleItemSearchChange = (value, index) => {
+    setItemSearch(value)
+    // Update the specific item's search value
+    const updatedItems = [...billItems]
+    updatedItems[index] = {
+      ...updatedItems[index],
+      searchValue: value
+    }
+    setBillItems(updatedItems)
+  }
+
+  const handleItemSelect = (item, index) => {
+    const updatedItems = [...billItems]
+    updatedItems[index] = {
+      ...updatedItems[index],
+      itemId: item._id,
+      item: item,
+      customRate: item.rate,
+      searchValue: `${item.name} - ${formatCurrency(item.rate)} ${item.units || 'per piece'} - ${item.taxSlab}% GST`
+    }
+    setBillItems(updatedItems)
+    setItemSearch('') // Clear global search
+  }
+
+  const clearItemSelection = (index) => {
+    const updatedItems = [...billItems]
+    updatedItems[index] = {
+      ...updatedItems[index],
+      itemId: '',
+      item: null,
+      customRate: '',
+      searchValue: ''
+    }
+    setBillItems(updatedItems)
+  }
+
   const handleCustomerSelect = (customer) => {
     const displayName = billingType === 'B2B' ? customer.firmName : customer.name
     setCustomerSearch(`${displayName} - ${customer.contact}`)
@@ -361,7 +398,8 @@ const Billing = () => {
       quantity: 1,
       customRate: '', // Custom rate for this invoice only
       itemDiscount: 0, // Per-item discount
-      item: null
+      item: null,
+      searchValue: '' // For search functionality
     }
     setBillItems([...billItems, newItem])
   }
@@ -1025,9 +1063,6 @@ const Billing = () => {
                 >
                   New Item
                 </Button>
-                <Button onClick={handleAddItem} size="sm" className="w-full sm:w-auto">
-                  Add to Bill
-                </Button>
               </div>
             </div>
 
@@ -1036,47 +1071,96 @@ const Billing = () => {
             ) : (
               <div className="space-y-4">
                 {billItems.map((billItem, index) => (
-                  <div key={billItem.id || `item-${index}`} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    {/* Item Selection Row */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Item <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={billItem.itemId}
-                          onChange={(e) => {
-                            if (e.target.value === 'ADD_NEW_ITEM') {
-                              handleOpenAddItemModal()
-                            } else {
-                              handleItemChange(index, 'itemId', e.target.value)
-                            }
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                        >
-                          <option value="">Select an item</option>
-                          {items.map(item => (
-                            <option key={item._id} value={item._id}>
-                              {item.name} - {formatCurrency(item.rate)} {item.units || 'per piece'} - {item.taxSlab}% GST
-                            </option>
-                          ))}
-                          <option value="ADD_NEW_ITEM" className="text-blue-600 font-medium">
-                            ➕ Add New Item
-                          </option>
-                        </select>
-                      </div>
-                      <div className="flex justify-end">
-                        <Button
-                          onClick={() => handleRemoveItem(index)}
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 border-red-300 hover:bg-red-50"
-                        >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Remove
-                        </Button>
+                  <div key={billItem.id || `item-${index}`} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50">
+                    {/* Item Selection with Search */}
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Item <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={billItem.searchValue || ''}
+                              onChange={(e) => handleItemSearchChange(e.target.value, index)}
+                              placeholder="Search items by name, HSN code, or units..."
+                              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+                            />
+                            {billItem.itemId && (
+                              <button
+                                onClick={() => clearItemSelection(index)}
+                                className="absolute right-2 top-2 p-1 text-gray-400 hover:text-gray-600"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )}
+                            
+                            {/* Searchable Dropdown */}
+                            {billItem.searchValue && !billItem.itemId && (
+                              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                {(() => {
+                                  const searchTerm = billItem.searchValue.toLowerCase()
+                                  const filteredResults = items.filter(item => 
+                                    item.name?.toLowerCase().includes(searchTerm) ||
+                                    item.hsnCode?.toLowerCase().includes(searchTerm) ||
+                                    item.units?.toLowerCase().includes(searchTerm)
+                                  )
+                                  
+                                  return filteredResults.length > 0 ? (
+                                    filteredResults.map(item => (
+                                      <div
+                                        key={item._id}
+                                        onClick={() => handleItemSelect(item, index)}
+                                        className="px-3 py-2 cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                                      >
+                                        <div className="font-medium text-sm">{item.name}</div>
+                                        <div className="text-xs text-gray-500">
+                                          {formatCurrency(item.rate)} • {item.units || 'per piece'} • {item.taxSlab}% GST • HSN: {item.hsnCode}
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="px-3 py-4 text-center text-gray-500 text-sm">
+                                      No items found matching "{billItem.searchValue}"
+                                    </div>
+                                  )
+                                })()}
+                                
+                                {/* Add New Item Option */}
+                                <div
+                                  onClick={() => {
+                                    clearItemSelection(index)
+                                    handleOpenAddItemModal()
+                                  }}
+                                  className="px-3 py-2 cursor-pointer hover:bg-gray-50 border-t border-gray-200 text-blue-600 font-medium text-sm"
+                                >
+                                  <div className="flex items-center">
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                    Add New Item
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex justify-end sm:justify-start">
+                          <Button
+                            onClick={() => handleRemoveItem(index)}
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-300 hover:bg-red-50"
+                          >
+                            <svg className="w-4 h-4 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span className="hidden sm:inline">Remove</span>
+                          </Button>
+                        </div>
                       </div>
                     </div>
 
@@ -1150,6 +1234,23 @@ const Billing = () => {
                 ))}
               </div>
             )}
+            
+            {/* Add New Row Button - Bottom of items section */}
+            <div className="mt-4 flex justify-center">
+              <Button
+                onClick={handleAddItem}
+                variant="outline"
+                size="sm"
+                className="px-6"
+                leftIcon={
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                }
+              >
+                Add New Row
+              </Button>
+            </div>
           </div>
 
           {/* Global Discount, Shipping, and Payment */}
