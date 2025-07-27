@@ -378,14 +378,166 @@ function tryPatternBasedLookup(gstin) {
 }
 
 /**
- * Try third-party GST verification API
+ * Try third-party GST verification API using RapidAPI
  */
 async function tryThirdPartyGSTAPI(gstin) {
     try {
-        console.log('[GST API] Trying third-party GST verification services for:', gstin);
+        console.log('[GST API] Trying RapidAPI GST verification service for:', gstin);
 
-        // Real GST verification APIs (free and paid services)
-        const gstAPIs = [
+        // RapidAPI GST verification endpoint
+        const apiUrl = `https://gst-return-status.p.rapidapi.com/free/gstin/${gstin}`;
+        const apiKey = '89c550f961msh1b9558d22d67712p12e1a9jsn31a3ea3a7e79';
+
+        console.log('[GST API] Making request to RapidAPI GST service...');
+
+        const response = await makeHttpsRequest(apiUrl, {
+            timeout: 15000,
+            headers: {
+                'x-rapidapi-key': apiKey,
+                'x-rapidapi-host': 'gst-return-status.p.rapidapi.com',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'User-Agent': 'GST-Invoice-System/1.0'
+            }
+        });
+
+        if (response.ok && response.data) {
+            console.log('[GST API] RapidAPI response:', JSON.stringify(response.data, null, 2));
+
+            // Parse RapidAPI response format
+            const gstData = parseRapidAPIResponse(response.data, gstin);
+            if (gstData) {
+                console.log('[GST API] Successfully parsed RapidAPI data for:', gstData.legalName);
+                return {
+                    success: true,
+                    data: gstData,
+                    source: 'rapidapi-gst-verification'
+                };
+            }
+        } else {
+            console.log('[GST API] RapidAPI returned non-OK response:', response.status, response.data);
+        }
+
+        console.log('[GST API] RapidAPI GST verification failed, trying fallback APIs...');
+        
+        // Fallback to other free APIs if available
+        return await tryFallbackGSTAPIs(gstin);
+
+    } catch (error) {
+        console.log('[GST API] RapidAPI GST verification error:', error.message);
+        return await tryFallbackGSTAPIs(gstin);
+    }
+}
+
+/**
+ * Parse RapidAPI GST verification response
+ */
+function parseRapidAPIResponse(data, gstin) {
+    try {
+        console.log('[GST Parser] Parsing RapidAPI response for:', gstin);
+        
+        // Check if the response indicates success
+        if (!data || typeof data !== 'object') {
+            console.log('[GST Parser] Invalid response format');
+            return null;
+        }
+
+        // RapidAPI response structure may vary, handle different formats
+        let gstInfo = data;
+        
+        // If response has nested structure
+        if (data.data) {
+            gstInfo = data.data;
+        } else if (data.result) {
+            gstInfo = data.result;
+        } else if (data.response) {
+            gstInfo = data.response;
+        }
+
+        // Extract business name (try different field names)
+        let businessName = gstInfo.legalName || 
+                          gstInfo.legal_name || 
+                          gstInfo.businessName || 
+                          gstInfo.business_name || 
+                          gstInfo.tradeName || 
+                          gstInfo.trade_name ||
+                          gstInfo.name ||
+                          gstInfo.companyName ||
+                          gstInfo.taxpayer_name ||
+                          'Business Name Not Available';
+
+        // Extract address information
+        let address = '';
+        if (gstInfo.address) {
+            if (typeof gstInfo.address === 'string') {
+                address = gstInfo.address;
+            } else if (typeof gstInfo.address === 'object') {
+                // Build address from object
+                const addrParts = [];
+                if (gstInfo.address.building) addrParts.push(gstInfo.address.building);
+                if (gstInfo.address.street) addrParts.push(gstInfo.address.street);
+                if (gstInfo.address.locality) addrParts.push(gstInfo.address.locality);
+                if (gstInfo.address.city) addrParts.push(gstInfo.address.city);
+                if (gstInfo.address.state) addrParts.push(gstInfo.address.state);
+                if (gstInfo.address.pincode) addrParts.push(gstInfo.address.pincode);
+                address = addrParts.join(', ');
+            }
+        } else if (gstInfo.principalPlaceOfBusiness) {
+            address = gstInfo.principalPlaceOfBusiness;
+        } else if (gstInfo.principal_place_of_business) {
+            address = gstInfo.principal_place_of_business;
+        }
+
+        // Extract status
+        const status = gstInfo.status || gstInfo.gst_status || gstInfo.taxpayerStatus || 'Active';
+        
+        // Extract state information
+        const stateCode = gstin.substring(0, 2);
+        const stateName = GST_STATE_CODES[stateCode] || 'Unknown State';
+
+        // Extract registration date
+        let registrationDate = gstInfo.registrationDate || 
+                              gstInfo.registration_date || 
+                              gstInfo.effectiveDate ||
+                              gstInfo.effective_date ||
+                              new Date().toISOString().split('T')[0];
+
+        const parsedData = {
+            gstin: gstin,
+            legalName: businessName,
+            tradeName: gstInfo.tradeName || gstInfo.trade_name || businessName,
+            address: address || 'Address Not Available',
+            status: status,
+            registrationDate: registrationDate,
+            businessType: gstInfo.businessType || gstInfo.business_type || gstInfo.constitutionOfBusiness || 'Not Specified',
+            stateCode: stateCode,
+            stateName: stateName,
+            centerJurisdiction: gstInfo.centerJurisdiction || gstInfo.center_jurisdiction || 'Not Available',
+            stateJurisdiction: gstInfo.stateJurisdiction || gstInfo.state_jurisdiction || 'Not Available',
+            lastUpdated: new Date().toISOString(),
+            taxType: determineTaxType(stateCode),
+            verified: true,
+            source: 'rapidapi-gst-verification'
+        };
+
+        console.log('[GST Parser] Successfully parsed RapidAPI data:', parsedData.legalName);
+        return parsedData;
+
+    } catch (error) {
+        console.error('[GST Parser] Error parsing RapidAPI response:', error);
+        return null;
+    }
+}
+
+/**
+ * Try fallback GST APIs if RapidAPI fails
+ */
+async function tryFallbackGSTAPIs(gstin) {
+    try {
+        console.log('[GST API] Trying fallback GST verification services for:', gstin);
+
+        // Fallback free GST verification APIs
+        const fallbackAPIs = [
             {
                 name: 'GST Master India',
                 url: `https://commonapi.mastersindia.co/commonapis/searchgstin?gstin=${gstin}`,
@@ -403,33 +555,15 @@ async function tryThirdPartyGSTAPI(gstin) {
                     'User-Agent': 'Mozilla/5.0 GST Verification'
                 },
                 parseResponse: (data) => parseGSTAPICoResponse(data, gstin)
-            },
-            {
-                name: 'Clear Tax API',
-                url: `https://sandbox-quickbooks.api.intuit.com/v1/gst/taxpayerdetails?gstin=${gstin}`,
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                parseResponse: (data) => parseClearTaxResponse(data, gstin)
-            },
-            {
-                name: 'GST System API',
-                url: `https://api.gstsystem.co.in/gst/verify?gstin=${gstin}`,
-                headers: {
-                    'Accept': 'application/json',
-                    'X-API-Source': 'gst-invoice-system'
-                },
-                parseResponse: (data) => parseGSTSystemResponse(data, gstin)
             }
         ];
 
-        for (const api of gstAPIs) {
+        for (const api of fallbackAPIs) {
             try {
-                console.log(`[GST API] Trying ${api.name}...`);
+                console.log(`[GST API] Trying fallback ${api.name}...`);
 
                 const response = await makeHttpsRequest(api.url, {
-                    timeout: 12000,
+                    timeout: 10000,
                     headers: api.headers
                 });
 
@@ -449,17 +583,16 @@ async function tryThirdPartyGSTAPI(gstin) {
                 } else {
                     console.log(`[GST API] ${api.name} returned non-OK response:`, response.status);
                 }
-            } catch (apiError) {
-                console.log(`[GST API] ${api.name} failed:`, apiError.message);
+            } catch (error) {
+                console.log(`[GST API] ${api.name} failed:`, error.message);
                 continue; // Try next API
             }
         }
 
-        console.log('[GST API] All third-party APIs failed, falling back to enhanced mock data');
-        return { success: false, error: 'All third-party GST APIs failed' };
+        return { success: false, error: 'All fallback APIs failed' };
 
     } catch (error) {
-        console.log('[GST API] Third-party API error:', error.message);
+        console.log('[GST API] Fallback APIs error:', error.message);
         return { success: false, error: error.message };
     }
 }
