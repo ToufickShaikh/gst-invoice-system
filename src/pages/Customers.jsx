@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast'
 import Layout from '../components/Layout'
 import Table from '../components/Table'
 import Button from '../components/Button'
+import InputField from '../components/InputField' // Import InputField
 import { customersAPI } from '../api/customers'
 import AddCustomerModal from '../components/AddCustomerModal'
 
@@ -14,17 +15,25 @@ const Customers = () => {
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('') // New state for search term
 
   const b2bColumns = [
     { key: 'firmName', label: 'Firm Name' },
     { key: 'gstNo', label: 'GST No.' },
-    { key: 'firmAddress', label: 'Address' },
-    { key: 'contact', label: 'Contact' }
+    { key: 'firmAddress', label: 'Registered Address' },
+    { key: 'contact', label: 'Contact' },
+    { key: 'email', label: 'Email' },
+    { key: 'panNo', label: 'PAN No.' },
+    { key: 'billingAddress', label: 'Billing Address' },
+    { key: 'notes', label: 'Notes' },
   ]
 
   const b2cColumns = [
     { key: 'name', label: 'Name' },
-    { key: 'contact', label: 'Contact' }
+    { key: 'contact', label: 'Contact' },
+    { key: 'email', label: 'Email' },
+    { key: 'billingAddress', label: 'Billing Address' },
+    { key: 'notes', label: 'Notes' },
   ]
 
   const fetchCustomers = async () => {
@@ -78,7 +87,35 @@ const Customers = () => {
     setEditingCustomer(null)
   }
 
-  const filteredCustomers = customers.filter(c => c.customerType === activeTab)
+  // Filter customers based on active tab and search term
+  const filteredCustomers = customers.filter(c => {
+    const matchesTab = c.customerType === activeTab;
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+    if (!lowerCaseSearchTerm) return matchesTab; // If no search term, return all matching tab
+
+    // Check if any relevant field contains the search term
+    if (activeTab === 'B2B') {
+      return matchesTab && (
+        c.firmName.toLowerCase().includes(lowerCaseSearchTerm) ||
+        c.gstNo.toLowerCase().includes(lowerCaseSearchTerm) ||
+        c.firmAddress.toLowerCase().includes(lowerCaseSearchTerm) ||
+        c.contact.toLowerCase().includes(lowerCaseSearchTerm) ||
+        c.email.toLowerCase().includes(lowerCaseSearchTerm) ||
+        (c.panNo && c.panNo.toLowerCase().includes(lowerCaseSearchTerm)) ||
+        (c.billingAddress && c.billingAddress.toLowerCase().includes(lowerCaseSearchTerm)) ||
+        (c.notes && c.notes.toLowerCase().includes(lowerCaseSearchTerm))
+      );
+    } else { // B2C
+      return matchesTab && (
+        c.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+        c.contact.toLowerCase().includes(lowerCaseSearchTerm) ||
+        c.email.toLowerCase().includes(lowerCaseSearchTerm) ||
+        (c.billingAddress && c.billingAddress.toLowerCase().includes(lowerCaseSearchTerm)) ||
+        (c.notes && c.notes.toLowerCase().includes(lowerCaseSearchTerm))
+      );
+    }
+  });
 
   return (
     <Layout>
@@ -92,8 +129,8 @@ const Customers = () => {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200">
+        {/* Tabs and Search */}
+        <div className="flex flex-col sm:flex-row justify-between items-center border-b border-gray-200 pb-4">
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => setActiveTab('B2B')}
@@ -114,6 +151,15 @@ const Customers = () => {
               B2C Customers
             </button>
           </nav>
+          <div className="mt-4 sm:mt-0 w-full sm:w-auto">
+            <InputField
+              type="text"
+              placeholder="Search customers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full sm:w-64"
+            />
+          </div>
         </div>
 
         {/* Table */}

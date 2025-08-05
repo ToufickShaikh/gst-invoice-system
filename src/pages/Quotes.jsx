@@ -58,8 +58,8 @@ const Quotes = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await customersAPI.getAllCustomers();
-      setCustomers(response.data);
+      const response = await customersAPI.getAll();
+      setCustomers(Array.isArray(response) ? response : response.data);
     } catch (error) {
       toast.error('Failed to fetch customers');
     }
@@ -218,7 +218,7 @@ const Quotes = () => {
               >
                 <option value="">Select Customer</option>
                 {customers.map((c) => (
-                  <option key={c._id} value={c._id}>{c.name}</option>
+                  <option key={c._id} value={c._id}>{c.name || c.firmName}</option>
                 ))}
               </select>
             </div>

@@ -193,6 +193,25 @@ const AddCustomerModal = ({
           placeholder="Enter email address"
           type="email"
         />
+        <InputField
+          label="PAN Number"
+          value={formData.panNo}
+          onChange={(e) => handleChange('panNo', e.target.value)}
+          placeholder="Enter PAN number (optional)"
+        />
+        <InputField
+          label="Billing Address"
+          value={formData.billingAddress}
+          onChange={(e) => handleChange('billingAddress', e.target.value)}
+          placeholder="Enter billing address"
+        />
+        <InputField
+          label="Notes"
+          value={formData.notes}
+          onChange={(e) => handleChange('notes', e.target.value)}
+          placeholder="Any internal notes about the customer"
+          isTextArea
+        />
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             State <span className="text-red-500">*</span>
