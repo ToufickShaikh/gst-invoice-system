@@ -161,20 +161,29 @@ const Layout = ({ children }) => {
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    isActiveRoute(item.path)
-                      ? 'bg-blue-100 text-blue-700 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </Link>
+            <nav className="hidden md:flex items-center space-x-2">
+              {navItems.map((item, idx) => (
+                <div key={item.path} className="relative group">
+                  <Link
+                    to={item.path}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 shadow-sm border border-transparent ${
+                      isActiveRoute(item.path)
+                        ? 'bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 border-blue-300 scale-105'
+                        : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50 hover:scale-105'
+                    }`}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </Link>
+                  {/* Tooltip for guidance */}
+                  <span className="absolute left-1/2 -bottom-8 -translate-x-1/2 px-2 py-1 text-xs rounded bg-gray-900 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    Go to {item.label}
+                  </span>
+                  {/* Divider between sections for clarity */}
+                  {idx === 2 || idx === 5 ? (
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-px bg-gradient-to-b from-blue-200 to-purple-200 opacity-60"></div>
+                  ) : null}
+                </div>
               ))}
             </nav>
 
@@ -230,38 +239,47 @@ const Layout = ({ children }) => {
         } overflow-hidden bg-white border-t border-gray-200`}>
           <div className="px-4 py-3 space-y-1">
             {/* User Info Mobile */}
-            <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg mb-3">
+            <div className="flex items-center space-x-3 p-3 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg mb-3 shadow-sm">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                 <span className="text-white font-semibold">
                   {(userProfile?.name || user?.email || 'U')[0].toUpperCase()}
                 </span>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">{userProfile?.name || 'Welcome back!'}</p>
+                <p className="text-sm font-medium text-blue-700">{userProfile?.name || 'Welcome back!'}</p>
                 <p className="text-xs text-gray-500">{userProfile?.email || user?.email || 'User'}</p>
               </div>
             </div>
 
             {/* Navigation Items */}
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  isActiveRoute(item.path)
-                    ? 'bg-blue-100 text-blue-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </Link>
+            {navItems.map((item, idx) => (
+              <div key={item.path} className="relative group">
+                <Link
+                  to={item.path}
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 shadow-sm border border-transparent ${
+                    isActiveRoute(item.path)
+                      ? 'bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 border-blue-300 scale-105'
+                      : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50 hover:scale-105'
+                  }`}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </Link>
+                {/* Tooltip for guidance */}
+                <span className="absolute left-1/2 -bottom-8 -translate-x-1/2 px-2 py-1 text-xs rounded bg-gray-900 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Go to {item.label}
+                </span>
+                {/* Divider between sections for clarity */}
+                {idx === 2 || idx === 5 ? (
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-px bg-gradient-to-b from-blue-200 to-purple-200 opacity-60"></div>
+                ) : null}
+              </div>
             ))}
 
             {/* Logout Button Mobile */}
             <button
               onClick={handleLogout}
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors mt-3 border-t border-gray-200 pt-3"
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors mt-3 border-t border-gray-200 pt-3 shadow-sm"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
