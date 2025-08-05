@@ -14,6 +14,7 @@ import SalesOrders from '../src/pages/SalesOrders'
 import NewSalesOrder from '../src/pages/NewSalesOrder'
 import Quotes from '../src/pages/Quotes'
 import NewQuote from '../src/pages/NewQuote'
+import Suppliers from '../src/pages/Suppliers'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
