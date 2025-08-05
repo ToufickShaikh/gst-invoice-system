@@ -5,6 +5,7 @@ import Layout from '../components/Layout'
 import InputField from '../components/InputField'
 import Button from '../components/Button'
 import Modal from '../components/Modal'
+import AddCustomerModal from '../components/AddCustomerModal'
 import { customersAPI } from '../api/customers'
 import { itemsAPI } from '../api/items'
 import { billingAPI } from '../api/billing'
@@ -35,20 +36,6 @@ const Billing = () => {
 
   // Add Customer Modal states
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
-  const [newCustomer, setNewCustomer] = useState({
-    customerType: 'B2C',
-    name: '',
-    firmName: '',
-    firmAddress: '',
-    contact: '',
-    email: '',
-    gstNo: '',
-    state: '33-Tamil Nadu' // Default state
-  })
-  const [addingCustomer, setAddingCustomer] = useState(false)
-  const [gstinValidating, setGstinValidating] = useState(false)
-  const [gstinValid, setGstinValid] = useState(null)
-  const [gstinDetails, setGstinDetails] = useState(null)
 
   // Add Item Modal states
   const [showAddItemModal, setShowAddItemModal] = useState(false)
@@ -622,159 +609,16 @@ const Billing = () => {
     }
   }
 
-  // Add Customer functions
-  const handleOpenAddCustomerModal = () => {
-    setNewCustomer({
-      customerType: billingType,
-      name: '',
-      firmName: '',
-      firmAddress: '',
-      contact: '',
-      email: '',
-      gstNo: '',
-      state: '33-Tamil Nadu'
-    })
-    setGstinValidating(false)
-    setGstinValid(null)
-    setGstinDetails(null)
-    setShowAddCustomerModal(true)
-  }
+  const handleCustomerAdded = (newCustomer) => {
+    setCustomers((prev) => [...prev, newCustomer])
+    // Auto-select the newly created customer
+    const displayName = billingType === 'B2B' ? newCustomer.firmName : newCustomer.name
+    setCustomerSearch(`${displayName} - ${newCustomer.contact}`)
+    setSelectedCustomer(newCustomer._id)
+    setShowCustomerDropdown(false)
 
-  const handleCloseAddCustomerModal = () => {
-    setShowAddCustomerModal(false)
-    setNewCustomer({
-      customerType: 'B2C',
-      name: '',
-      firmName: '',
-      firmAddress: '',
-      contact: '',
-      email: '',
-      gstNo: '',
-      state: '33-Tamil Nadu'
-    })
-    setGstinValidating(false)
-    setGstinValid(null)
-    setGstinDetails(null)
-  }
-
-  const handleNewCustomerChange = (field, value) => {
-    setNewCustomer(prev => ({
-      ...prev,
-      [field]: value
-    }))
-
-    // Handle GSTIN validation for B2B customers
-    if (field === 'gstNo' && billingType === 'B2B' && value.length >= 15) {
-      validateAndVerifyGSTIN(value)
-    } else if (field === 'gstNo') {
-      // Reset validation state if GSTIN is incomplete
-      setGstinValid(null)
-      setGstinDetails(null)
-    }
-  }
-
-  const validateAndVerifyGSTIN = async (gstin) => {
-    setGstinValidating(true)
-    setGstinValid(null)
-    setGstinDetails(null)
-
-    try {
-      // First validate format
-      const validationResult = await gstAPI.validateGSTIN(gstin)
-
-      if (validationResult.valid) {
-        setGstinValid(true)
-
-        // Then verify and get details
-        const verificationResult = await gstAPI.verifyGSTIN(gstin)
-
-        if (verificationResult.verified && verificationResult.companyDetails) {
-          const details = verificationResult.companyDetails
-          setGstinDetails(details)
-
-          // Auto-fill customer form with verified details
-          setNewCustomer(prev => ({
-            ...prev,
-            firmName: details.legalName || prev.firmName,
-            firmAddress: details.principalPlaceOfBusiness || prev.firmAddress,
-            state: details.state || prev.state
-          }))
-
-          toast.success('GSTIN verified successfully!')
-        } else {
-          setGstinValid(false)
-          toast.error(verificationResult.error || 'GSTIN verification failed')
-        }
-      } else {
-        setGstinValid(false)
-        toast.error(validationResult.error || 'Invalid GSTIN format')
-      }
-    } catch (error) {
-      console.error('GSTIN validation error:', error)
-      setGstinValid(false)
-      toast.error('Failed to validate GSTIN')
-    } finally {
-      setGstinValidating(false)
-    }
-  }
-
-  const handleAddNewCustomer = async () => {
-    // Validation
     if (billingType === 'B2B') {
-      if (!newCustomer.firmName.trim()) {
-        toast.error('Firm name is required for B2B customers')
-        return
-      }
-      if (!newCustomer.firmAddress.trim()) {
-        toast.error('Firm address is required for B2B customers')
-        return
-      }
-    } else {
-      if (!newCustomer.name.trim()) {
-        toast.error('Customer name is required')
-        return
-      }
-    }
-
-    if (!newCustomer.contact.trim()) {
-      toast.error('Contact number is required')
-      return
-    }
-
-    setAddingCustomer(true)
-    try {
-      const customerData = {
-        ...newCustomer,
-        customerType: billingType
-      }
-
-      const response = await customersAPI.create(customerData)
-      const createdCustomer = response.data || response
-
-      // Add to customers list
-      setCustomers(prev => [...prev, createdCustomer])
-
-      // Auto-select the newly created customer in searchable dropdown
-      const displayName = billingType === 'B2B' ? createdCustomer.firmName : createdCustomer.name
-      setCustomerSearch(`${displayName} - ${createdCustomer.contact}`)
-      setSelectedCustomer(createdCustomer._id)
-      setShowCustomerDropdown(false)
-
-      // Close modal
-      handleCloseAddCustomerModal()
-
-      toast.success(`${billingType} customer added successfully!`)
-
-      // Detect tax type for B2B customers
-      if (billingType === 'B2B' && createdCustomer) {
-        detectTaxType(createdCustomer)
-      }
-
-    } catch (error) {
-      console.error('Error adding customer:', error)
-      toast.error('Failed to add customer. Please try again.')
-    } finally {
-      setAddingCustomer(false)
+      detectTaxType(newCustomer)
     }
   }
 
@@ -1025,7 +869,7 @@ const Billing = () => {
                       <div
                         onClick={() => {
                           setShowCustomerDropdown(false)
-                          handleOpenAddCustomerModal()
+                          setShowAddCustomerModal(true)
                         }}
                         className="px-3 py-2 cursor-pointer hover:bg-gray-50 border-t border-gray-200 text-blue-600 font-medium"
                       >
@@ -1049,7 +893,7 @@ const Billing = () => {
                 </div>
 
                 <Button
-                  onClick={handleOpenAddCustomerModal}
+                  onClick={() => setShowAddCustomerModal(true)}
                   variant="primary"
                   size="sm"
                   leftIcon={
@@ -1485,146 +1329,12 @@ const Billing = () => {
       </div>
 
       {/* Add Customer Modal */}
-      <Modal
+      <AddCustomerModal
         isOpen={showAddCustomerModal}
-        onRequestClose={handleCloseAddCustomerModal}
-        contentLabel="Add Customer"
-        className="max-w-lg mx-auto p-6 rounded-lg shadow-lg bg-white"
-      >
-        <h2 className="text-xl font-semibold mb-4">
-          {billingType === 'B2B' ? 'Add B2B Customer' : 'Add B2C Customer'}
-        </h2>
-
-        <div className="space-y-4">
-          {billingType === 'B2B' && (
-            <div>
-              <InputField
-                label="Firm Name"
-                value={newCustomer.firmName}
-                onChange={(e) => handleNewCustomerChange('firmName', e.target.value)}
-                placeholder="Enter firm name"
-                required
-              />
-              <InputField
-                label="Firm Address"
-                value={newCustomer.firmAddress}
-                onChange={(e) => handleNewCustomerChange('firmAddress', e.target.value)}
-                placeholder="Enter firm address"
-                required
-              />
-            </div>
-          )}
-          <div>
-            <InputField
-              label="Customer Name"
-              value={newCustomer.name}
-              onChange={(e) => handleNewCustomerChange('name', e.target.value)}
-              placeholder="Enter customer name"
-              required={billingType === 'B2C'}
-            />
-          </div>
-          <div>
-            <InputField
-              label="Contact Number"
-              value={newCustomer.contact}
-              onChange={(e) => handleNewCustomerChange('contact', e.target.value)}
-              placeholder="Enter contact number (for WhatsApp notifications)"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              📱 We'll use this number for WhatsApp invoice notifications
-            </p>
-          </div>
-          <div>
-            <InputField
-              label="Email"
-              value={newCustomer.email}
-              onChange={(e) => handleNewCustomerChange('email', e.target.value)}
-              placeholder="Enter email address"
-              type="email"
-            />
-          </div>
-          {billingType === 'B2B' && (
-            <div>
-              <InputField
-                label="GST Number"
-                value={newCustomer.gstNo}
-                onChange={(e) => handleNewCustomerChange('gstNo', e.target.value)}
-                placeholder="Enter GST number"
-                required
-              />
-            </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              State <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={newCustomer.state}
-              onChange={(e) => handleNewCustomerChange('state', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value="">Select state</option>
-              <option value="01-Jammu and Kashmir">01 - Jammu and Kashmir</option>
-              <option value="02-Himachal Pradesh">02 - Himachal Pradesh</option>
-              <option value="03-Punjab">03 - Punjab</option>
-              <option value="04-Chandigarh">04 - Chandigarh</option>
-              <option value="05-Uttarakhand">05 - Uttarakhand</option>
-              <option value="06-Haryana">06 - Haryana</option>
-              <option value="07-Delhi">07 - Delhi</option>
-              <option value="08-Rajasthan">08 - Rajasthan</option>
-              <option value="09-Uttar Pradesh">09 - Uttar Pradesh</option>
-              <option value="10-Bihar">10 - Bihar</option>
-              <option value="11-Sikkim">11 - Sikkim</option>
-              <option value="12-Arunachal Pradesh">12 - Arunachal Pradesh</option>
-              <option value="13-Nagaland">13 - Nagaland</option>
-              <option value="14-Manipur">14 - Manipur</option>
-              <option value="15-Mizoram">15 - Mizoram</option>
-              <option value="16-Tripura">16 - Tripura</option>
-              <option value="17-Meghalaya">17 - Meghalaya</option>
-              <option value="18-Assam">18 - Assam</option>
-              <option value="19-West Bengal">19 - West Bengal</option>
-              <option value="20-Jharkhand">20 - Jharkhand</option>
-              <option value="21-Odisha">21 - Odisha</option>
-              <option value="22-Chhattisgarh">22 - Chhattisgarh</option>
-              <option value="23-Madhya Pradesh">23 - Madhya Pradesh</option>
-              <option value="24-Gujarat">24 - Gujarat</option>
-              <option value="25-Daman and Diu">25 - Daman and Diu</option>
-              <option value="26-Dadra and Nagar Haveli">26 - Dadra and Nagar Haveli</option>
-              <option value="27-Maharashtra">27 - Maharashtra</option>
-              <option value="28-Andhra Pradesh">28 - Andhra Pradesh</option>
-              <option value="29-Karnataka">29 - Karnataka</option>
-              <option value="30-Goa">30 - Goa</option>
-              <option value="31-Lakshadweep">31 - Lakshadweep</option>
-              <option value="32-Kerala">32 - Kerala</option>
-              <option value="33-Tamil Nadu">33 - Tamil Nadu</option>
-              <option value="34-Puducherry">34 - Puducherry</option>
-              <option value="35-Andaman and Nicobar Islands">35 - Andaman and Nicobar Islands</option>
-              <option value="36-Telangana">36 - Telangana</option>
-              <option value="37-Ladakh">37 - Ladakh</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-4">
-          <Button
-            onClick={handleCloseAddCustomerModal}
-            variant="outline"
-            size="sm"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAddNewCustomer}
-            variant="primary"
-            size="sm"
-            loading={addingCustomer}
-          >
-            Add Customer
-          </Button>
-        </div>
-      </Modal>
+        onClose={() => setShowAddCustomerModal(false)}
+        onCustomerAdded={handleCustomerAdded}
+        customerType={billingType}
+      />
 
       {/* Add Item Modal */}
       <Modal
