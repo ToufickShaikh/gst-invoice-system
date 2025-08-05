@@ -6,12 +6,12 @@ import Button from '../components/Button';
 import Modal from '../components/Modal';
 import InputField from '../components/InputField';
 import { purchasesAPI } from '../api/purchases';
-import { customersAPI } from '../api/customers';
+import { suppliersAPI } from '../api/suppliers'; // Correct import for suppliersAPI
 import { itemsAPI } from '../api/items';
 
 const Purchases = () => {
   const [purchases, setPurchases] = useState([]);
-  const [customers, setCustomers] = useState([]);
+  const [suppliers, setSuppliers] = useState([]); // Correctly declare suppliers state
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,7 +24,7 @@ const Purchases = () => {
   });
 
   const columns = [
-    { key: 'supplier.firmName', label: 'Supplier' },
+    { key: 'supplier.name', label: 'Supplier' }, // Use supplier.name
     { key: 'purchaseDate', label: 'Date' },
     {
       key: 'actions',
@@ -52,12 +52,12 @@ const Purchases = () => {
     }
   };
 
-  const fetchCustomers = async () => {
+  const fetchSuppliers = async () => { // Correct function to fetch suppliers
     try {
-      const response = await customersAPI.getAllCustomers();
-      setCustomers(response.data);
+      const response = await suppliersAPI.getAll();
+      setSuppliers(response);
     } catch (error) {
-      toast.error('Failed to fetch customers');
+      toast.error('Failed to fetch suppliers');
     }
   };
 
@@ -72,7 +72,7 @@ const Purchases = () => {
 
   useEffect(() => {
     fetchPurchases();
-    fetchCustomers();
+    fetchSuppliers(); // Call fetchSuppliers here
     fetchItems();
   }, []);
 
