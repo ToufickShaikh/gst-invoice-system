@@ -130,6 +130,17 @@ const createInvoice = async (req, res) => {
         const invoiceNumber = await generateInvoiceNumber(customerType);
         console.log(`[3/5] Generated invoice number: ${invoiceNumber}`);
 
+        // Check stock availability and decrement
+        for (const invoiceItem of items) {
+            const item = await Item.findById(invoiceItem.item);
+            if (!item) {
+                return res.status(404).json({ message: `Item with ID ${invoiceItem.item} not found` });
+            }
+            if (item.quantityInStock < invoiceItem.quantity) {
+                return res.status(400).json({ message: `Insufficient stock for ${item.name}. Available: ${item.quantityInStock}, Requested: ${invoiceItem.quantity}` });
+            }
+        }
+
         const invoice = new Invoice({
             invoiceNumber,
             customer,
@@ -152,6 +163,13 @@ const createInvoice = async (req, res) => {
         console.log('[4/5] Saving new invoice to database...');
         await invoice.save();
         console.log('[4/5] Invoice saved successfully.');
+
+        // Decrement stock quantities after successful save
+        for (const invoiceItem of items) {
+            await Item.findByIdAndUpdate(invoiceItem.item, {
+                $inc: { quantityInStock: -invoiceItem.quantity },
+            });
+        }
 
         // Optionally, generate PDF and return its path
         let pdfPath = null;
@@ -185,6 +203,19 @@ const updateInvoice = async (req, res) => {
         console.log(`[1/6] Received request to update invoice ${id}`);
         console.log('[2/6] Request body:', JSON.stringify(updatedData, null, 2));
 
+        // Fetch the original invoice to revert stock changes
+        const originalInvoice = await Invoice.findById(id);
+        if (!originalInvoice) {
+            return res.status(404).json({ message: 'Original invoice not found for update' });
+        }
+
+        // Revert stock for original items
+        for (const originalItem of originalInvoice.items) {
+            await Item.findByIdAndUpdate(originalItem.item, {
+                $inc: { quantityInStock: originalItem.quantity },
+            });
+        }
+
         // Ensure items have all necessary data for recalculation
         console.log('[3/6] Populating item data for recalculation...');
         const populatedItems = await Promise.all(
@@ -210,6 +241,27 @@ const updateInvoice = async (req, res) => {
         console.log('[3/6] Item data populated successfully.');
 
         updatedData.items = populatedItems;
+
+        // Check stock availability for new items and decrement
+        for (const updatedItem of updatedData.items) {
+            const item = await Item.findById(updatedItem.item);
+            if (!item) {
+                return res.status(404).json({ message: `Item with ID ${updatedItem.item} not found` });
+            }
+            // Only check if the quantity is increasing or if it's a new item
+            const originalQuantity = originalInvoice.items.find(oi => oi.item.toString() === updatedItem.item.toString())?.quantity || 0;
+            if (item.quantityInStock + originalQuantity < updatedItem.quantity) {
+                // Revert changes made so far before sending error
+                for (const revertItem of updatedData.items) {
+                    if (revertItem.item.toString() !== updatedItem.item.toString()) {
+                        await Item.findByIdAndUpdate(revertItem.item, {
+                            $inc: { quantityInStock: revertItem.quantity },
+                        });
+                    }
+                }
+                return res.status(400).json({ message: `Insufficient stock for ${item.name}. Available: ${item.quantityInStock + originalQuantity}, Requested: ${updatedItem.quantity}` });
+            }
+        }
 
         // Recalculate totals based on updated items
         console.log('[4/6] Recalculating invoice totals...');
@@ -253,6 +305,13 @@ const updateInvoice = async (req, res) => {
         }
         console.log(`[5/6] Invoice ${id} updated successfully in DB.`);
 
+        // Decrement stock for updated items
+        for (const updatedItem of updatedData.items) {
+            await Item.findByIdAndUpdate(updatedItem.item, {
+                $inc: { quantityInStock: -updatedItem.quantity },
+            });
+        }
+
         // After successful update, regenerate the PDF
         console.log(`[6/6] Regenerating PDF for invoice ${id}...`);
         let pdfPath = null;
@@ -283,6 +342,13 @@ const deleteInvoice = async (req, res) => {
 
         if (!invoice) {
             return res.status(404).json({ message: 'Invoice not found' });
+        }
+
+        // Revert stock changes
+        for (const invoiceItem of invoice.items) {
+            await Item.findByIdAndUpdate(invoiceItem.item, {
+                $inc: { quantityInStock: invoiceItem.quantity },
+            });
         }
 
         await invoice.deleteOne(); // Use the instance method to remove

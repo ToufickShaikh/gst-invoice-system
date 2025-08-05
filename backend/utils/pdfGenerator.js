@@ -12,7 +12,7 @@ async function generateInvoicePDF(invoiceData) {
         let html = await fs.readFile(templatePath, 'utf-8');
 
         // Replace placeholders
-        html = replacePlaceholders(html, invoiceData);
+        html = await replacePlaceholders(html, invoiceData);
 
         const outputDir = path.resolve(__dirname, '../invoices');
         await fs.mkdir(outputDir, { recursive: true });
@@ -48,7 +48,7 @@ async function generateInvoicePDF(invoiceData) {
     }
 }
 
-function replacePlaceholders(html, invoiceData) {
+async function replacePlaceholders(html, invoiceData) {
     // Company details
     html = html.replace(/{{companyName}}/g, 'Shaikh Tools And Dies');
     html = html.replace(/{{companyAddress}}/g, 'NO.11/44 EDAPALLAM STREET PARK TOWN');
