@@ -59,7 +59,25 @@ const NewSalesOrder = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Check if all items exist in inventory
+      for (const orderItem of formData.items) {
+        const found = items.find(i => i._id === orderItem.item);
+        if (!found) {
+          toast.error('Selected item does not exist in inventory');
+          return;
+        }
+        if (orderItem.quantity > found.stock) {
+          toast.error(`Not enough stock for ${found.name}`);
+          return;
+        }
+      }
       await billingAPI.createSalesOrder(formData);
+      // Reduce stock for each item sold
+      for (const orderItem of formData.items) {
+        const found = items.find(i => i._id === orderItem.item);
+        const newStock = found.stock - parseInt(orderItem.quantity);
+        await itemsAPI.update(orderItem.item, { ...found, stock: newStock });
+      }
       toast.success('Sales order created successfully');
     } catch (error) {
       toast.error('Failed to create sales order');
@@ -135,6 +153,7 @@ const NewSalesOrder = () => {
               <Button type="button" onClick={handleAddItem} className="mt-2">
                 Add Item
               </Button>
+              <p className="text-xs text-gray-500 mt-2">Only existing items can be selected. To add new items, go to the Items or Purchases page.</p>
             </div>
             <InputField
               label="Notes"

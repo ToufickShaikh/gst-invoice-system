@@ -129,12 +129,44 @@ const Purchases = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Validate supplier
+    if (!formData.supplier) {
+      toast.error('Supplier is required');
+      return;
+    }
+    // Validate items
+    if (!formData.items.length) {
+      toast.error('At least one item is required');
+      return;
+    }
+    for (const item of formData.items) {
+      if (!item.item || !item.quantity || !item.purchasePrice) {
+        toast.error('All item fields are required');
+        return;
+      }
+      if (parseInt(item.quantity) <= 0) {
+        toast.error('Quantity must be greater than zero');
+        return;
+      }
+      if (parseFloat(item.purchasePrice) < 0) {
+        toast.error('Purchase price must be zero or greater');
+        return;
+      }
+    }
     try {
       if (isEditMode) {
         await purchasesAPI.updatePurchase(currentPurchaseId, formData);
         toast.success('Purchase updated successfully');
       } else {
         await purchasesAPI.createPurchase(formData);
+        // Update inventory stock for each item
+        for (const item of formData.items) {
+          const found = items.find(i => i._id === item.item);
+          if (found) {
+            const newStock = (found.stock ?? 0) + parseInt(item.quantity);
+            await itemsAPI.update(item.item, { ...found, stock: newStock });
+          }
+        }
         toast.success('Purchase created successfully');
       }
       fetchPurchases();
