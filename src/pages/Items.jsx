@@ -28,7 +28,8 @@ const Items = () => {
     { key: 'hsnCode', label: 'HSN Code' },
     { key: 'formattedRate', label: 'Rate' },
     { key: 'units', label: 'Units' },
-    { key: 'taxSlabDisplay', label: 'Tax Slab' }
+    { key: 'taxSlabDisplay', label: 'Tax Slab' },
+    { key: 'stock', label: 'Stock' }
   ]
 
   const fetchItems = async () => {
@@ -42,7 +43,8 @@ const Items = () => {
       const formattedItems = itemsArr.map(item => ({
         ...item,
         formattedRate: formatCurrency(item.rate),
-        taxSlabDisplay: `${item.taxSlab}%`
+        taxSlabDisplay: `${item.taxSlab}%`,
+        stock: item.stock ?? 0
       }))
       setItems(formattedItems)
     } catch (error) {
@@ -68,7 +70,10 @@ const Items = () => {
       rate: parseFloat(formData.rate),
       taxSlab: parseFloat(formData.taxSlab)
     }
-
+    // If adding, allow initial stock entry
+    if (!editingItem && formData.stock !== undefined) {
+      itemData.stock = parseInt(formData.stock)
+    }
     try {
       if (editingItem) {
         await itemsAPI.update(editingItem._id, itemData)
@@ -91,7 +96,8 @@ const Items = () => {
       hsnCode: item.hsnCode,
       rate: item.rate.toString(),
       taxSlab: item.taxSlab.toString(),
-      units: item.units || 'per piece'
+      units: item.units || 'per piece',
+      stock: item.stock ?? 0
     })
     setIsModalOpen(true)
   }
@@ -215,6 +221,14 @@ const Items = () => {
                 <option value="28">28%</option>
               </select>
             </div>
+            <InputField
+              label="Stock"
+              name="stock"
+              type="number"
+              value={formData.stock ?? ''}
+              onChange={handleChange}
+              min={0}
+            />
             <div className="flex justify-end space-x-2 mt-6">
               <Button type="button" variant="secondary" onClick={handleCloseModal}>
                 Cancel
