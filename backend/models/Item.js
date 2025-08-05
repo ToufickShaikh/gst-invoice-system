@@ -20,6 +20,10 @@ const itemSchema = new mongoose.Schema({
         ],
         default: 'per piece'
     },
+    quantityInStock: {
+        type: Number,
+        default: 0
+    },
 });
 
 const Item = mongoose.model('Item', itemSchema);

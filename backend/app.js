@@ -88,7 +88,10 @@ app.use('/api/auth', authRoutes); // Authentication routes
 app.use('/api/customers', customerRoutes); // Customer management routes
 app.use('/api/items', itemRoutes); // Item management routes
 app.use('/api/billing', billingRoutes); // Billing/invoice routes
-app.use('/api/gst', gstRoutes); // GST verification routes
+app.use('/api/gst', gstRoutes);
+app.use('/api/purchases', require('./routes/purchaseRoutes'));
+app.use('/api/sales-orders', require('./routes/salesOrderRoutes'));
+app.use('/api/quotes', require('./routes/quoteRoutes')); // GST verification routes
 
 // Serve generated invoices as static files with proper headers
 app.use('/invoices', (req, res, next) => {

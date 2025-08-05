@@ -9,6 +9,11 @@ import InvoiceSuccess from '../src/pages/InvoiceSuccess'
 import Invoices from '../src/pages/Invoices'
 import Login from '../src/pages/Login'
 import EditInvoice from '../src/pages/EditInvoice'
+import Purchases from '../src/pages/Purchases'
+import SalesOrders from '../src/pages/SalesOrders'
+import NewSalesOrder from '../src/pages/NewSalesOrder'
+import Quotes from '../src/pages/Quotes'
+import NewQuote from '../src/pages/NewQuote'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -40,6 +45,11 @@ const AppRoutes = () => {
       <Route path="/invoice-success" element={<PrivateRoute><InvoiceSuccess /></PrivateRoute>} />
       <Route path="/invoices" element={<PrivateRoute><Invoices /></PrivateRoute>} />
       <Route path="/edit-invoice/:id" element={<PrivateRoute><EditInvoice /></PrivateRoute>} />
+      <Route path="/purchases" element={<PrivateRoute><Purchases /></PrivateRoute>} />
+      <Route path="/sales-orders" element={<PrivateRoute><SalesOrders /></PrivateRoute>} />
+      <Route path="/sales-orders/new" element={<PrivateRoute><NewSalesOrder /></PrivateRoute>} />
+      <Route path="/quotes" element={<PrivateRoute><Quotes /></PrivateRoute>} />
+      <Route path="/quotes/new" element={<PrivateRoute><NewQuote /></PrivateRoute>} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   )

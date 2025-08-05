@@ -1025,10 +1025,10 @@ async function verifyAndAutoFillGST(gstin) {
             autoFillFields: {
                 firmName: apiResponse.data.legalName,
                 tradeName: apiResponse.data.tradeName,
-                firmAddress: apiResponse.data.principalPlaceOfBusiness || `${apiResponse.data.address?.buildingName || ''}, ${apiResponse.data.address?.street || ''}, ${apiResponse.data.address?.location || ''}`.replace(/^,\s*|,\s*$/g, '').replace(/,\s*,/g, ','),
+                firmAddress: [apiResponse.data.address?.buildingName, apiResponse.data.address?.street, apiResponse.data.address?.location, apiResponse.data.address?.city, apiResponse.data.address?.pincode].filter(Boolean).join(', '),
                 city: apiResponse.data.address?.city || apiResponse.data.address?.location || '',
                 district: apiResponse.data.address?.district || apiResponse.data.address?.location || '',
-                state: apiResponse.data.address?.state || `${validation.stateCode}-${GST_STATE_CODES[validation.stateCode]}`, // Format as "XX-StateName"
+                state: apiResponse.data.address?.state || `${validation.stateCode}-${GST_STATE_CODES[validation.stateCode]}`,
                 stateCode: validation.stateCode,
                 pincode: apiResponse.data.address?.pincode || '',
                 businessType: apiResponse.data.businessType || determineBusinessType(gstin)
