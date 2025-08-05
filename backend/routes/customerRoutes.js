@@ -3,6 +3,7 @@ const { getCustomers, createCustomer, updateCustomer, deleteCustomer } = require
 
 const router = express.Router();
 
+router.get('/:id', getCustomers);
 router.get('/', getCustomers);
 router.post('/', createCustomer);
 router.put('/:id', updateCustomer);

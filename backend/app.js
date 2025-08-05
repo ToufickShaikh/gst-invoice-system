@@ -12,6 +12,7 @@ const gstRoutes = require('./routes/gstRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const salesOrderRoutes = require('./routes/salesOrderRoutes');
 const quoteRoutes = require('./routes/quoteRoutes');
+const supplierRoutes = require('./routes/supplierRoutes');
 
 const app = express(); // Create Express app instance
 
@@ -89,6 +90,7 @@ app.use('/api/gst', gstRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
 app.use('/api/quotes', quoteRoutes);
+app.use('/api/suppliers', supplierRoutes); // Supplier management routes
 
 // Serve generated invoices as static files with proper headers
 app.use('/invoices', express.static('invoices'));

@@ -213,9 +213,9 @@ const Purchases = () => {
                 required
               >
                 <option value="">Select a supplier</option>
-                {customers.map((customer) => (
-                  <option key={customer._id} value={customer._id}>
-                    {customer.firmName}
+                {suppliers.map((supplier) => (
+                  <option key={supplier._id} value={supplier._id}>
+                    {supplier.name}
                   </option>
                 ))}
               </select>

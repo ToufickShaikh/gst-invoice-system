@@ -50,6 +50,7 @@ const AppRoutes = () => {
       <Route path="/sales-orders/new" element={<PrivateRoute><NewSalesOrder /></PrivateRoute>} />
       <Route path="/quotes" element={<PrivateRoute><Quotes /></PrivateRoute>} />
       <Route path="/quotes/new" element={<PrivateRoute><NewQuote /></PrivateRoute>} />
+      <Route path="/suppliers" element={<PrivateRoute><Suppliers /></PrivateRoute>} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   )

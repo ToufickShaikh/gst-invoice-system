@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const purchaseSchema = new mongoose.Schema({
   supplier: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Customer',
+    ref: 'Supplier',
     required: true,
   },
   items: [

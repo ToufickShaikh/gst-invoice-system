@@ -114,6 +114,15 @@ const Layout = ({ children }) => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
         </svg>
       )
+    },
+    {
+      path: '/suppliers',
+      label: 'Suppliers',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h2a2 2 0 002-2V8a2 2 0 00-2-2h-2M17 20V6M17 20H7m10 0v-2a2 2 0 00-2-2H9a2 2 0 00-2 2v2M7 20H5a2 2 0 01-2-2V8a2 2 0 012-2h2m0 0V4a2 2 0 012-2h4a2 2 0 012 2v2M7 6h10" />
+        </svg>
+      )
     }
   ]
 

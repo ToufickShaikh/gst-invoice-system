@@ -1,6 +1,16 @@
 const Purchase = require('../models/Purchase');
 const Item = require('../models/Item');
 
+// Helper function for consistent error responses
+const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
+    console.error(`[ERROR] ${message}:`, errorDetails);
+    res.status(statusCode).json({
+        message,
+        error: errorDetails ? errorDetails.message || errorDetails.toString() : 'Unknown error',
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined,
+    });
+};
+
 // @desc    Get all purchase bills
 // @route   GET /api/purchases
 // @access  Private
@@ -9,7 +19,7 @@ exports.getPurchases = async (req, res) => {
     const purchases = await Purchase.find().populate('items.item').populate('supplier');
     res.json(purchases);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error' });
+    sendErrorResponse(res, 500, 'Failed to retrieve purchases', error);
   }
 };
 
@@ -37,7 +47,7 @@ exports.createPurchase = async (req, res) => {
 
     res.status(201).json(purchase);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error' });
+    sendErrorResponse(res, 500, 'Failed to create purchase', error);
   }
 };
 
@@ -78,7 +88,7 @@ exports.updatePurchase = async (req, res) => {
 
     res.json(purchase);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error' });
+    sendErrorResponse(res, 500, 'Failed to update purchase', error);
   }
 };
 
@@ -102,10 +112,10 @@ exports.deletePurchase = async (req, res) => {
       });
     }
 
-    await purchase.remove();
+    await purchase.deleteOne(); // Use deleteOne() for Mongoose 6+
 
     res.json({ message: 'Purchase removed' });
   } catch (error) {
-    res.status(500).json({ message: 'Server Error' });
+    sendErrorResponse(res, 500, 'Failed to delete purchase', error);
   }
 };
