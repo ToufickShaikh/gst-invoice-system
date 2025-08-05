@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const purchaseSchema = new mongoose.Schema({
   supplier: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Customer',
     required: true,
   },
   items: [

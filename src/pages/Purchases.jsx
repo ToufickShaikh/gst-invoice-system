@@ -5,14 +5,18 @@ import Table from '../components/Table';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import InputField from '../components/InputField';
+import { purchasesAPI } from '../api/purchases';
 import { customersAPI } from '../api/customers';
 import { itemsAPI } from '../api/items';
-import { billingAPI } from '../api/billing';
 
 const Purchases = () => {
   const [purchases, setPurchases] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [currentPurchaseId, setCurrentPurchaseId] = useState(null);
   const [formData, setFormData] = useState({
     supplier: '',
     items: [],
@@ -20,17 +24,27 @@ const Purchases = () => {
   });
 
   const columns = [
-    { key: 'supplier', label: 'Supplier' },
+    { key: 'supplier.firmName', label: 'Supplier' },
     { key: 'purchaseDate', label: 'Date' },
-    { key: 'items', label: 'Items' },
-    { key: 'notes', label: 'Notes' },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (purchase) => (
+        <div className="flex space-x-2">
+          <Button onClick={() => handleEdit(purchase)}>Edit</Button>
+          <Button variant="danger" onClick={() => handleDelete(purchase._id)}>
+            Delete
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   const fetchPurchases = async () => {
     setLoading(true);
     try {
-      const response = await billingAPI.getAllPurchases();
-      setPurchases(response.data);
+      const response = await purchasesAPI.getAllPurchases();
+      setPurchases(response);
     } catch (error) {
       toast.error('Failed to fetch purchases');
     } finally {
@@ -38,8 +52,28 @@ const Purchases = () => {
     }
   };
 
+  const fetchCustomers = async () => {
+    try {
+      const response = await customersAPI.getAllCustomers();
+      setCustomers(response.data);
+    } catch (error) {
+      toast.error('Failed to fetch customers');
+    }
+  };
+
+  const fetchItems = async () => {
+    try {
+      const response = await itemsAPI.getAllItems();
+      setItems(response.data);
+    } catch (error) {
+      toast.error('Failed to fetch items');
+    }
+  };
+
   useEffect(() => {
     fetchPurchases();
+    fetchCustomers();
+    fetchItems();
   }, []);
 
   const handleChange = (e) => {
@@ -66,15 +100,49 @@ const Purchases = () => {
     setFormData({ ...formData, items: newItems });
   };
 
+  const handleEdit = (purchase) => {
+    setIsEditMode(true);
+    setCurrentPurchaseId(purchase._id);
+    setFormData({
+      supplier: purchase.supplier._id,
+      items: purchase.items.map((item) => ({
+        item: item.item._id,
+        quantity: item.quantity,
+        purchasePrice: item.purchasePrice,
+      })),
+      notes: purchase.notes,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this purchase?')) {
+      try {
+        await purchasesAPI.deletePurchase(id);
+        toast.success('Purchase deleted successfully');
+        fetchPurchases();
+      } catch (error) {
+        toast.error('Failed to delete purchase');
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await billingAPI.createPurchase(formData);
-      toast.success('Purchase created successfully');
+      if (isEditMode) {
+        await purchasesAPI.updatePurchase(currentPurchaseId, formData);
+        toast.success('Purchase updated successfully');
+      } else {
+        await purchasesAPI.createPurchase(formData);
+        toast.success('Purchase created successfully');
+      }
       fetchPurchases();
       setIsModalOpen(false);
+      setIsEditMode(false);
+      setCurrentPurchaseId(null);
     } catch (error) {
-      toast.error('Failed to create purchase');
+      toast.error(`Failed to ${isEditMode ? 'update' : 'create'} purchase`);
     }
   };
 
@@ -83,7 +151,11 @@ const Purchases = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Purchases</h1>
-          <Button onClick={() => setIsModalOpen(true)}>Add Purchase</Button>
+          <Button onClick={() => {
+            setIsEditMode(false);
+            setFormData({ supplier: '', items: [], notes: '' });
+            setIsModalOpen(true);
+          }}>Add Purchase</Button>
         </div>
         <div className="bg-white rounded-lg shadow">
           {loading ? (
@@ -95,26 +167,45 @@ const Purchases = () => {
         <Modal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          title="Add Purchase"
+          title={isEditMode ? 'Edit Purchase' : 'Add Purchase'}
         >
           <form onSubmit={handleSubmit}>
-            <InputField
-              label="Supplier"
-              name="supplier"
-              value={formData.supplier}
-              onChange={handleChange}
-              required
-            />
+            <div className="mb-4">
+              <label htmlFor="supplier" className="block text-sm font-medium text-gray-700">Supplier</label>
+              <select
+                id="supplier"
+                name="supplier"
+                value={formData.supplier}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                required
+              >
+                <option value="">Select a supplier</option>
+                {customers.map((customer) => (
+                  <option key={customer._id} value={customer._id}>
+                    {customer.firmName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <h3 className="text-lg font-medium">Items</h3>
               {formData.items.map((item, index) => (
                 <div key={index} className="flex gap-4 items-center mt-2">
-                  <InputField
-                    label="Item"
+                  <select
                     value={item.item}
                     onChange={(e) => handleItemChange(index, 'item', e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     required
-                  />
+                  >
+                    <option value="">Select an item</option>
+                    {items.map((i) => (
+                      <option key={i._id} value={i._id}>
+                        {i.name}
+                      </option>
+                    ))}
+                  </select>
                   <InputField
                     label="Quantity"
                     type="number"
@@ -161,7 +252,7 @@ const Purchases = () => {
                 Cancel
               </Button>
               <Button type="submit" variant="primary">
-                Add Purchase
+                {isEditMode ? 'Update Purchase' : 'Add Purchase'}
               </Button>
             </div>
           </form>
