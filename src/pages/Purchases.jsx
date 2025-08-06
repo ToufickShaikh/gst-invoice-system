@@ -6,12 +6,12 @@ import Button from '../components/Button';
 import Modal from '../components/Modal';
 import InputField from '../components/InputField';
 import { purchasesAPI } from '../api/purchases';
-import { suppliersAPI } from '../api/suppliers'; // Correct import for suppliersAPI
+import { suppliersAPI } from '../api/suppliers';
 import { itemsAPI } from '../api/items';
 
 const Purchases = () => {
   const [purchases, setPurchases] = useState([]);
-  const [suppliers, setSuppliers] = useState([]); // Correctly declare suppliers state
+  const [suppliers, setSuppliers] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,7 +24,7 @@ const Purchases = () => {
   });
 
   const columns = [
-    { key: 'supplier.name', label: 'Supplier' }, // Use supplier.name
+    { key: 'supplier.name', label: 'Supplier' },
     { key: 'purchaseDate', label: 'Date' },
     {
       key: 'actions',
@@ -52,7 +52,7 @@ const Purchases = () => {
     }
   };
 
-  const fetchSuppliers = async () => { // Correct function to fetch suppliers
+  const fetchSuppliers = async () => {
     try {
       const response = await suppliersAPI.getAll();
       setSuppliers(response);
@@ -62,17 +62,22 @@ const Purchases = () => {
   };
 
   const fetchItems = async () => {
+    console.log('Attempting to fetch items...');
+    console.log('itemsAPI object:', itemsAPI);
     try {
       const response = await itemsAPI.getAllItems();
+      console.log('Items fetched successfully:', response);
       setItems(response);
     } catch (error) {
+      console.error('Error fetching items:', error);
       toast.error('Failed to fetch items');
     }
   };
 
   useEffect(() => {
+    console.log('Purchases component mounted. Fetching initial data...');
     fetchPurchases();
-    fetchSuppliers(); // Call fetchSuppliers here
+    fetchSuppliers();
     fetchItems();
   }, []);
 
