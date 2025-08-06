@@ -65,7 +65,7 @@ const Purchases = () => {
     console.log('Attempting to fetch items...');
     console.log('itemsAPI object:', itemsAPI);
     try {
-      const response = await itemsAPI.getAllItems();
+      const response = await itemsAPI.getAll(); // Changed from getAllItems() to getAll()
       console.log('Items fetched successfully:', response);
       setItems(response);
     } catch (error) {
