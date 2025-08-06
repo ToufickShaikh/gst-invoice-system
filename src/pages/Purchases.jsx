@@ -64,7 +64,7 @@ const Purchases = () => {
   const fetchItems = async () => {
     try {
       const response = await itemsAPI.getAllItems();
-      setItems(response.data);
+      setItems(response);
     } catch (error) {
       toast.error('Failed to fetch items');
     }

@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
+import { authAPI } from '../api/auth'
 
 const AuthContext = createContext()
 
@@ -27,57 +28,134 @@ export const AuthProvider = ({ children }) => {
   })
 
   useEffect(() => {
-    // Check for stored user and profile
-    const storedUser = localStorage.getItem('user')
-    const storedProfile = localStorage.getItem('userProfile')
-    
-    if (storedUser) {
-      const userData = JSON.parse(storedUser)
-      setUser(userData)
-      
-      // Set default profile or load stored profile
-      if (storedProfile) {
-        setUserProfile(JSON.parse(storedProfile))
-      } else {
-        // Create default profile
-        const defaultProfile = {
-          name: userData.name || userData.username || 'Admin User',
-          email: userData.email || 'admin@gstinvoice.com',
-          role: 'Administrator',
-          joinDate: new Date().toISOString().split('T')[0],
-          lastLogin: new Date().toISOString(),
-          preferences: {
-            theme: 'light',
-            language: 'en',
-            notifications: true
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token')
+      if (token) {
+        try {
+          // In a real app, you'd verify the token with the backend
+          // For now, we'll just assume it's valid if it exists
+          // and try to fetch user profile if available
+          const storedUser = localStorage.getItem('user')
+          if (storedUser) {
+            setUser(JSON.parse(storedUser))
           }
+          const storedProfile = localStorage.getItem('userProfile')
+          if (storedProfile) {
+            setUserProfile(JSON.parse(storedProfile))
+          } else if (storedUser) {
+            // If user data exists but profile doesn't, create a default one
+            const userData = JSON.parse(storedUser)
+            const defaultProfile = {
+              name: userData.username || 'Admin User',
+              email: userData.email || 'admin@gstinvoice.com',
+              role: 'Administrator',
+              joinDate: new Date().toISOString().split('T')[0],
+              lastLogin: new Date().toISOString(),
+              preferences: {
+                theme: 'light',
+                language: 'en',
+                notifications: true
+              }
+            }
+            setUserProfile(defaultProfile)
+            localStorage.setItem('userProfile', JSON.stringify(defaultProfile))
+          }
+        } catch (error) {
+          console.error('Auth check failed:', error)
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          localStorage.removeItem('userProfile')
+          setUser(null)
+          setUserProfile({
+            name: '',
+            email: '',
+            role: 'Admin',
+            joinDate: '',
+            lastLogin: '',
+            preferences: {
+              theme: 'light',
+              language: 'en',
+              notifications: true
+            }
+          })
         }
-        setUserProfile(defaultProfile)
-        localStorage.setItem('userProfile', JSON.stringify(defaultProfile))
       }
+      setLoading(false)
     }
-    setLoading(false)
+    checkAuth()
   }, [])
 
-  const login = (userData) => {
-    setUser(userData)
-    localStorage.setItem('user', JSON.stringify(userData))
-    
-    // Update last login time
-    const updatedProfile = {
-      ...userProfile,
-      lastLogin: new Date().toISOString(),
-      name: userData.name || userData.username || 'Admin User',
-      email: userData.email || 'admin@gstinvoice.com'
+  const login = async (username, password) => {
+    try {
+      const data = await authAPI.login({ username, password })
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify({ _id: data._id, username: data.username, email: data.email }))
+      setUser({ _id: data._id, username: data.username, email: data.email })
+
+      // Update user profile on login
+      const updatedProfile = {
+        ...userProfile,
+        name: data.username,
+        email: data.email,
+        lastLogin: new Date().toISOString(),
+      }
+      setUserProfile(updatedProfile)
+      localStorage.setItem('userProfile', JSON.stringify(updatedProfile))
+
+      return data
+    } catch (error) {
+      console.error('Login failed:', error)
+      throw error
     }
-    setUserProfile(updatedProfile)
-    localStorage.setItem('userProfile', JSON.stringify(updatedProfile))
+  }
+
+  const register = async (username, email, password) => {
+    try {
+      const data = await authAPI.register({ username, email, password })
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify({ _id: data._id, username: data.username, email: data.email }))
+      setUser({ _id: data._id, username: data.username, email: data.email })
+
+      // Create initial user profile on registration
+      const newProfile = {
+        name: data.username,
+        email: data.email,
+        role: 'Administrator',
+        joinDate: new Date().toISOString().split('T')[0],
+        lastLogin: new Date().toISOString(),
+        preferences: {
+          theme: 'light',
+          language: 'en',
+          notifications: true
+        }
+      }
+      setUserProfile(newProfile)
+      localStorage.setItem('userProfile', JSON.stringify(newProfile))
+
+      return data
+    } catch (error) {
+      console.error('Registration failed:', error)
+      throw error
+    }
   }
 
   const logout = () => {
-    setUser(null)
+    localStorage.removeItem('token')
     localStorage.removeItem('user')
-    // Keep user profile for next login
+    localStorage.removeItem('userProfile') // Clear profile on logout
+    setUser(null)
+    setUserProfile({
+      name: '',
+      email: '',
+      role: 'Admin',
+      joinDate: '',
+      lastLogin: '',
+      preferences: {
+        theme: 'light',
+        language: 'en',
+        notifications: true
+      }
+    })
   }
 
   const updateProfile = (updates) => {
@@ -95,16 +173,19 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userProfile', JSON.stringify(updatedProfile))
   }
 
+  const value = {
+    user,
+    userProfile,
+    loading,
+    login,
+    register,
+    logout,
+    updateProfile,
+    updatePreferences,
+  }
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      userProfile, 
-      login, 
-      logout, 
-      loading, 
-      updateProfile, 
-      updatePreferences 
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )

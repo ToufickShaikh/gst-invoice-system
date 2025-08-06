@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { createInvoice, getInvoices, getInvoiceById, updateInvoice, reprintInvoice, getDashboardStats, generatePaymentQr, deleteInvoice, generatePublicPdf } = require('../controllers/billingController.js');
+const { protect } = require('../middleware/authMiddleware');
+
+// Public PDF generation route (no authentication required)
+router.route('/public/pdf/:invoiceId').get(generatePublicPdf);
+
+// Protect all billing routes
+router.use(protect);
 
 // Corrected routes to match frontend API calls
 router.route('/invoices').post(createInvoice).get(getInvoices);
@@ -9,8 +16,5 @@ router.route('/invoices/:id').get(getInvoiceById).put(updateInvoice).delete(dele
 router.route('/invoices/:id/reprint').post(reprintInvoice);
 // Corrected route to match frontend API call for generating QR code
 router.route('/invoices/:id/payment-qr').get(generatePaymentQr);
-
-// Public PDF generation route (no authentication required)
-router.route('/public/pdf/:invoiceId').get(generatePublicPdf);
 
 module.exports = router;

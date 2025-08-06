@@ -1,4 +1,3 @@
-// Controller for item CRUD operations
 const Item = require('../models/Item.js');
 
 // Helper function for consistent error responses
@@ -20,7 +19,7 @@ const getItems = async (req, res) => {
         if (req.params.id) {
             const item = await Item.findById(req.params.id);
             if (!item) {
-                return res.status(404).json({ message: 'Item not found' });
+                return sendErrorResponse(res, 404, 'Item not found');
             }
             res.json(item);
         } else {
@@ -36,9 +35,23 @@ const getItems = async (req, res) => {
 // @route   POST /api/items
 // @access  Private
 const createItem = async (req, res) => {
+    const { name, hsnCode, rate, taxSlab, units, quantityInStock } = req.body;
+
+    // Basic input validation
+    if (!name || !hsnCode || !rate || !taxSlab || !units) {
+        return sendErrorResponse(res, 400, 'Please include all required item fields: name, hsnCode, rate, taxSlab, units');
+    }
+
     try {
         console.log('[ITEM] Create request received:', req.body);
-        const item = new Item(req.body);
+        const item = new Item({
+            name,
+            hsnCode,
+            rate,
+            taxSlab,
+            units,
+            quantityInStock: quantityInStock || 0, // Default to 0 if not provided
+        });
         await item.save();
         console.log('[ITEM] Item created successfully:', item._id);
         res.status(201).json(item);
@@ -47,6 +60,8 @@ const createItem = async (req, res) => {
         if (error.name === 'ValidationError') {
             const validationErrors = Object.values(error.errors).map(err => err.message);
             sendErrorResponse(res, 400, 'Validation failed', { messages: validationErrors, details: error.errors });
+        } else if (error.code === 11000) {
+            sendErrorResponse(res, 400, 'Item with this name or HSN Code already exists', error);
         } else {
             sendErrorResponse(res, 500, 'Failed to create item', error);
         }
@@ -60,9 +75,10 @@ const updateItem = async (req, res) => {
     try {
         console.log('[ITEM] Update request for ID:', req.params.id);
         console.log('[ITEM] Update data:', req.body);
+
         const item = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
         if (!item) {
-            return res.status(404).json({ message: 'Item not found' });
+            return sendErrorResponse(res, 404, 'Item not found');
         }
         console.log('[ITEM] Item updated successfully:', item._id);
         res.json(item);
@@ -71,6 +87,8 @@ const updateItem = async (req, res) => {
         if (error.name === 'ValidationError') {
             const validationErrors = Object.values(error.errors).map(err => err.message);
             sendErrorResponse(res, 400, 'Validation failed', { messages: validationErrors, details: error.errors });
+        } else if (error.code === 11000) {
+            sendErrorResponse(res, 400, 'Item with this name or HSN Code already exists', error);
         } else {
             sendErrorResponse(res, 500, 'Failed to update item', error);
         }
@@ -85,7 +103,7 @@ const deleteItem = async (req, res) => {
         console.log('[ITEM] Delete request for ID:', req.params.id);
         const item = await Item.findByIdAndDelete(req.params.id);
         if (!item) {
-            return res.status(404).json({ message: 'Item not found' });
+            return sendErrorResponse(res, 404, 'Item not found');
         }
         console.log('[ITEM] Item deleted successfully:', item._id);
         res.json({ message: 'Item deleted' });

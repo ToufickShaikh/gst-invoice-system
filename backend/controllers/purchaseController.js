@@ -1,5 +1,6 @@
 const Purchase = require('../models/Purchase');
 const Item = require('../models/Item');
+const Supplier = require('../models/Supplier');
 
 // Helper function for consistent error responses
 const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
@@ -29,7 +30,35 @@ exports.getPurchases = async (req, res) => {
 exports.createPurchase = async (req, res) => {
   const { supplier, items, notes } = req.body;
 
+  // Basic input validation
+  if (!supplier || !items || items.length === 0) {
+    return sendErrorResponse(res, 400, 'Supplier and at least one item are required');
+  }
+
   try {
+    // Validate supplier exists
+    const existingSupplier = await Supplier.findById(supplier);
+    if (!existingSupplier) {
+      return sendErrorResponse(res, 404, 'Supplier not found');
+    }
+
+    // Validate items and check stock (if applicable, though for purchase it's adding stock)
+    for (const purchasedItem of items) {
+      if (!purchasedItem.item || !purchasedItem.quantity || purchasedItem.purchasePrice === undefined) {
+        return sendErrorResponse(res, 400, 'Each item must have an item ID, quantity, and purchase price');
+      }
+      if (purchasedItem.quantity <= 0) {
+        return sendErrorResponse(res, 400, 'Quantity must be greater than zero');
+      }
+      if (purchasedItem.purchasePrice < 0) {
+        return sendErrorResponse(res, 400, 'Purchase price cannot be negative');
+      }
+      const existingItem = await Item.findById(purchasedItem.item);
+      if (!existingItem) {
+        return sendErrorResponse(res, 404, `Item with ID ${purchasedItem.item} not found`);
+      }
+    }
+
     const purchase = new Purchase({
       supplier,
       items,
@@ -58,11 +87,39 @@ exports.updatePurchase = async (req, res) => {
   const { id } = req.params;
   const { supplier, items, notes } = req.body;
 
+  // Basic input validation
+  if (!supplier || !items || items.length === 0) {
+    return sendErrorResponse(res, 400, 'Supplier and at least one item are required');
+  }
+
   try {
     const purchase = await Purchase.findById(id);
 
     if (!purchase) {
-      return res.status(404).json({ message: 'Purchase not found' });
+      return sendErrorResponse(res, 404, 'Purchase not found');
+    }
+
+    // Validate supplier exists
+    const existingSupplier = await Supplier.findById(supplier);
+    if (!existingSupplier) {
+      return sendErrorResponse(res, 404, 'Supplier not found');
+    }
+
+    // Validate items and check stock (if applicable, though for purchase it's adding stock)
+    for (const purchasedItem of items) {
+      if (!purchasedItem.item || !purchasedItem.quantity || purchasedItem.purchasePrice === undefined) {
+        return sendErrorResponse(res, 400, 'Each item must have an item ID, quantity, and purchase price');
+      }
+      if (purchasedItem.quantity <= 0) {
+        return sendErrorResponse(res, 400, 'Quantity must be greater than zero');
+      }
+      if (purchasedItem.purchasePrice < 0) {
+        return sendErrorResponse(res, 400, 'Purchase price cannot be negative');
+      }
+      const existingItem = await Item.findById(purchasedItem.item);
+      if (!existingItem) {
+        return sendErrorResponse(res, 404, `Item with ID ${purchasedItem.item} not found`);
+      }
     }
 
     // Revert stock changes from the original purchase
@@ -102,7 +159,7 @@ exports.deletePurchase = async (req, res) => {
     const purchase = await Purchase.findById(id);
 
     if (!purchase) {
-      return res.status(404).json({ message: 'Purchase not found' });
+      return sendErrorResponse(res, 404, 'Purchase not found');
     }
 
     // Revert stock changes from the purchase

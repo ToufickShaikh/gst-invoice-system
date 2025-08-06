@@ -4,7 +4,19 @@ const Customer = require('../models/Customer');
 const pdfGenerator = require('../utils/pdfGenerator');
 const { calculateTotals } = require('../utils/taxHelpers');
 const { v4: uuidv4 } = require('uuid');
-const { generateUpiQr } = require('../utils/upiHelper'); // Import UPI QR generator
+const { generateUpiQr } = require('../utils/upiHelper');
+const fs = require('fs');
+const path = require('path');
+
+// Helper function for consistent error responses
+const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
+    console.error(`[ERROR] ${message}:`, errorDetails);
+    res.status(statusCode).json({
+        message,
+        error: errorDetails ? errorDetails.message || errorDetails.toString() : 'Unknown error',
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined,
+    });
+};
 
 // Helper function to generate sequential invoice numbers
 async function generateInvoiceNumber(customerType) {
@@ -18,7 +30,7 @@ async function generateInvoiceNumber(customerType) {
 
         if (lastInvoice) {
             // Extract the number part from the invoice number (e.g., "B2B-05" -> 5)
-            const match = lastInvoice.invoiceNumber.match(new RegExp(`^${customerType}-(\\d+)$`));
+            const match = lastInvoice.invoiceNumber.match(new RegExp(`^${customerType}-(\d+)$`));
             if (match) {
                 nextNumber = parseInt(match[1]) + 1;
             }
@@ -68,8 +80,7 @@ const getInvoices = async (req, res) => {
 
         res.json(invoices);
     } catch (error) {
-        console.error('[ERROR] Failed to get invoices:', error);
-        res.status(500).json({ message: 'Failed to get invoices', error: error.message });
+        sendErrorResponse(res, 500, 'Failed to get invoices', error);
     }
 };
 
@@ -83,12 +94,12 @@ const getInvoiceById = async (req, res) => {
             .populate('items.item');
 
         if (!invoice) {
-            return res.status(404).json({ message: 'Invoice not found' });
+            return sendErrorResponse(res, 404, 'Invoice not found');
         }
 
         res.json(invoice);
     } catch (error) {
-        res.status(500).json({ message: error.message || 'Server error' });
+        sendErrorResponse(res, 500, 'Failed to get invoice', error);
     }
 };
 
@@ -97,72 +108,70 @@ const getInvoiceById = async (req, res) => {
 // @access  Private
 const createInvoice = async (req, res) => {
     console.log('--- Starting Invoice Creation ---');
+    const { customer, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '' } = req.body;
+
+    // Input validation
+    if (!customer || !items || items.length === 0) {
+        return sendErrorResponse(res, 400, 'Customer and at least one item are required');
+    }
+
     try {
-        const {
-            customer,
-            items,
-            discount = 0,
-            shippingCharges = 0,
-            paidAmount = 0,
-            paymentMethod = '',
-            billingType = ''
-        } = req.body;
-
-        console.log('[1/5] Received data for new invoice:', JSON.stringify(req.body, null, 2));
-
         // Ensure customer data is populated for tax calculation
         const customerDetails = await Customer.findById(customer);
         if (!customerDetails) {
-            console.error('[ERROR] Customer not found for ID:', customer);
-            return res.status(400).json({ message: 'Customer not found' });
+            return sendErrorResponse(res, 400, 'Customer not found');
+        }
+
+        // Validate items and check stock availability
+        for (const invoiceItem of items) {
+            if (!invoiceItem.item || !invoiceItem.quantity || invoiceItem.rate === undefined) {
+                return sendErrorResponse(res, 400, 'Each item must have an item ID, quantity, and rate');
+            }
+            if (invoiceItem.quantity <= 0) {
+                return sendErrorResponse(res, 400, 'Quantity must be greater than zero');
+            }
+            if (invoiceItem.rate < 0) {
+                return sendErrorResponse(res, 400, 'Rate cannot be negative');
+            }
+
+            const item = await Item.findById(invoiceItem.item);
+            if (!item) {
+                return sendErrorResponse(res, 404, `Item with ID ${invoiceItem.item} not found`);
+            }
+            if (item.quantityInStock < invoiceItem.quantity) {
+                return sendErrorResponse(res, 400, `Insufficient stock for ${item.name}. Available: ${item.quantityInStock}, Requested: ${invoiceItem.quantity}`);
+            }
         }
 
         // Recalculate totals on the backend to ensure data integrity
-        console.log('[2/5] Calculating totals based on items...');
         const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(items, customerDetails.state);
         const balance = grandTotal - paidAmount;
         const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
-        console.log('[2/5] Totals calculated:', { subTotal, taxAmount, totalTax, grandTotal, balance });
 
         // Generate sequential invoice number based on customer type
-        console.log('[3/5] Generating invoice number...');
         const customerType = customerDetails.customerType;
         const invoiceNumber = await generateInvoiceNumber(customerType);
-        console.log(`[3/5] Generated invoice number: ${invoiceNumber}`);
-
-        // Check stock availability and decrement
-        for (const invoiceItem of items) {
-            const item = await Item.findById(invoiceItem.item);
-            if (!item) {
-                return res.status(404).json({ message: `Item with ID ${invoiceItem.item} not found` });
-            }
-            if (item.quantityInStock < invoiceItem.quantity) {
-                return res.status(400).json({ message: `Insufficient stock for ${item.name}. Available: ${item.quantityInStock}, Requested: ${invoiceItem.quantity}` });
-            }
-        }
 
         const invoice = new Invoice({
             invoiceNumber,
             customer,
             items,
-            subTotal, // Use calculated subTotal
+            subTotal,
             cgst: taxAmount.cgst,
             sgst: taxAmount.sgst,
             igst: taxAmount.igst,
-            totalTax, // Use calculated totalTax
-            grandTotal, // Use calculated grandTotal
+            totalTax,
+            grandTotal,
             discount,
             shippingCharges,
             paidAmount,
             balance,
             paymentMethod,
             billingType,
-            totalAmount: grandTotal, // For reporting consistency
+            totalAmount: grandTotal,
         });
 
-        console.log('[4/5] Saving new invoice to database...');
         await invoice.save();
-        console.log('[4/5] Invoice saved successfully.');
 
         // Decrement stock quantities after successful save
         for (const invoiceItem of items) {
@@ -174,39 +183,36 @@ const createInvoice = async (req, res) => {
         // Optionally, generate PDF and return its path
         let pdfPath = null;
         try {
-            console.log('[4/4] Generating PDF...');
             pdfPath = await pdfGenerator.generateInvoicePDF(invoice);
             invoice.pdfPath = pdfPath;
             await invoice.save();
-            console.log('[4/4] PDF generated at:', pdfPath);
         } catch (e) {
             console.error('PDF generation failed during creation:', e);
+            // Do not block invoice creation if PDF fails
         }
 
-        console.log('--- Invoice Creation Finished ---');
         res.status(201).json(invoice);
     } catch (error) {
-        console.error('--- [ERROR] Invoice Creation Failed ---', error);
-        res.status(500).json({ message: error.message || 'Server error' });
+        sendErrorResponse(res, 500, 'Failed to create invoice', error);
     }
 };
 
-// Update an existing invoice by ID
-// @desc    Update an invoice
+// @desc    Update an existing invoice by ID
 // @route   PUT /api/billing/invoices/:id
 // @access  Private
 const updateInvoice = async (req, res) => {
-    console.log('--- Starting Invoice Update Process ---');
-    try {
-        const { id } = req.params;
-        const updatedData = req.body;
-        console.log(`[1/6] Received request to update invoice ${id}`);
-        console.log('[2/6] Request body:', JSON.stringify(updatedData, null, 2));
+    const { id } = req.params;
+    const { customer, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '' } = req.body;
 
-        // Fetch the original invoice to revert stock changes
+    // Input validation
+    if (!customer || !items || items.length === 0) {
+        return sendErrorResponse(res, 400, 'Customer and at least one item are required');
+    }
+
+    try {
         const originalInvoice = await Invoice.findById(id);
         if (!originalInvoice) {
-            return res.status(404).json({ message: 'Original invoice not found for update' });
+            return sendErrorResponse(res, 404, 'Original invoice not found for update');
         }
 
         // Revert stock for original items
@@ -216,119 +222,90 @@ const updateInvoice = async (req, res) => {
             });
         }
 
-        // Ensure items have all necessary data for recalculation
-        console.log('[3/6] Populating item data for recalculation...');
-        const populatedItems = await Promise.all(
-            updatedData.items.map(async (item) => {
-                // The item object from the frontend might just have item._id and quantity
-                if (item.rate && item.quantity && item.name) {
-                    return item; // Item has what we need
-                }
-                // If data is missing, fetch the full item details from DB
-                const itemDetails = await Item.findById(item.item || item._id);
-                if (!itemDetails) {
-                    // Throw an error if an item ID is invalid
-                    throw new Error(`Item with ID ${item.item || item._id} not found.`);
-                }
-                return {
-                    item: itemDetails._id,
-                    name: itemDetails.name,
-                    rate: itemDetails.rate,
-                    quantity: item.quantity, // Quantity from the frontend
-                };
-            })
-        );
-        console.log('[3/6] Item data populated successfully.');
+        // Ensure customer data is populated for tax calculation
+        const customerDetails = await Customer.findById(customer);
+        if (!customerDetails) {
+            return sendErrorResponse(res, 400, 'Customer for invoice not found');
+        }
 
-        updatedData.items = populatedItems;
+        // Validate items and check stock availability for new items
+        for (const updatedItem of items) {
+            if (!updatedItem.item || !updatedItem.quantity || updatedItem.rate === undefined) {
+                return sendErrorResponse(res, 400, 'Each item must have an item ID, quantity, and rate');
+            }
+            if (updatedItem.quantity <= 0) {
+                return sendErrorResponse(res, 400, 'Quantity must be greater than zero');
+            }
+            if (updatedItem.rate < 0) {
+                return sendErrorResponse(res, 400, 'Rate cannot be negative');
+            }
 
-        // Check stock availability for new items and decrement
-        for (const updatedItem of updatedData.items) {
             const item = await Item.findById(updatedItem.item);
             if (!item) {
-                return res.status(404).json({ message: `Item with ID ${updatedItem.item} not found` });
+                return sendErrorResponse(res, 404, `Item with ID ${updatedItem.item} not found`);
             }
-            // Only check if the quantity is increasing or if it's a new item
-            const originalQuantity = originalInvoice.items.find(oi => oi.item.toString() === updatedItem.item.toString())?.quantity || 0;
-            if (item.quantityInStock + originalQuantity < updatedItem.quantity) {
+            if (item.quantityInStock < updatedItem.quantity) {
                 // Revert changes made so far before sending error
-                for (const revertItem of updatedData.items) {
+                for (const revertItem of items) {
                     if (revertItem.item.toString() !== updatedItem.item.toString()) {
                         await Item.findByIdAndUpdate(revertItem.item, {
                             $inc: { quantityInStock: revertItem.quantity },
                         });
                     }
                 }
-                return res.status(400).json({ message: `Insufficient stock for ${item.name}. Available: ${item.quantityInStock + originalQuantity}, Requested: ${updatedItem.quantity}` });
+                return sendErrorResponse(res, 400, `Insufficient stock for ${item.name}. Available: ${item.quantityInStock}, Requested: ${updatedItem.quantity}`);
             }
         }
 
         // Recalculate totals based on updated items
-        console.log('[4/6] Recalculating invoice totals...');
-        const customerDetails = await Customer.findById(updatedData.customer._id || updatedData.customer);
-        if (!customerDetails) {
-            return res.status(404).json({ message: 'Customer for invoice not found' });
-        }
-
-        const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(
-            updatedData.items,
-            customerDetails.state
-        );
+        const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(items, customerDetails.state);
         const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
-        const balance = grandTotal - (updatedData.paidAmount || 0);
+        const balance = grandTotal - paidAmount;
 
-        updatedData.subTotal = subTotal;
-        updatedData.cgst = taxAmount.cgst;
-        updatedData.sgst = taxAmount.sgst;
-        updatedData.igst = taxAmount.igst;
-        updatedData.totalTax = totalTax;
-        updatedData.grandTotal = grandTotal;
-        updatedData.balance = balance;
-        updatedData.totalAmount = grandTotal; // For reporting consistency
-
-        console.log('[4/6] Invoice totals recalculated.');
-        console.log('Recalculated Totals:', { subTotal, taxAmount, grandTotal, balance });
-
-
-        // Perform the update in the database
-        console.log(`[5/6] Updating invoice ${id} in the database...`);
-        const updatedInvoice = await Invoice.findByIdAndUpdate(id, updatedData, {
-            new: true,
-            runValidators: true,
-        })
+        const updatedInvoice = await Invoice.findByIdAndUpdate(id, {
+            customer,
+            items,
+            subTotal,
+            cgst: taxAmount.cgst,
+            sgst: taxAmount.sgst,
+            igst: taxAmount.igst,
+            totalTax,
+            grandTotal,
+            discount,
+            shippingCharges,
+            paidAmount,
+            balance,
+            paymentMethod,
+            billingType,
+            totalAmount: grandTotal,
+        }, { new: true, runValidators: true })
             .populate('customer')
             .populate('items.item');
 
         if (!updatedInvoice) {
-            console.error(`[ERROR] Invoice with ID ${id} not found for update.`);
-            return res.status(404).json({ message: 'Invoice not found' });
+            return sendErrorResponse(res, 404, 'Invoice not found');
         }
-        console.log(`[5/6] Invoice ${id} updated successfully in DB.`);
 
         // Decrement stock for updated items
-        for (const updatedItem of updatedData.items) {
+        for (const updatedItem of items) {
             await Item.findByIdAndUpdate(updatedItem.item, {
                 $inc: { quantityInStock: -updatedItem.quantity },
             });
         }
 
         // After successful update, regenerate the PDF
-        console.log(`[6/6] Regenerating PDF for invoice ${id}...`);
         let pdfPath = null;
         try {
             pdfPath = await pdfGenerator.generateInvoicePDF(updatedInvoice);
             updatedInvoice.pdfPath = pdfPath;
             await updatedInvoice.save();
-            console.log(`[6/6] PDF for invoice ${id} regenerated.`);
         } catch (e) {
             console.error(`[WARN] PDF regeneration failed for invoice ${id}:`, e);
         }
-        console.log('--- Invoice Update Process Finished ---');
+
         res.json(updatedInvoice);
     } catch (error) {
-        console.error('--- [ERROR] Invoice Update Process Failed ---');
-        console.error('Error details:', error);
-        res.status(500).json({ message: 'Failed to update invoice', error: error.message });
+        sendErrorResponse(res, 500, 'Failed to update invoice', error);
     }
 };
 
@@ -341,7 +318,7 @@ const deleteInvoice = async (req, res) => {
         const invoice = await Invoice.findById(id);
 
         if (!invoice) {
-            return res.status(404).json({ message: 'Invoice not found' });
+            return sendErrorResponse(res, 404, 'Invoice not found');
         }
 
         // Revert stock changes
@@ -351,12 +328,20 @@ const deleteInvoice = async (req, res) => {
             });
         }
 
-        await invoice.deleteOne(); // Use the instance method to remove
+        // Delete associated PDF file if it exists
+        if (invoice.pdfPath) {
+            const fullPath = path.join(__dirname, '../invoices', path.basename(invoice.pdfPath));
+            if (fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
+                console.log(`[INFO] Deleted PDF file: ${fullPath}`);
+            }
+        }
+
+        await invoice.deleteOne();
 
         res.json({ message: 'Invoice removed successfully' });
     } catch (error) {
-        console.error('[ERROR] Failed to delete invoice:', error);
-        res.status(500).json({ message: 'Failed to delete invoice', error: error.message });
+        sendErrorResponse(res, 500, 'Failed to delete invoice', error);
     }
 };
 
@@ -364,16 +349,11 @@ const deleteInvoice = async (req, res) => {
 const reprintInvoice = async (req, res) => {
     try {
         const invoiceId = req.params.id;
-        console.log(`[INFO] Starting reprint for invoice: ${invoiceId}`);
-
         const invoice = await Invoice.findById(invoiceId).populate('customer').populate('items.item');
 
         if (!invoice) {
-            console.error(`[ERROR] Invoice not found: ${invoiceId}`);
-            return res.status(404).json({ message: 'Invoice not found' });
+            return sendErrorResponse(res, 404, 'Invoice not found');
         }
-
-        console.log(`[INFO] Found invoice: ${invoice.invoiceNumber}`);
 
         // If grandTotal is 0 or null, it's likely a legacy invoice. Let's recalculate.
         const currentTotal = invoice.grandTotal || invoice.totalAmount || 0;
@@ -381,12 +361,10 @@ const reprintInvoice = async (req, res) => {
             console.warn(`[WARN] Reprinting legacy invoice ${invoiceId} with invalid grandTotal. Attempting to recalculate.`);
 
             if (!invoice.customer) {
-                console.error(`[ERROR] Cannot recalculate for reprint: Customer data is missing for invoice ${invoiceId}`);
-                return res.status(400).json({ message: 'Cannot recalculate for reprint: Customer data is missing.' });
+                return sendErrorResponse(res, 400, 'Cannot recalculate for reprint: Customer data is missing.');
             }
             if (!invoice.items || invoice.items.length === 0 || invoice.items.some(i => !i.item)) {
-                console.error(`[ERROR] Cannot recalculate for reprint: Item data is missing for invoice ${invoiceId}`);
-                return res.status(400).json({ message: 'Cannot recalculate for reprint: Item data is missing or not fully populated.' });
+                return sendErrorResponse(res, 400, 'Cannot recalculate for reprint: Item data is missing or not fully populated.');
             }
 
             // Recalculate totals
@@ -402,8 +380,6 @@ const reprintInvoice = async (req, res) => {
             const newTotalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
             const newBalance = newGrandTotal - (invoice.paidAmount || 0);
 
-            console.log('[INFO] Recalculated Totals for reprint:', { newGrandTotal, newBalance });
-
             // Update the invoice in the DB to fix legacy data
             invoice.subTotal = subTotal;
             invoice.cgst = taxAmount.cgst;
@@ -415,70 +391,46 @@ const reprintInvoice = async (req, res) => {
             invoice.totalAmount = newGrandTotal;
 
             await invoice.save();
-            console.log(`[SUCCESS] Legacy invoice ${invoiceId} has been updated during reprint.`);
         }
 
-        console.log(`[INFO] Generating PDF for invoice: ${invoice.invoiceNumber}`);
         const pdfPath = await pdfGenerator.generateInvoicePDF(invoice);
         invoice.pdfPath = pdfPath;
         await invoice.save();
 
-        console.log(`[SUCCESS] PDF generated successfully: ${pdfPath}`);
         res.json({ pdfPath, message: 'Invoice reprinted successfully' });
     } catch (error) {
-        console.error('[ERROR] Failed to reprint invoice:', error);
-        console.error('[ERROR] Stack trace:', error.stack);
-        res.status(500).json({
-            message: 'Failed to generate PDF',
-            error: error.message,
-            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+        sendErrorResponse(res, 500, 'Failed to generate PDF', error);
     }
 };
 
 // Dashboard stats endpoint
 const getDashboardStats = async (req, res) => {
-    console.log('Fetching dashboard stats with query:', req.query);
     try {
         const { startDate, endDate } = req.query;
 
-        // Build the date range query for aggregations using invoiceDate field
         let dateQuery = {};
-        let hasDateFilter = false;
-
-        if (startDate || endDate) {
-            hasDateFilter = true;
-            console.log(`Applying date filter: startDate=${startDate}, endDate=${endDate}`);
-
-            if (startDate) {
-                dateQuery.invoiceDate = { ...dateQuery.invoiceDate, $gte: new Date(startDate) };
-            }
-            if (endDate) {
-                const end = new Date(endDate);
-                end.setUTCHours(23, 59, 59, 999); // Set to the end of the day
-                dateQuery.invoiceDate = { ...dateQuery.invoiceDate, $lte: end };
-            }
+        if (startDate) {
+            dateQuery.createdAt = { ...dateQuery.createdAt, $gte: new Date(startDate) };
+        }
+        if (endDate) {
+            const end = new Date(endDate);
+            end.setUTCHours(23, 59, 59, 999); // Set to the end of the day
+            dateQuery.createdAt = { ...dateQuery.createdAt, $lte: end };
         }
 
-        console.log('Constructed date query for invoices:', JSON.stringify(dateQuery));
-        console.log('Has date filter:', hasDateFilter, 'Using date query:', Object.keys(dateQuery).length > 0);
-
         const totalInvoices = await Invoice.countDocuments(dateQuery);
-        // Customer count is not typically filtered by invoice date range, so we count all customers.
         const totalCustomers = await Customer.countDocuments();
 
         const invoiceData = await Invoice.aggregate([
-            { $match: dateQuery }, // Apply date filter (may be empty)
-            {
+            { $match: dateQuery },
+            {   
                 $group: {
                     _id: null,
-                    totalRevenue: { $sum: '$grandTotal' }, // Use grandTotal for revenue
+                    totalRevenue: { $sum: '$grandTotal' },
                     totalPaid: { $sum: '$paidAmount' },
                 },
             },
         ]);
-
-        console.log('Invoice aggregation result:', invoiceData);
 
         const stats = {
             totalInvoices,
@@ -487,11 +439,9 @@ const getDashboardStats = async (req, res) => {
             totalPaid: invoiceData[0]?.totalPaid || 0,
             balanceDue: (invoiceData[0]?.totalRevenue || 0) - (invoiceData[0]?.totalPaid || 0),
         };
-        console.log('Dashboard stats fetched successfully:', stats);
         res.json(stats);
     } catch (error) {
-        console.error('[ERROR] Failed to fetch dashboard stats:', error);
-        res.status(500).json({ message: 'Failed to fetch dashboard stats', error: error.message });
+        sendErrorResponse(res, 500, 'Failed to fetch dashboard stats', error);
     }
 };
 
@@ -501,44 +451,32 @@ const getDashboardStats = async (req, res) => {
  * @access  Private
  */
 const generatePaymentQr = async (req, res) => {
-    console.log(`--- Generating Payment QR for Invoice ID: ${req.params.id} --`);
     try {
         const invoiceId = req.params.id;
-        // Populate all related data in case a recalculation is needed
         const invoice = await Invoice.findById(invoiceId)
             .populate('customer')
             .populate('items.item');
 
         if (!invoice) {
-            console.error(`[ERROR] Invoice not found for ID: ${invoiceId}`);
-            return res.status(404).json({ message: 'Invoice not found' });
+            return sendErrorResponse(res, 404, 'Invoice not found');
         }
 
         let grandTotal = invoice.grandTotal || 0;
         let paidAmount = invoice.paidAmount || 0;
         let balance = grandTotal - paidAmount;
 
-        console.log(`[INFO] Initial Details: Grand Total=${grandTotal}, Paid Amount=${paidAmount}, Balance=${balance}`);
-
         // If grandTotal is 0, it's likely a legacy invoice. Let's recalculate.
         if (grandTotal <= 0) {
-            console.warn(`[WARN] grandTotal is ${grandTotal}. Attempting to recalculate for legacy invoice.`);
-
             if (!invoice.customer) {
-                return res.status(400).json({ message: 'Cannot recalculate: Customer data is missing.' });
+                return sendErrorResponse(res, 400, 'Cannot recalculate: Customer data is missing.');
             }
             if (!invoice.items || invoice.items.length === 0 || invoice.items.some(i => !i.item)) {
-                return res.status(400).json({ message: 'Cannot recalculate: Item data is missing or not fully populated.' });
+                return sendErrorResponse(res, 400, 'Cannot recalculate: Item data is missing or not fully populated.');
             }
 
-            // Recalculate totals
             const populatedItemsForRecalc = invoice.items.map(i => {
-                // Ensure we have a plain object with all necessary properties for calculation
                 const itemData = i.item.toObject ? i.item.toObject() : i.item;
-                return {
-                    ...itemData,
-                    quantity: i.quantity
-                };
+                return { ...itemData, quantity: i.quantity };
             });
 
             const { subTotal, taxAmount, totalAmount: newGrandTotal } = calculateTotals(
@@ -548,9 +486,6 @@ const generatePaymentQr = async (req, res) => {
             const newTotalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
             const newBalance = newGrandTotal - paidAmount;
 
-            console.log('[INFO] Recalculated Totals:', { newGrandTotal, newBalance });
-
-            // Update the invoice in the DB to fix legacy data
             invoice.subTotal = subTotal;
             invoice.cgst = taxAmount.cgst;
             invoice.sgst = taxAmount.sgst;
@@ -561,31 +496,22 @@ const generatePaymentQr = async (req, res) => {
             invoice.totalAmount = newGrandTotal;
 
             await invoice.save();
-            console.log(`[SUCCESS] Legacy invoice ${invoiceId} has been updated with correct totals.`);
 
-            // Use the new values for QR generation
             grandTotal = newGrandTotal;
             balance = newBalance;
         }
 
-
         if (balance <= 0) {
-            console.warn(`[WARN] Request denied: Invoice is already fully paid or has zero balance. Balance: ${balance}`);
-            return res.status(400).json({ message: 'Invoice is already fully paid' });
+            return sendErrorResponse(res, 400, 'Invoice is already fully paid');
         }
 
-        // Use environment variable for UPI ID, with a fallback
         const upiId = process.env.UPI_ID || 'shaikhtool@ibl';
-        console.log(`[INFO] Generating QR with UPI ID: ${upiId} for amount: ${balance.toFixed(2)}`);
-
         const { qrCodeImage } = await generateUpiQr(upiId, balance.toFixed(2));
 
-        console.log(`[SUCCESS] QR code generated successfully.`);
         res.json({ qrCodeImage });
 
     } catch (error) {
-        console.error(`[FATAL] An unexpected error occurred:`, error);
-        res.status(500).json({ message: error.message || 'Server error' });
+        sendErrorResponse(res, 500, 'Failed to generate QR code', error);
     }
 };
 
@@ -593,48 +519,38 @@ const generatePaymentQr = async (req, res) => {
 // @route   GET /api/billing/public/pdf/:invoiceId
 // @access  Public
 const generatePublicPdf = async (req, res) => {
-    console.log('--- Public PDF Generation Request ---');
     try {
         const { invoiceId } = req.params;
 
-        // Find the invoice
         const invoice = await Invoice.findById(invoiceId)
             .populate('customer')
             .populate('items.item');
 
         if (!invoice) {
-            return res.status(404).json({ message: 'Invoice not found' });
+            return sendErrorResponse(res, 404, 'Invoice not found');
         }
 
-        console.log(`Generating public PDF for invoice: ${invoice.invoiceNumber}`);
-
-        // Generate PDF with a temporary filename
         const tempFileName = `public-invoice-${invoiceId}-${Date.now()}.pdf`;
-        const pdfPath = await pdfGenerator.generateInvoicePdf(invoice, tempFileName);
+        const pdfPath = await pdfGenerator.generateInvoicePDF(invoice, tempFileName);
 
-        // Set headers for PDF download
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`);
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
 
-        // Send the PDF file
         res.sendFile(pdfPath, (err) => {
             if (err) {
                 console.error('Error sending PDF file:', err);
                 if (!res.headersSent) {
-                    res.status(500).json({ message: 'Error sending PDF file' });
+                    sendErrorResponse(res, 500, 'Error sending PDF file', err);
                 }
             }
 
-            // Auto-delete the file after 1 minute
             setTimeout(() => {
-                const fs = require('fs');
                 try {
-                    if (fs.existsSync(pdfPath)) {
-                        fs.unlinkSync(pdfPath);
-                        console.log(`Temporary PDF deleted: ${tempFileName}`);
+                    if (fs.existsSync(fullPath)) {
+                        fs.unlinkSync(fullPath);
                     }
                 } catch (deleteError) {
                     console.error('Error deleting temporary PDF:', deleteError);
@@ -643,11 +559,7 @@ const generatePublicPdf = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[ERROR] Public PDF generation failed:', error);
-        res.status(500).json({
-            message: 'Failed to generate PDF',
-            error: error.message
-        });
+        sendErrorResponse(res, 500, 'Public PDF generation failed', error);
     }
 };
 
@@ -660,5 +572,5 @@ module.exports = {
     getInvoices,
     getInvoiceById,
     deleteInvoice,
-    generatePublicPdf, // Export the new function
+    generatePublicPdf,
 };

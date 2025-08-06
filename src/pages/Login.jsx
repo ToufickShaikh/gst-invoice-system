@@ -2,15 +2,16 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
-import { authAPI } from '../api/auth'
 import InputField from '../components/InputField'
 import Button from '../components/Button'
 
 const Login = () => {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, register } = useAuth()
+  const [isRegisterMode, setIsRegisterMode] = useState(false)
   const [formData, setFormData] = useState({
     username: '',
+    email: '',
     password: ''
   })
   const [loading, setLoading] = useState(false)
@@ -24,12 +25,18 @@ const Login = () => {
     setLoading(true)
 
     try {
-      const response = await authAPI.login(formData)
-      login(response.user)
-      toast.success('Login successful!')
-      navigate('/dashboard')
+      if (isRegisterMode) {
+        await register(formData.username, formData.email, formData.password)
+        toast.success('Registration successful! Please log in.')
+        setIsRegisterMode(false) // Switch to login mode after successful registration
+      } else {
+        await login(formData.username, formData.password)
+        toast.success('Login successful!')
+        navigate('/dashboard')
+      }
     } catch (error) {
-      toast.error('Invalid credentials')
+      const errorMessage = error.response?.data?.message || 'An error occurred. Please try again.'
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -56,6 +63,17 @@ const Login = () => {
               placeholder="Enter username"
               required
             />
+            {isRegisterMode && (
+              <InputField
+                label="Email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter email address"
+                required
+              />
+            )}
             <InputField
               label="Password"
               type="password"
@@ -71,11 +89,33 @@ const Login = () => {
               className="w-full"
               disabled={loading}
             >
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? (isRegisterMode ? 'Registering...' : 'Logging in...') : (isRegisterMode ? 'Register' : 'Login')}
             </Button>
           </form>
           <p className="text-sm text-gray-600 text-center mt-4">
-            Demo: username: hokage, password: admin
+            {isRegisterMode ? (
+              <>
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsRegisterMode(false)}
+                  className="text-yellow-600 hover:text-yellow-800 font-medium focus:outline-none"
+                >
+                  Login
+                </button>
+              </>
+            ) : (
+              <>
+                Don't have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsRegisterMode(true)}
+                  className="text-yellow-600 hover:text-yellow-800 font-medium focus:outline-none"
+                >
+                  Register
+                </button>
+              </>
+            )}
           </p>
 
           {/* Developer Credit */}
