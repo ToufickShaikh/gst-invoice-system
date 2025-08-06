@@ -1,44 +1,96 @@
 // Controller for item CRUD operations
 const Item = require('../models/Item.js');
 
-// Get all items
+// Helper function for consistent error responses
+const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
+    console.error(`[ERROR] ${message}:`, errorDetails);
+    res.status(statusCode).json({
+        message,
+        error: errorDetails ? errorDetails.message || errorDetails.toString() : 'Unknown error',
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined,
+    });
+};
+
+// @desc    Get all items or a single item by ID
+// @route   GET /api/items
+// @route   GET /api/items/:id
+// @access  Private
 const getItems = async (req, res) => {
     try {
-        const items = await Item.find();
-        res.json(items);
+        if (req.params.id) {
+            const item = await Item.findById(req.params.id);
+            if (!item) {
+                return res.status(404).json({ message: 'Item not found' });
+            }
+            res.json(item);
+        } else {
+            const items = await Item.find(req.query).sort({ name: 1 });
+            res.json(items);
+        }
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        sendErrorResponse(res, 500, 'Failed to retrieve items', error);
     }
 };
 
-// Create a new item
+// @desc    Create a new item
+// @route   POST /api/items
+// @access  Private
 const createItem = async (req, res) => {
     try {
+        console.log('[ITEM] Create request received:', req.body);
         const item = new Item(req.body);
         await item.save();
+        console.log('[ITEM] Item created successfully:', item._id);
         res.status(201).json(item);
     } catch (error) {
-        res.status(400).json({ message: 'Error creating item' });
+        console.error('[ITEM] Error creating item:', error);
+        if (error.name === 'ValidationError') {
+            const validationErrors = Object.values(error.errors).map(err => err.message);
+            sendErrorResponse(res, 400, 'Validation failed', { messages: validationErrors, details: error.errors });
+        } else {
+            sendErrorResponse(res, 500, 'Failed to create item', error);
+        }
     }
 };
 
-// Update an existing item by ID
+// @desc    Update an existing item by ID
+// @route   PUT /api/items/:id
+// @access  Private
 const updateItem = async (req, res) => {
     try {
-        const item = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        console.log('[ITEM] Update request for ID:', req.params.id);
+        console.log('[ITEM] Update data:', req.body);
+        const item = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!item) {
+            return res.status(404).json({ message: 'Item not found' });
+        }
+        console.log('[ITEM] Item updated successfully:', item._id);
         res.json(item);
     } catch (error) {
-        res.status(400).json({ message: 'Error updating item' });
+        console.error('[ITEM] Error updating item:', error);
+        if (error.name === 'ValidationError') {
+            const validationErrors = Object.values(error.errors).map(err => err.message);
+            sendErrorResponse(res, 400, 'Validation failed', { messages: validationErrors, details: error.errors });
+        } else {
+            sendErrorResponse(res, 500, 'Failed to update item', error);
+        }
     }
 };
 
-// Delete an item by ID
+// @desc    Delete an item by ID
+// @route   DELETE /api/items/:id
+// @access  Private
 const deleteItem = async (req, res) => {
     try {
-        await Item.findByIdAndDelete(req.params.id);
+        console.log('[ITEM] Delete request for ID:', req.params.id);
+        const item = await Item.findByIdAndDelete(req.params.id);
+        if (!item) {
+            return res.status(404).json({ message: 'Item not found' });
+        }
+        console.log('[ITEM] Item deleted successfully:', item._id);
         res.json({ message: 'Item deleted' });
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        sendErrorResponse(res, 500, 'Failed to delete item', error);
     }
 };
 

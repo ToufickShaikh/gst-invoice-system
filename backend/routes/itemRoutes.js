@@ -3,6 +3,7 @@ const { getItems, createItem, updateItem, deleteItem } = require('../controllers
 
 const router = express.Router();
 
+router.get('/:id', getItems);
 router.get('/', getItems);
 router.post('/', createItem);
 router.put('/:id', updateItem);
