@@ -1,23 +1,20 @@
-// frontend/src/api/items.js
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+import axiosInstance from './axiosInstance';
 
 export const itemsAPI = {
   getAll: async () => {
-    const res = await axios.get(`${API_BASE_URL}/items`);
+    const res = await axiosInstance.get(`/items`);
     return res.data;
   },
   create: async (item) => {
-    const res = await axios.post(`${API_BASE_URL}/items`, item);
+    const res = await axiosInstance.post(`/items`, item);
     return res.data;
   },
   update: async (id, item) => {
-    const res = await axios.put(`${API_BASE_URL}/items/${id}`, item);
+    const res = await axiosInstance.put(`/items/${id}`, item);
     return res.data;
   },
   delete: async (id) => {
-    const res = await axios.delete(`${API_BASE_URL}/items/${id}`);
+    const res = await axiosInstance.delete(`/items/${id}`);
     return res.data;
   }
 };
