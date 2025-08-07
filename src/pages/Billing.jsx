@@ -521,6 +521,21 @@ const Billing = () => {
     }
   }
 
+  const handleCustomerSelect = (customerId) => {
+    setSelectedCustomer(customerId)
+    const customer = customers.find(c => c._id === customerId)
+    if (customer) {
+      setBillingType(customer.customerType)
+      if (customer.customerType === 'B2B') {
+        detectTaxType(customer)
+      }
+    }
+  }
+
+  const clearCustomerSelection = () => {
+    setSelectedCustomer('')
+  }
+
   return (
     <Layout>
       <div className="space-y-6 px-4 sm:px-6 lg:px-8">
