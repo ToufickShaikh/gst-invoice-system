@@ -165,11 +165,23 @@ const Purchases = () => {
       }
     }
     try {
+      // Convert string values to numbers before sending
+      const processedFormData = {
+        ...formData,
+        items: formData.items.map(item => ({
+          ...item,
+          quantity: parseInt(item.quantity),
+          purchasePrice: parseFloat(item.purchasePrice)
+        }))
+      };
+      
+      console.log('Submitting purchase data:', processedFormData);
       if (isEditMode) {
-        await purchasesAPI.updatePurchase(currentPurchaseId, formData);
+        await purchasesAPI.updatePurchase(currentPurchaseId, processedFormData);
         toast.success('Purchase updated successfully');
       } else {
-        await purchasesAPI.createPurchase(formData);
+        const result = await purchasesAPI.createPurchase(processedFormData);
+        console.log('Purchase created successfully:', result);
         // Backend automatically updates stock for purchases
         toast.success('Purchase created successfully');
       }
@@ -178,8 +190,19 @@ const Purchases = () => {
       setIsModalOpen(false);
       setIsEditMode(false);
       setCurrentPurchaseId(null);
+      // Reset form data
+      setFormData({ 
+        supplier: '', 
+        items: [{ item: '', quantity: 1, purchasePrice: 0 }], 
+        notes: '' 
+      });
     } catch (error) {
-      toast.error(`Failed to ${isEditMode ? 'update' : 'create'} purchase`);
+      console.error('Purchase operation error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
+      toast.error(`Failed to ${isEditMode ? 'update' : 'create'} purchase: ${errorMessage}`);
     }
   };
 
@@ -190,7 +213,11 @@ const Purchases = () => {
           <h1 className="text-2xl font-bold">Purchases</h1>
           <Button onClick={() => {
             setIsEditMode(false);
-            setFormData({ supplier: '', items: [], notes: '' });
+            setFormData({ 
+              supplier: '', 
+              items: [{ item: '', quantity: 1, purchasePrice: 0 }], // Initialize with one empty item
+              notes: '' 
+            });
             setIsModalOpen(true);
           }}>Add Purchase</Button>
         </div>
