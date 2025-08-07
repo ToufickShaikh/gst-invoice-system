@@ -132,7 +132,7 @@ const CustomerSelect = ({
                           {billingType === 'B2B' && customer.gstNo && ` • GST: ${customer.gstNo}`}
                         </div>
                       </div>
-                    ));
+                    })
                   ) : (
                     <div className="px-3 py-4 text-center text-gray-500">
                       {customerSearch.trim() ? 'No customers found' : 'Start typing to search customers'}
