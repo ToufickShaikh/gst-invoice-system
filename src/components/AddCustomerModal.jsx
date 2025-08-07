@@ -125,7 +125,7 @@ const AddCustomerModal = ({
   return (
     <Modal
       isOpen={isOpen}
-      onRequestClose={onClose}
+      onClose={onClose}
       contentLabel="Add Customer"
       className="max-w-lg mx-auto p-6 rounded-lg shadow-lg bg-white"
     >

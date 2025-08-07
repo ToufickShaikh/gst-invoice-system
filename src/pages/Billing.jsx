@@ -10,8 +10,9 @@ import { customersAPI } from '../api/customers'
 import { itemsAPI } from '../api/items'
 import { billingAPI } from '../api/billing'
 import { gstAPI } from '../api/gst'
-import { calculateTax, calculateTotal } from '../utils/taxCalculations'
+import { calculateTax } from '../utils/taxCalculations'
 import { formatCurrency } from '../utils/dateHelpers'
+import BillItemRow from '../components/BillItemRow'
 
 const Billing = () => {
   const navigate = useNavigate()
@@ -48,14 +49,9 @@ const Billing = () => {
   })
   const [addingItem, setAddingItem] = useState(false)
 
-  // Searchable Customer Dropdown states
-  const [customerSearch, setCustomerSearch] = useState('')
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
-  const [filteredCustomers, setFilteredCustomers] = useState([])
+  
 
-  // Items Search states
-  const [itemSearch, setItemSearch] = useState('')
-  const [filteredItems, setFilteredItems] = useState([])
+  
 
   useEffect(() => {
     fetchData()
@@ -69,43 +65,9 @@ const Billing = () => {
     }
   }, [editInvoiceId, customers, items])
 
-  // Filter customers based on search term
-  useEffect(() => {
-    if (!customerSearch.trim()) {
-      setFilteredCustomers(customers)
-    } else {
-      const searchTerm = customerSearch.toLowerCase()
-      const filtered = customers.filter(customer => {
-        const name = billingType === 'B2B' ? customer.firmName : customer.name
-        const contact = customer.contact || ''
-        const email = customer.email || ''
+  
 
-        return (
-          name?.toLowerCase().includes(searchTerm) ||
-          contact.includes(searchTerm) ||
-          email.toLowerCase().includes(searchTerm)
-        )
-      })
-      setFilteredCustomers(filtered)
-    }
-  }, [customers, customerSearch, billingType])
-
-  // Filter items based on search term
-  useEffect(() => {
-    if (!itemSearch.trim()) {
-      setFilteredItems(items)
-    } else {
-      const searchTerm = itemSearch.toLowerCase()
-      const filtered = items.filter(item => {
-        return (
-          item.name?.toLowerCase().includes(searchTerm) ||
-          item.hsnCode?.toLowerCase().includes(searchTerm) ||
-          item.units?.toLowerCase().includes(searchTerm)
-        )
-      })
-      setFilteredItems(filtered)
-    }
-  }, [items, itemSearch])
+  
 
   const fetchData = async () => {
     try {
@@ -166,49 +128,34 @@ const Billing = () => {
   // Load invoice data for editing
   const loadInvoiceForEditing = async (invoiceId) => {
     if (loading) {
-      console.log('Already loading, skipping...')
       return
     }
 
     try {
-      console.log('Starting to load invoice for editing:', invoiceId)
       setLoading(true)
 
-      // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Request timeout after 15 seconds')), 15000)
       )
 
-      console.log('Calling API to get invoice...')
       const response = await Promise.race([
         billingAPI.getInvoiceById(invoiceId),
         timeoutPromise
       ])
-      console.log('API response received:', response)
 
       const invoice = response.data || response
 
       if (invoice) {
-        console.log('Invoice data found:', invoice)
         setEditingInvoice(invoice)
-
-        // Find and set customer (check both local customers and invoice customer data)
-        console.log('Looking for customer in:', customers.length, 'customers')
-        console.log('Invoice customer data:', invoice.customer)
 
         let customer = customers.find(c => c._id === invoice.customer || c._id === invoice.customer?._id)
 
-        // If not found in local customers, use the customer data from invoice
         if (!customer && invoice.customer) {
-          console.log('Customer not found in local list, using invoice customer data')
           customer = typeof invoice.customer === 'object' ? invoice.customer : null
-
-          // Add to local customers list if it's a full customer object
           if (customer && customer._id) {
             setCustomers(prev => {
               const exists = prev.find(c => c._id === customer._id)
               if (!exists) {
-                console.log('Adding customer to local list:', customer)
                 return [...prev, customer]
               }
               return prev
@@ -217,42 +164,25 @@ const Billing = () => {
         }
 
         if (customer) {
-          console.log('Customer found/used:', customer)
-          console.log('Setting billing type to:', customer.customerType)
           setBillingType(customer.customerType)
           setSelectedCustomer(customer._id)
-
-          // Set customer search display text
           const displayName = customer.customerType === 'B2B' ? customer.firmName : customer.name
           const searchText = `${displayName} - ${customer.contact}`
-          console.log('Setting customer search text:', searchText)
           setCustomerSearch(searchText)
-
-          // Detect tax type for the customer
           if (customer.customerType === 'B2B') {
             detectTaxType(customer)
           }
-        } else {
-          console.warn('Customer not found for invoice.customer:', invoice.customer)
         }
 
-        // Map items properly with full item details
-        console.log('Mapping invoice items:', invoice.items?.length || 0, 'items')
-        console.log('Available items in store:', items.length)
-
-        const mappedItems = (invoice.items || []).map((invoiceItem, index) => {
-          console.log(`Mapping item ${index + 1}:`, invoiceItem)
-
-          // Find the item in the items list
+        const mappedItems = (invoice.items || []).map((invoiceItem) => {
           const fullItem = items.find(item =>
             item._id === invoiceItem.item ||
             item._id === invoiceItem.item?._id ||
             item.name === invoiceItem.name
           )
 
-          console.log(`Found full item for ${invoiceItem.name}:`, fullItem)
-
-          const mappedItem = {
+          return {
+            id: Date.now() + Math.random(), // Assign a unique ID for the BillItemRow key
             item: fullItem || {
               _id: invoiceItem.item || invoiceItem.item?._id,
               name: invoiceItem.name,
@@ -266,14 +196,10 @@ const Billing = () => {
             customRate: invoiceItem.rate !== invoiceItem.originalRate ? invoiceItem.rate : '',
             effectiveRate: invoiceItem.rate,
             itemDiscountAmount: invoiceItem.itemDiscount || 0,
-            searchValue: '' // Initialize search value for existing items
+            searchValue: fullItem ? `${fullItem.name} - ${formatCurrency(fullItem.rate)} ${fullItem.units || 'per piece'} - ${fullItem.taxSlab}% GST` : ''
           }
-
-          console.log(`Mapped item ${index + 1}:`, mappedItem)
-          return mappedItem
         })
 
-        console.log('All mapped items:', mappedItems)
         setBillItems(mappedItems)
         setDiscountAmt(invoice.discountAmt || invoice.discount || 0)
         setShippingCharges(invoice.shippingCharges || 0)
@@ -282,7 +208,6 @@ const Billing = () => {
 
         toast.success('Invoice loaded for editing!')
       } else {
-        console.error('No invoice data received')
         toast.error('No invoice data found')
         navigate('/invoices')
       }
@@ -299,87 +224,11 @@ const Billing = () => {
       }
       navigate('/invoices')
     } finally {
-      console.log('Finished loading invoice data')
       setLoading(false)
     }
   }
 
-  const handleCustomerChange = (customerId) => {
-    setSelectedCustomer(customerId)
-
-    if (customerId && billingType === 'B2B') {
-      const customer = customers.find(c => c._id === customerId)
-      if (customer) {
-        detectTaxType(customer)
-      }
-    } else {
-      setTaxType('CGST_SGST') // Default for B2C
-    }
-  }
-
-  const handleCustomerSearchChange = (value) => {
-    setCustomerSearch(value)
-    setShowCustomerDropdown(true)
-    if (!value.trim()) {
-      setSelectedCustomer('')
-    }
-  }
-
-  const handleItemSearchChange = (value, index) => {
-    setItemSearch(value)
-    // Update the specific item's search value
-    const updatedItems = [...billItems]
-    updatedItems[index] = {
-      ...updatedItems[index],
-      searchValue: value
-    }
-    setBillItems(updatedItems)
-  }
-
-  const handleItemSelect = (item, index) => {
-    const updatedItems = [...billItems]
-    updatedItems[index] = {
-      ...updatedItems[index],
-      itemId: item._id,
-      item: item,
-      customRate: item.rate,
-      searchValue: `${item.name} - ${formatCurrency(item.rate)} ${item.units || 'per piece'} - ${item.taxSlab}% GST`
-    }
-    setBillItems(updatedItems)
-    setItemSearch('') // Clear global search
-  }
-
-  const clearItemSelection = (index) => {
-    const updatedItems = [...billItems]
-    updatedItems[index] = {
-      ...updatedItems[index],
-      itemId: '',
-      item: null,
-      customRate: '',
-      searchValue: ''
-    }
-    setBillItems(updatedItems)
-  }
-
-  const handleCustomerSelect = (customer) => {
-    const displayName = billingType === 'B2B' ? customer.firmName : customer.name
-    setCustomerSearch(`${displayName} - ${customer.contact}`)
-    setSelectedCustomer(customer._id)
-    setShowCustomerDropdown(false)
-
-    if (billingType === 'B2B') {
-      detectTaxType(customer)
-    } else {
-      setTaxType('CGST_SGST')
-    }
-  }
-
-  const clearCustomerSelection = () => {
-    setCustomerSearch('')
-    setSelectedCustomer('')
-    setShowCustomerDropdown(false)
-    setTaxType('CGST_SGST')
-  }
+  
 
   const handleAddItem = () => {
     const newItem = {
@@ -396,17 +245,7 @@ const Billing = () => {
 
   const handleItemChange = (index, field, value) => {
     const updatedItems = [...billItems]
-    if (field === 'itemId') {
-      const selectedItem = items.find(i => i._id === value)
-      updatedItems[index] = {
-        ...updatedItems[index],
-        itemId: value,
-        item: selectedItem,
-        customRate: selectedItem ? selectedItem.rate : '' // Initialize custom rate with original rate
-      }
-    } else {
-      updatedItems[index][field] = value
-    }
+    updatedItems[index][field] = value
     setBillItems(updatedItems)
   }
 
@@ -414,44 +253,31 @@ const Billing = () => {
     setBillItems(billItems.filter((_, i) => i !== index))
   }
 
-  const getCustomerDetails = () => {
-    // First try to find customer in local customers array
-    let customer = customers.find(c => c._id === selectedCustomer)
-
-    // If not found and in edit mode, try to get customer from editingInvoice
-    if (!customer && editingInvoice?.customer && isEditMode) {
-      customer = typeof editingInvoice.customer === 'object' ? editingInvoice.customer : null
-    }
-
-    return customer
-  }
+  
 
   const getBillItemsWithTax = () => {
-    const customer = getCustomerDetails()
+    const customer = customers.find(c => c._id === selectedCustomer)
     const isInterState = taxType === 'IGST'
+
+    // Calculate total before global discount once
+    const totalBeforeGlobalDiscount = billItems.reduce((sum, bItem) => {
+      if (!bItem.item) return sum
+      const bRate = Number(bItem.customRate) || Number(bItem.item.rate) || 0
+      const bQuantity = Number(bItem.quantity) || 0
+      const bItemDiscount = Number(bItem.itemDiscount) || 0
+      return sum + (bRate * bQuantity - bItemDiscount)
+    }, 0)
 
     return billItems.map(billItem => {
       if (!billItem.item) return null
 
-      // Use custom rate if provided, otherwise use original item rate
       const rate = Number(billItem.customRate) || Number(billItem.item.rate) || 0
       const quantity = Number(billItem.quantity) || 0
       const taxSlab = Number(billItem.item.taxSlab) || 0
       const itemDiscount = Number(billItem.itemDiscount) || 0
 
       const itemTotal = rate * quantity
-      const itemDiscountAmount = itemDiscount
-      const subtotalAfterItemDiscount = itemTotal - itemDiscountAmount
-
-      // Apply global discount proportionally only to the subtotal after item discount
-      const totalBeforeGlobalDiscount = billItems.reduce((sum, bItem) => {
-        if (!bItem.item) return sum
-        const bRate = Number(bItem.customRate) || Number(bItem.item.rate) || 0
-        const bQuantity = Number(bItem.quantity) || 0
-        const bItemDiscount = Number(bItem.itemDiscount) || 0
-        const bItemTotal = bRate * bQuantity
-        return sum + (bItemTotal - bItemDiscount)
-      }, 0)
+      const subtotalAfterItemDiscount = itemTotal - itemDiscount
 
       const globalDiscountAmount = totalBeforeGlobalDiscount > 0 ?
         (subtotalAfterItemDiscount / totalBeforeGlobalDiscount) * Number(discountAmt || 0) : 0
@@ -461,11 +287,11 @@ const Billing = () => {
 
       return {
         ...billItem,
-        effectiveRate: rate, // Store the effective rate used
+        effectiveRate: rate,
         itemTotal,
-        itemDiscountAmount,
+        itemDiscountAmount: itemDiscount,
         globalDiscountAmount,
-        totalDiscountAmount: itemDiscountAmount + globalDiscountAmount,
+        totalDiscountAmount: itemDiscount + globalDiscountAmount,
         taxableAmount,
         tax,
         totalWithTax: taxableAmount + (tax ? tax.total : 0)
@@ -520,9 +346,6 @@ const Billing = () => {
         items: itemsForBackend,
         discount: Number(discountAmt),
         shippingCharges: Number(shippingCharges),
-        totalBeforeTax: Number(totalBeforeTax),
-        totalTax: Number(totalTax),
-        grandTotal: Number(grandTotal),
         paidAmount: Number(paidAmount),
         balance: Number(balance),
         paymentMethod,
@@ -539,8 +362,6 @@ const Billing = () => {
         response = await billingAPI.createInvoice(invoiceData)
         toast.success('Invoice generated successfully!')
       }
-
-      console.log('Invoice operation response:', response); // Debug log
 
       // Get customer details for WhatsApp
       const customerDetails = customers.find(c => c._id === selectedCustomer)
@@ -571,18 +392,16 @@ const Billing = () => {
           name: item.item.name,
           quantity: item.quantity,
           rate: item.effectiveRate,
-          itemTotal: item.itemTotal,
+          itemTotal: item.item.itemTotal,
           itemDiscount: item.itemDiscountAmount,
           tax: item.tax
         }))
       }
 
-      console.log('Navigating to invoice-success with state:', successState); // Debug log
-
       // Show success message and give user option to stay or go to success page
       toast.success(
         <div className="text-sm">
-          <p className="font-semibold">Invoice #{response.invoiceNumber} generated successfully!</p>
+          <p className="semibold">Invoice #{response.invoiceNumber} generated successfully!</p>
           <p className="text-xs mt-1">PDF download should start automatically.</p>
         </div>,
         { 
@@ -613,9 +432,10 @@ const Billing = () => {
     setCustomers((prev) => [...prev, newCustomer])
     // Auto-select the newly created customer
     const displayName = billingType === 'B2B' ? newCustomer.firmName : newCustomer.name
-    setCustomerSearch(`${displayName} - ${newCustomer.contact}`)
+    const searchText = `${displayName} - ${newCustomer.contact}`
+    setCustomerSearch(searchText)
     setSelectedCustomer(newCustomer._id)
-    setShowCustomerDropdown(false)
+    // setShowCustomerDropdown(false) // No longer needed as CustomerSelect manages its own dropdown state
 
     if (billingType === 'B2B') {
       detectTaxType(newCustomer)
@@ -780,145 +600,16 @@ const Billing = () => {
 
         <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           {/* Customer Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {isEditMode ? 'Customer (Read-only)' : 'Select Customer'} <span className="text-red-500">*</span>
-            </label>
-            {isEditMode ? (
-              // Read-only customer display in edit mode
-              <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
-                {(() => {
-                  // First try to find customer in local customers array
-                  let customer = customers.find(c => c._id === selectedCustomer)
-
-                  // If not found, try to get customer from editingInvoice
-                  if (!customer && editingInvoice?.customer) {
-                    customer = typeof editingInvoice.customer === 'object' ? editingInvoice.customer : null
-                  }
-
-                  if (customer) {
-                    const displayName = billingType === 'B2B' ? customer.firmName : customer.name
-                    return `${displayName} ${customer.contact ? `• ${customer.contact}` : ''} ${billingType === 'B2B' && customer.gstNo ? `• GST: ${customer.gstNo}` : ''}`
-                  }
-                  return editingInvoice ? 'Loading customer information...' : 'Loading invoice data...'
-                })()}
-              </div>
-            ) : (
-              // Regular customer selection for new invoices
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={customerSearch}
-                      onChange={(e) => handleCustomerSearchChange(e.target.value)}
-                      onFocus={() => setShowCustomerDropdown(true)}
-                      placeholder={`Search customers by ${billingType === 'B2B' ? 'firm name' : 'name'}, contact, or email...`}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    {selectedCustomer && (
-                      <button
-                        onClick={clearCustomerSelection}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                    {!selectedCustomer && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Dropdown */}
-                  {showCustomerDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {filteredCustomers.length > 0 ? (
-                        filteredCustomers.map((customer) => {
-                          const displayName = billingType === 'B2B' ? customer.firmName : customer.name
-                          const isSelected = selectedCustomer === customer._id
-
-                          return (
-                            <div
-                              key={customer._id}
-                              onClick={() => handleCustomerSelect(customer)}
-                              className={`px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${isSelected ? 'bg-blue-50 text-blue-700' : ''
-                                }`}
-                            >
-                              <div className="font-medium">{displayName}</div>
-                              <div className="text-sm text-gray-500">
-                                {customer.contact}
-                                {customer.email && ` • ${customer.email}`}
-                                {billingType === 'B2B' && customer.gstNo && ` • GST: ${customer.gstNo}`}
-                              </div>
-                            </div>
-                          )
-                        })
-                      ) : (
-                        <div className="px-3 py-4 text-center text-gray-500">
-                          {customerSearch.trim() ? 'No customers found' : 'Start typing to search customers'}
-                        </div>
-                      )}
-
-                      {/* Add Customer Option */}
-                      <div
-                        onClick={() => {
-                          setShowCustomerDropdown(false)
-                          setShowAddCustomerModal(true)
-                        }}
-                        className="px-3 py-2 cursor-pointer hover:bg-gray-50 border-t border-gray-200 text-blue-600 font-medium"
-                      >
-                        <div className="flex items-center">
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                          </svg>
-                          Add New Customer
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Click outside handler */}
-                  {showCustomerDropdown && (
-                    <div
-                      className="fixed inset-0 z-0"
-                      onClick={() => setShowCustomerDropdown(false)}
-                    />
-                  )}
-                </div>
-
-                <Button
-                  onClick={() => setShowAddCustomerModal(true)}
-                  variant="primary"
-                  size="sm"
-                  leftIcon={
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12h18M12 3v18" />
-                    </svg>
-                  }
-                >
-                  Add Customer
-                </Button>
-              </div>
-            )}
-
-            {/* Selected Customer Info */}
-            {selectedCustomer && (
-              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center text-green-800">
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm font-medium">Customer Selected</span>
-                </div>
-              </div>
-            )}
-          </div>
+          <CustomerSelect
+            customers={customers}
+            selectedCustomer={selectedCustomer}
+            onSelectCustomer={handleCustomerSelect}
+            onClearSelection={clearCustomerSelection}
+            billingType={billingType}
+            onAddCustomerClick={() => setShowAddCustomerModal(true)}
+            isEditMode={isEditMode}
+            editingInvoiceCustomer={editingInvoice?.customer}
+          />
 
           {/* Tax Type Indicator */}
           {selectedCustomer && billingType === 'B2B' && (
@@ -960,166 +651,14 @@ const Billing = () => {
             ) : (
               <div className="space-y-4">
                 {billItems.map((billItem, index) => (
-                  <div key={billItem.id || `item-${index}`} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50">
-                    {/* Item Selection with Search */}
-                    <div className="space-y-3">
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Item <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              value={billItem.searchValue || ''}
-                              onChange={(e) => handleItemSearchChange(e.target.value, index)}
-                              placeholder="Search items by name, HSN code, or units..."
-                              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm"
-                            />
-                            {billItem.itemId && (
-                              <button
-                                onClick={() => clearItemSelection(index)}
-                                className="absolute right-2 top-2 p-1 text-gray-400 hover:text-gray-600"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            )}
-                            
-                            {/* Searchable Dropdown */}
-                            {billItem.searchValue && !billItem.itemId && (
-                              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                {(() => {
-                                  const searchTerm = billItem.searchValue.toLowerCase()
-                                  const filteredResults = items.filter(item => 
-                                    item.name?.toLowerCase().includes(searchTerm) ||
-                                    item.hsnCode?.toLowerCase().includes(searchTerm) ||
-                                    item.units?.toLowerCase().includes(searchTerm)
-                                  )
-                                  
-                                  return filteredResults.length > 0 ? (
-                                    filteredResults.map(item => (
-                                      <div
-                                        key={item._id}
-                                        onClick={() => handleItemSelect(item, index)}
-                                        className="px-3 py-2 cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
-                                      >
-                                        <div className="font-medium text-sm">{item.name}</div>
-                                        <div className="text-xs text-gray-500">
-                                          {formatCurrency(item.rate)} • {item.units || 'per piece'} • {item.taxSlab}% GST • HSN: {item.hsnCode}
-                                        </div>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="px-3 py-4 text-center text-gray-500 text-sm">
-                                      No items found matching "{billItem.searchValue}"
-                                    </div>
-                                  )
-                                })()}
-                                
-                                {/* Add New Item Option */}
-                                <div
-                                  onClick={() => {
-                                    clearItemSelection(index)
-                                    handleOpenAddItemModal()
-                                  }}
-                                  className="px-3 py-2 cursor-pointer hover:bg-gray-50 border-t border-gray-200 text-blue-600 font-medium text-sm"
-                                >
-                                  <div className="flex items-center">
-                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                    Add New Item
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex justify-end sm:justify-start">
-                          <Button
-                            onClick={() => handleRemoveItem(index)}
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 border-red-300 hover:bg-red-50"
-                          >
-                            <svg className="w-4 h-4 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            <span className="hidden sm:inline">Remove</span>
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quantity, Rate, and Discounts Row */}
-                    {billItem.item && (
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Quantity
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={billItem.quantity}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/[^0-9]/g, '')
-                              handleItemChange(index, 'quantity', parseInt(value) || 1)
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            placeholder="1"
-                            min="1"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Rate (₹)
-                            <span className="text-xs text-gray-500 ml-1">
-                              (Original: {formatCurrency(billItem.item.rate)})
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={billItem.customRate}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/[^0-9.]/g, '')
-                              handleItemChange(index, 'customRate', value)
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            placeholder={billItem.item.rate}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Item Discount (₹)
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={billItem.itemDiscount || ''}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/[^0-9.]/g, '')
-                              handleItemChange(index, 'itemDiscount', parseFloat(value) || 0)
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <div className="text-sm text-gray-600">
-                            <div>Subtotal: {formatCurrency((Number(billItem.customRate) || Number(billItem.item.rate) || 0) * (Number(billItem.quantity) || 0))}</div>
-                            {billItem.itemDiscount > 0 && (
-                              <div className="text-green-600">Discount: -{formatCurrency(billItem.itemDiscount)}</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <BillItemRow
+                    key={billItem.id || `item-${index}`}
+                    billItem={billItem}
+                    index={index}
+                    items={items}
+                    onItemChange={handleItemChange}
+                    onRemoveItem={handleRemoveItem}
+                  />
                 ))}
               </div>
             )}
@@ -1244,203 +783,203 @@ const Billing = () => {
                         <div className="flex justify-between text-xs text-gray-600">
                           <span>Taxable Amount</span>
                           <span>{formatCurrency(item.taxableAmount)}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Totals */}
-                  <div className="border-t border-gray-300 pt-3 space-y-2">
-                    <div className="flex justify-between">
-                      <span>Subtotal (After Discounts):</span>
-                      <span>{formatCurrency(totalBeforeTax)}</span>
+                      ))}
                     </div>
 
-                    {/* Total Discounts */}
-                    {(billItemsWithTax.some(item => item.itemDiscountAmount > 0) || discountAmt > 0) && (
-                      <div className="bg-green-50 p-2 rounded text-sm">
-                        <div className="font-medium text-green-800 mb-1">Discount Breakdown:</div>
-                        {billItemsWithTax.some(item => item.itemDiscountAmount > 0) && (
-                          <div className="flex justify-between text-green-700">
-                            <span>Item Discounts:</span>
-                            <span>-{formatCurrency(billItemsWithTax.reduce((sum, item) => sum + item.itemDiscountAmount, 0))}</span>
-                          </div>
-                        )}
-                        {discountAmt > 0 && (
-                          <div className="flex justify-between text-green-700">
-                            <span>Global Discount:</span>
-                            <span>-{formatCurrency(discountAmt)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between font-medium text-green-800 border-t border-green-200 pt-1">
-                          <span>Total Discount:</span>
-                          <span>-{formatCurrency(billItemsWithTax.reduce((sum, item) => sum + item.totalDiscountAmount, 0))}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between">
-                      <span>Tax Amount ({taxType === 'IGST' ? 'IGST' : 'CGST + SGST'}):</span>
-                      <span>{formatCurrency(totalTax)}</span>
-                    </div>
-
-                    {shippingCharges > 0 && (
+                    {/* Totals */}
+                    <div className="border-t border-gray-300 pt-3 space-y-2">
                       <div className="flex justify-between">
-                        <span>Shipping Charges:</span>
-                        <span>{formatCurrency(shippingCharges)}</span>
+                        <span>Subtotal (After Discounts):</span>
+                        <span>{formatCurrency(totalBeforeTax)}</span>
                       </div>
-                    )}
 
-                    <div className="flex justify-between font-bold text-lg border-t border-gray-400 pt-2">
-                      <span>Grand Total:</span>
-                      <span>{formatCurrency(grandTotal)}</span>
+                      {/* Total Discounts */}
+                      {(billItemsWithTax.some(item => item.itemDiscountAmount > 0) || discountAmt > 0) && (
+                        <div className="bg-green-50 p-2 rounded text-sm">
+                          <div className="font-medium text-green-800 mb-1">Discount Breakdown:</div>
+                          {billItemsWithTax.some(item => item.itemDiscountAmount > 0) && (
+                            <div className="flex justify-between text-green-700">
+                              <span>Item Discounts:</span>
+                              <span>-{formatCurrency(billItemsWithTax.reduce((sum, item) => sum + item.itemDiscountAmount, 0))}</span>
+                            </div>
+                          )}
+                          {discountAmt > 0 && (
+                            <div className="flex justify-between text-green-700">
+                              <span>Global Discount:</span>
+                              <span>-{formatCurrency(discountAmt)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-medium text-green-800 border-t border-green-200 pt-1">
+                            <span>Total Discount:</span>
+                            <span>-{formatCurrency(billItemsWithTax.reduce((sum, item) => sum + item.totalDiscountAmount, 0))}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between">
+                        <span>Tax Amount ({taxType === 'IGST' ? 'IGST' : 'CGST + SGST'}):</span>
+                        <span>{formatCurrency(totalTax)}</span>
+                      </div>
+
+                      {shippingCharges > 0 && (
+                        <div className="flex justify-between">
+                          <span>Shipping Charges:</span>
+                          <span>{formatCurrency(shippingCharges)}</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between font-bold text-lg border-t border-gray-400 pt-2">
+                        <span>Grand Total:</span>
+                        <span>{formatCurrency(grandTotal)}</span>
+                      </div>
+
+                      {paidAmount > 0 && (
+                        <>
+                          <div className="flex justify-between text-blue-600">
+                            <span>Paid Amount ({paymentMethod}):</span>
+                            <span>{formatCurrency(paidAmount)}</span>
+                          </div>
+                          <div className={`flex justify-between font-medium ${balance > 0 ? 'text-red-600' : balance < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                            <span>{balance > 0 ? 'Balance Due:' : balance < 0 ? 'Excess Paid:' : 'Fully Paid:'}</span>
+                            <span>{balance > 0 ? formatCurrency(balance) : balance < 0 ? formatCurrency(Math.abs(balance)) : '₹0'}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
-
-                    {paidAmount > 0 && (
-                      <>
-                        <div className="flex justify-between text-blue-600">
-                          <span>Paid Amount ({paymentMethod}):</span>
-                          <span>{formatCurrency(paidAmount)}</span>
-                        </div>
-                        <div className={`flex justify-between font-medium ${balance > 0 ? 'text-red-600' : balance < 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                          <span>{balance > 0 ? 'Balance Due:' : balance < 0 ? 'Excess Paid:' : 'Fully Paid:'}</span>
-                          <span>{balance > 0 ? formatCurrency(balance) : balance < 0 ? formatCurrency(Math.abs(balance)) : '₹0'}</span>
-                        </div>
-                      </>
-                    )}
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Generate Invoice Button */}
-          <div className="flex justify-end mt-6">
+            {/* Generate Invoice Button */}
+            <div className="flex justify-end mt-6">
+              <Button
+                onClick={handleGenerateInvoice}
+                variant="primary"
+                size="lg"
+                disabled={loading}
+              >
+                {loading ? (isEditMode ? 'Updating...' : 'Generating...') : (isEditMode ? 'Update Invoice' : 'Generate Invoice')}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Add Customer Modal */}
+        <AddCustomerModal
+          isOpen={showAddCustomerModal}
+          onClose={() => setShowAddCustomerModal(false)}
+          onCustomerAdded={handleCustomerAdded}
+          customerType={billingType}
+        />
+
+        {/* Add Item Modal */}
+        <Modal
+          isOpen={showAddItemModal}
+          onClose={handleCloseAddItemModal}
+          contentLabel="Add Item"
+          className="max-w-lg mx-auto p-6 rounded-lg shadow-lg bg-white"
+        >
+          <h2 className="text-xl font-semibold mb-4">Add New Item</h2>
+
+          <div className="space-y-4">
+            <div>
+              <InputField
+                label="Item Name"
+                value={newItem.name}
+                onChange={(e) => handleNewItemChange('name', e.target.value)}
+                placeholder="Enter item name"
+                required
+              />
+            </div>
+            <div>
+              <InputField
+                label="HSN Code"
+                value={newItem.hsnCode}
+                onChange={(e) => handleNewItemChange('hsnCode', e.target.value)}
+                placeholder="Enter HSN code (e.g., 1234, 5678)"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Rate (₹) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={newItem.rate}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9.]/g, '')
+                  handleNewItemChange('rate', value)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="Enter rate per unit"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tax Slab (%) <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={newItem.taxSlab}
+                onChange={(e) => handleNewItemChange('taxSlab', parseInt(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                required
+              >
+                <option value="0">0% - Exempt</option>
+                <option value="3">3% - GST</option>
+                <option value="5">5% - GST</option>
+                <option value="12">12% - GST</option>
+                <option value="18">18% - GST</option>
+                <option value="28">28% - GST</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Units <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={newItem.units}
+                onChange={(e) => handleNewItemChange('units', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                required
+              >
+                <option value="per piece">per piece</option>
+                <option value="per ft">per ft</option>
+                <option value="per roll">per roll</option>
+                <option value="per sqft">per sqft</option>
+                <option value="per box">per box</option>
+                <option value="per set">per set</option>
+                <option value="per gram">per gram</option>
+                <option value="per kg">per kg</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-4 mt-6">
             <Button
-              onClick={handleGenerateInvoice}
-              variant="primary"
-              size="lg"
-              disabled={loading}
+              onClick={handleCloseAddItemModal}
+              variant="outline"
+              size="sm"
             >
-              {loading ? (isEditMode ? 'Updating...' : 'Generating...') : (isEditMode ? 'Update Invoice' : 'Generate Invoice')}
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddNewItem}
+              variant="primary"
+              size="sm"
+              loading={addingItem}
+            >
+              Add Item
             </Button>
           </div>
-        </div>
-      </div>
+        </Modal>
+      </Layout>
+    )
+  }
 
-      {/* Add Customer Modal */}
-      <AddCustomerModal
-        isOpen={showAddCustomerModal}
-        onClose={() => setShowAddCustomerModal(false)}
-        onCustomerAdded={handleCustomerAdded}
-        customerType={billingType}
-      />
-
-      {/* Add Item Modal */}
-      <Modal
-        isOpen={showAddItemModal}
-        onRequestClose={handleCloseAddItemModal}
-        contentLabel="Add Item"
-        className="max-w-lg mx-auto p-6 rounded-lg shadow-lg bg-white"
-      >
-        <h2 className="text-xl font-semibold mb-4">Add New Item</h2>
-
-        <div className="space-y-4">
-          <div>
-            <InputField
-              label="Item Name"
-              value={newItem.name}
-              onChange={(e) => handleNewItemChange('name', e.target.value)}
-              placeholder="Enter item name"
-              required
-            />
-          </div>
-          <div>
-            <InputField
-              label="HSN Code"
-              value={newItem.hsnCode}
-              onChange={(e) => handleNewItemChange('hsnCode', e.target.value)}
-              placeholder="Enter HSN code (e.g., 1234, 5678)"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Rate (₹) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={newItem.rate}
-              onChange={(e) => {
-                const value = e.target.value.replace(/[^0-9.]/g, '')
-                handleNewItemChange('rate', value)
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              placeholder="Enter rate per unit"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tax Slab (%) <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={newItem.taxSlab}
-              onChange={(e) => handleNewItemChange('taxSlab', parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              required
-            >
-              <option value="0">0% - Exempt</option>
-              <option value="3">3% - GST</option>
-              <option value="5">5% - GST</option>
-              <option value="12">12% - GST</option>
-              <option value="18">18% - GST</option>
-              <option value="28">28% - GST</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Units <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={newItem.units}
-              onChange={(e) => handleNewItemChange('units', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              required
-            >
-              <option value="per piece">per piece</option>
-              <option value="per ft">per ft</option>
-              <option value="per roll">per roll</option>
-              <option value="per sqft">per sqft</option>
-              <option value="per box">per box</option>
-              <option value="per set">per set</option>
-              <option value="per gram">per gram</option>
-              <option value="per kg">per kg</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-4 mt-6">
-          <Button
-            onClick={handleCloseAddItemModal}
-            variant="outline"
-            size="sm"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAddNewItem}
-            variant="primary"
-            size="sm"
-            loading={addingItem}
-          >
-            Add Item
-          </Button>
-        </div>
-      </Modal>
-    </Layout>
-  )
-}
-
-export default Billing
+  export default Billing

@@ -84,7 +84,7 @@ const AddSupplierModal = ({
   return (
     <Modal
       isOpen={isOpen}
-      onRequestClose={onClose}
+      onClose={onClose}
       contentLabel={editingSupplier ? "Edit Supplier" : "Add Supplier"}
       className="max-w-lg mx-auto p-6 rounded-lg shadow-lg bg-white"
     >
