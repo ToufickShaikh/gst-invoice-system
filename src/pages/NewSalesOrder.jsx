@@ -23,14 +23,23 @@ const NewSalesOrder = () => {
           customersAPI.getAll(),
           itemsAPI.getAll(),
         ]);
-        setCustomers(customersRes.data);
-        // Map quantityInStock to stock for consistency
-        const itemsWithStock = itemsRes.data.map(item => ({
-          ...item,
-          stock: item.quantityInStock ?? 0
-        }));
+        setCustomers(customersRes.data || []);
+        // Map quantityInStock to stock for consistency and filter out null items
+        const itemsData = Array.isArray(itemsRes.data) 
+          ? itemsRes.data 
+          : (Array.isArray(itemsRes) ? itemsRes : []);
+        
+        const itemsWithStock = itemsData
+          .filter(item => item != null) // Filter out null/undefined items
+          .map(item => ({
+            ...item,
+            stock: item.quantityInStock ?? 0
+          }));
         setItems(itemsWithStock);
       } catch (error) {
+        console.error('Error fetching data:', error);
+        setCustomers([]);
+        setItems([]);
         toast.error('Failed to fetch data');
       }
     };
@@ -66,13 +75,14 @@ const NewSalesOrder = () => {
     try {
       // Check if all items exist in inventory
       for (const orderItem of formData.items) {
-        const found = items.find(i => i._id === orderItem.item);
+        const found = items.find(i => i && i._id === orderItem.item);
         if (!found) {
           toast.error('Selected item does not exist in inventory');
           return;
         }
-        if (orderItem.quantity > found.stock) {
-          toast.error(`Not enough stock for ${found.name}`);
+        const availableStock = found.stock ?? 0;
+        if (orderItem.quantity > availableStock) {
+          toast.error(`Not enough stock for ${found.name || 'item'}. Available: ${availableStock}`);
           return;
         }
       }

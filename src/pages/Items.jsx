@@ -32,25 +32,31 @@ const Items = () => {
     { 
       key: 'stockDisplay', 
       label: 'Stock',
-      render: (item) => (
-        <div className={`font-semibold ${
-          item.stock <= 0 ? 'text-red-600' : 
-          item.stock <= 10 ? 'text-orange-600' : 
-          'text-green-600'
-        }`}>
-          {item.stock || 0}
-          {item.stock <= 0 && (
-            <span className="ml-1 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
-              Out of Stock
-            </span>
-          )}
-          {item.stock > 0 && item.stock <= 10 && (
-            <span className="ml-1 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
-              Low Stock
-            </span>
-          )}
-        </div>
-      )
+      render: (item) => {
+        // Defensive check to handle undefined items
+        if (!item) return <span>-</span>;
+        
+        const stock = item.stock ?? 0;
+        return (
+          <div className={`font-semibold ${
+            stock <= 0 ? 'text-red-600' : 
+            stock <= 10 ? 'text-orange-600' : 
+            'text-green-600'
+          }`}>
+            {stock}
+            {stock <= 0 && (
+              <span className="ml-1 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                Out of Stock
+              </span>
+            )}
+            {stock > 0 && stock <= 10 && (
+              <span className="ml-1 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                Low Stock
+              </span>
+            )}
+          </div>
+        );
+      }
     }
   ]
 
@@ -58,18 +64,22 @@ const Items = () => {
     setLoading(true)
     try {
       const response = await itemsAPI.getAll()
-      // Defensive: always use array
+      // Defensive: always use array and handle undefined items
       const itemsArr = Array.isArray(response.data)
         ? response.data
         : (Array.isArray(response) ? response : [])
-      const formattedItems = itemsArr.map(item => ({
-        ...item,
-        formattedRate: formatCurrency(item.rate),
-        taxSlabDisplay: `${item.taxSlab}%`,
-        stock: item.quantityInStock ?? 0  // Use quantityInStock from backend
-      }))
+      
+      const formattedItems = itemsArr
+        .filter(item => item != null) // Filter out null/undefined items
+        .map(item => ({
+          ...item,
+          formattedRate: formatCurrency(item.rate || 0),
+          taxSlabDisplay: `${item.taxSlab || 0}%`,
+          stock: item.quantityInStock ?? 0  // Use quantityInStock from backend
+        }))
       setItems(formattedItems)
     } catch (error) {
+      console.error('Error fetching items:', error)
       setItems([])
       toast.error('Failed to fetch items')
     } finally {
@@ -112,12 +122,17 @@ const Items = () => {
   }
 
   const handleEdit = (item) => {
+    if (!item) {
+      toast.error('Invalid item selected');
+      return;
+    }
+    
     setEditingItem(item)
     setFormData({
-      name: item.name,
-      hsnCode: item.hsnCode,
-      rate: item.rate.toString(),
-      taxSlab: item.taxSlab.toString(),
+      name: item.name || '',
+      hsnCode: item.hsnCode || '',
+      rate: (item.rate || 0).toString(),
+      taxSlab: (item.taxSlab || 0).toString(),
       units: item.units || 'per piece',
       stock: item.quantityInStock ?? 0  // Use quantityInStock from backend
     })
@@ -152,7 +167,7 @@ const Items = () => {
     <Layout>
       <div className="space-y-6">
         {/* Stock Alerts */}
-        {items.some(item => item.stock <= 10) && (
+        {items.filter(item => item != null).some(item => (item.stock ?? 0) <= 10) && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div className="flex items-center">
               <svg className="w-5 h-5 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -161,11 +176,11 @@ const Items = () => {
               <h3 className="text-yellow-800 font-medium">Stock Alerts</h3>
             </div>
             <div className="mt-2 text-sm text-yellow-700">
-              {items.filter(item => item.stock <= 0).length > 0 && (
-                <p>{items.filter(item => item.stock <= 0).length} items are out of stock</p>
+              {items.filter(item => item != null && (item.stock ?? 0) <= 0).length > 0 && (
+                <p>{items.filter(item => item != null && (item.stock ?? 0) <= 0).length} items are out of stock</p>
               )}
-              {items.filter(item => item.stock > 0 && item.stock <= 10).length > 0 && (
-                <p>{items.filter(item => item.stock > 0 && item.stock <= 10).length} items have low stock</p>
+              {items.filter(item => item != null && (item.stock ?? 0) > 0 && (item.stock ?? 0) <= 10).length > 0 && (
+                <p>{items.filter(item => item != null && (item.stock ?? 0) > 0 && (item.stock ?? 0) <= 10).length} items have low stock</p>
               )}
             </div>
           </div>
