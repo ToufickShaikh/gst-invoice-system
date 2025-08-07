@@ -1,5 +1,5 @@
 const express = require('express');
-const { getItems, createItem, updateItem, deleteItem } = require('../controllers/itemController.js');
+const { getItems, createItem, updateItem, deleteItem, updateStock } = require('../controllers/itemController.js');
 const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -15,5 +15,9 @@ router.route('/:id')
     .get(getItems)
     .put(updateItem)
     .delete(deleteItem);
+
+// Stock update route
+router.route('/:id/stock')
+    .patch(updateStock);
 
 module.exports = router;

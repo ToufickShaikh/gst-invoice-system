@@ -164,17 +164,18 @@ const Purchases = () => {
         toast.success('Purchase updated successfully');
       } else {
         await purchasesAPI.createPurchase(formData);
-        // Update inventory stock for each item
+        // Update inventory stock for each item using the new stock API
         for (const item of formData.items) {
-          const found = items.find(i => i._id === item.item);
-          if (found) {
-            const newStock = (found.stock ?? 0) + parseInt(item.quantity);
-            await itemsAPI.update(item.item, { ...found, stock: newStock });
+          try {
+            await itemsAPI.updateStock(item.item, parseInt(item.quantity));
+          } catch (stockError) {
+            console.warn('Failed to update stock for item:', item.item, stockError);
           }
         }
-        toast.success('Purchase created successfully');
+        toast.success('Purchase created and stock updated successfully');
       }
       fetchPurchases();
+      fetchItems(); // Refresh items to show updated stock
       setIsModalOpen(false);
       setIsEditMode(false);
       setCurrentPurchaseId(null);
