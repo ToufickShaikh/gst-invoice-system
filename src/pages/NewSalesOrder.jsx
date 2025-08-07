@@ -87,14 +87,7 @@ const NewSalesOrder = () => {
         }
       }
       await billingAPI.createSalesOrder(formData);
-      // Reduce stock for each item sold using the new stock API
-      for (const orderItem of formData.items) {
-        try {
-          await itemsAPI.updateStock(orderItem.item, -parseInt(orderItem.quantity));
-        } catch (stockError) {
-          console.warn('Failed to update stock for item:', orderItem.item, stockError);
-        }
-      }
+      // Backend automatically handles stock reduction for sales orders
       toast.success('Sales order created successfully');
     } catch (error) {
       toast.error('Failed to create sales order');

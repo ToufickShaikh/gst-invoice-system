@@ -117,21 +117,15 @@ const deleteItem = async (req, res) => {
 // @access  Private
 const updateStock = async (req, res) => {
     try {
-        const { quantity, operation } = req.body;
+        const { quantityChange } = req.body;
         
-        if (quantity === undefined || !operation) {
-            return sendErrorResponse(res, 400, 'Quantity and operation (add/subtract) are required');
+        if (quantityChange === undefined) {
+            return sendErrorResponse(res, 400, 'quantityChange is required');
         }
 
-        if (quantity < 0) {
-            return sendErrorResponse(res, 400, 'Quantity cannot be negative');
-        }
-
-        const updateValue = operation === 'add' ? quantity : -quantity;
-        
         const item = await Item.findByIdAndUpdate(
             req.params.id,
-            { $inc: { quantityInStock: updateValue } },
+            { $inc: { quantityInStock: quantityChange } },
             { new: true, runValidators: true }
         );
 
@@ -143,12 +137,13 @@ const updateStock = async (req, res) => {
             // Revert the update if it would result in negative stock
             await Item.findByIdAndUpdate(
                 req.params.id,
-                { $inc: { quantityInStock: -updateValue } }
+                { $inc: { quantityInStock: -quantityChange } }
             );
             return sendErrorResponse(res, 400, 'Insufficient stock. Cannot reduce stock below zero.');
         }
 
-        console.log(`[ITEM] Stock updated for item ${item.name}: ${operation} ${quantity}. New stock: ${item.quantityInStock}`);
+        const operation = quantityChange > 0 ? 'increased' : 'decreased';
+        console.log(`[ITEM] Stock ${operation} for item ${item.name} by ${Math.abs(quantityChange)}. New stock: ${item.quantityInStock}`);
         res.json(item);
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to update item stock', error);

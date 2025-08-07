@@ -170,15 +170,8 @@ const Purchases = () => {
         toast.success('Purchase updated successfully');
       } else {
         await purchasesAPI.createPurchase(formData);
-        // Update inventory stock for each item using the new stock API
-        for (const item of formData.items) {
-          try {
-            await itemsAPI.updateStock(item.item, parseInt(item.quantity));
-          } catch (stockError) {
-            console.warn('Failed to update stock for item:', item.item, stockError);
-          }
-        }
-        toast.success('Purchase created and stock updated successfully');
+        // Backend automatically updates stock for purchases
+        toast.success('Purchase created successfully');
       }
       fetchPurchases();
       fetchItems(); // Refresh items to show updated stock
