@@ -29,6 +29,11 @@ exports.getPurchases = async (req, res) => {
 // @access  Private
 exports.createPurchase = async (req, res) => {
   const { supplier, items, notes } = req.body;
+  
+  console.log('[PURCHASE] Create purchase request received:');
+  console.log('- Supplier:', supplier);
+  console.log('- Items:', JSON.stringify(items, null, 2));
+  console.log('- Notes:', notes);
 
   // Basic input validation
   if (!supplier || !items || items.length === 0) {
@@ -66,12 +71,23 @@ exports.createPurchase = async (req, res) => {
     });
 
     await purchase.save();
+    console.log('[PURCHASE] Purchase saved successfully:', purchase._id);
 
     // Update stock quantities
     for (const purchasedItem of items) {
-      await Item.findByIdAndUpdate(purchasedItem.item, {
-        $inc: { quantityInStock: purchasedItem.quantity },
-      });
+      console.log(`[PURCHASE] Updating stock for item ${purchasedItem.item}, quantity: ${purchasedItem.quantity}`);
+      
+      const updatedItem = await Item.findByIdAndUpdate(
+        purchasedItem.item, 
+        { $inc: { quantityInStock: purchasedItem.quantity } },
+        { new: true }
+      );
+      
+      if (updatedItem) {
+        console.log(`[PURCHASE] Stock updated for ${updatedItem.name}: ${updatedItem.quantityInStock}`);
+      } else {
+        console.error(`[PURCHASE] Failed to find item with ID: ${purchasedItem.item}`);
+      }
     }
 
     res.status(201).json(purchase);

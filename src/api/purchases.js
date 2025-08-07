@@ -6,7 +6,9 @@ export const purchasesAPI = {
     return res.data;
   },
   createPurchase: async (purchaseData) => {
+    console.log('[API] Creating purchase with data:', purchaseData);
     const res = await axiosInstance.post('/purchases', purchaseData);
+    console.log('[API] Purchase creation response:', res.data);
     return res.data;
   },
   updatePurchase: async (id, purchaseData) => {
