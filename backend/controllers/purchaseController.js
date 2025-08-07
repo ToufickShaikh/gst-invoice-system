@@ -17,7 +17,12 @@ const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
 // @access  Private
 exports.getPurchases = async (req, res) => {
   try {
-    const purchases = await Purchase.find().populate('items.item').populate('supplier');
+    const purchases = await Purchase.find()
+      .populate('supplier', 'name email phone address gstin')
+      .populate('items.item', 'name hsnCode rate units quantityInStock')
+      .sort({ purchaseDate: -1 }); // Sort by newest first
+    
+    console.log(`[PURCHASE] Retrieved ${purchases.length} purchases`);
     res.json(purchases);
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to retrieve purchases', error);
@@ -73,24 +78,34 @@ exports.createPurchase = async (req, res) => {
     await purchase.save();
     console.log('[PURCHASE] Purchase saved successfully:', purchase._id);
 
-    // Update stock quantities
+    // Update stock quantities with better error handling
     for (const purchasedItem of items) {
-      console.log(`[PURCHASE] Updating stock for item ${purchasedItem.item}, quantity: ${purchasedItem.quantity}`);
+      console.log(`[PURCHASE] Updating stock for item ${purchasedItem.item}, quantity: +${purchasedItem.quantity}`);
       
-      const updatedItem = await Item.findByIdAndUpdate(
-        purchasedItem.item, 
-        { $inc: { quantityInStock: purchasedItem.quantity } },
-        { new: true }
-      );
-      
-      if (updatedItem) {
-        console.log(`[PURCHASE] Stock updated for ${updatedItem.name}: ${updatedItem.quantityInStock}`);
-      } else {
-        console.error(`[PURCHASE] Failed to find item with ID: ${purchasedItem.item}`);
+      try {
+        const updatedItem = await Item.findByIdAndUpdate(
+          purchasedItem.item, 
+          { $inc: { quantityInStock: purchasedItem.quantity } },
+          { new: true }
+        );
+        
+        if (updatedItem) {
+          console.log(`[PURCHASE] ✅ Stock updated for ${updatedItem.name}: ${updatedItem.quantityInStock}`);
+        } else {
+          console.error(`[PURCHASE] ❌ Failed to find item with ID: ${purchasedItem.item}`);
+        }
+      } catch (stockError) {
+        console.error(`[PURCHASE] ❌ Error updating stock for item ${purchasedItem.item}:`, stockError);
+        // Continue with other items even if one fails
       }
     }
 
-    res.status(201).json(purchase);
+    // Populate the response with item and supplier details
+    const populatedPurchase = await Purchase.findById(purchase._id)
+      .populate('supplier', 'name email phone')
+      .populate('items.item', 'name hsnCode rate units quantityInStock');
+
+    res.status(201).json(populatedPurchase);
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to create purchase', error);
   }
