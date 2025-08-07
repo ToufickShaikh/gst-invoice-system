@@ -13,8 +13,8 @@ export const itemsAPI = {
     const res = await axiosInstance.put(`/items/${id}`, item);
     return res.data;
   },
-  updateStock: async (id, quantity, operation) => {
-    const res = await axiosInstance.patch(`/items/${id}/stock`, { quantity, operation });
+  updateStock: async (id, quantityChange) => {
+    const res = await axiosInstance.patch(`/items/${id}/stock`, { quantityChange });
     return res.data;
   },
   delete: async (id) => {

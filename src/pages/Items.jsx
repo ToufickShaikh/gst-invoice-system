@@ -66,7 +66,7 @@ const Items = () => {
         ...item,
         formattedRate: formatCurrency(item.rate),
         taxSlabDisplay: `${item.taxSlab}%`,
-        stock: item.stock ?? 0
+        stock: item.quantityInStock ?? 0  // Use quantityInStock from backend
       }))
       setItems(formattedItems)
     } catch (error) {
@@ -92,9 +92,9 @@ const Items = () => {
       rate: parseFloat(formData.rate),
       taxSlab: parseFloat(formData.taxSlab)
     }
-    // If adding, allow initial stock entry
+    // If adding, allow initial stock entry - use quantityInStock for backend
     if (!editingItem && formData.stock !== undefined) {
-      itemData.stock = parseInt(formData.stock)
+      itemData.quantityInStock = parseInt(formData.stock)
     }
     try {
       if (editingItem) {
@@ -119,7 +119,7 @@ const Items = () => {
       rate: item.rate.toString(),
       taxSlab: item.taxSlab.toString(),
       units: item.units || 'per piece',
-      stock: item.stock ?? 0
+      stock: item.quantityInStock ?? 0  // Use quantityInStock from backend
     })
     setIsModalOpen(true)
   }

@@ -24,7 +24,12 @@ const NewSalesOrder = () => {
           itemsAPI.getAll(),
         ]);
         setCustomers(customersRes.data);
-        setItems(itemsRes.data);
+        // Map quantityInStock to stock for consistency
+        const itemsWithStock = itemsRes.data.map(item => ({
+          ...item,
+          stock: item.quantityInStock ?? 0
+        }));
+        setItems(itemsWithStock);
       } catch (error) {
         toast.error('Failed to fetch data');
       }

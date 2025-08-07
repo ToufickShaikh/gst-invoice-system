@@ -83,8 +83,13 @@ const Billing = () => {
       const itemsArr = Array.isArray(itemsRes.data)
         ? itemsRes.data
         : (Array.isArray(itemsRes) ? itemsRes : [])
+      // Map quantityInStock to stock for consistency
+      const itemsWithStock = itemsArr.map(item => ({
+        ...item,
+        stock: item.quantityInStock ?? 0
+      }));
       setCustomers(customersArr.filter(c => c.customerType === billingType))
-      setItems(itemsArr)
+      setItems(itemsWithStock)
     } catch (error) {
       setCustomers([])
       setItems([])

@@ -67,7 +67,13 @@ const Purchases = () => {
     try {
       const response = await itemsAPI.getAll(); // Changed from getAllItems() to getAll()
       console.log('Items fetched successfully:', response);
-      setItems(response);
+      // Ensure consistent stock property mapping
+      const itemsWithStock = Array.isArray(response.data) 
+        ? response.data.map(item => ({ ...item, stock: item.quantityInStock ?? 0 }))
+        : (Array.isArray(response) 
+          ? response.map(item => ({ ...item, stock: item.quantityInStock ?? 0 }))
+          : []);
+      setItems(itemsWithStock);
     } catch (error) {
       console.error('Error fetching items:', error);
       toast.error('Failed to fetch items');

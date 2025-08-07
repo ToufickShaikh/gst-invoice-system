@@ -68,7 +68,13 @@ const Quotes = () => {
   const fetchItems = async () => {
     try {
       const response = await itemsAPI.getAll();
-      setItems(Array.isArray(response.data) ? response.data : response);
+      const itemsArray = Array.isArray(response.data) ? response.data : response;
+      // Map quantityInStock to stock for consistency
+      const itemsWithStock = itemsArray.map(item => ({
+        ...item,
+        stock: item.quantityInStock ?? 0
+      }));
+      setItems(itemsWithStock);
     } catch (error) {
       toast.error('Failed to fetch items');
     }

@@ -86,8 +86,14 @@ const EditInvoice = () => {
                 throw new Error('Could not load the invoice. It might have been deleted.');
             }
 
+            // Map quantityInStock to stock for consistency
+            const itemsWithStock = itemsList.map(item => ({
+                ...item,
+                stock: item.quantityInStock ?? 0
+            }));
+
             setCustomers(customersList);
-            setItems(itemsList);
+            setItems(itemsWithStock);
             setInvoiceData({
                 ...fetchedInvoice,
                 // Handle case where customer might be null or missing from the DB
