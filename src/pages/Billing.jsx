@@ -13,6 +13,7 @@ import { gstAPI } from '../api/gst'
 import { calculateTax } from '../utils/taxCalculations'
 import { formatCurrency } from '../utils/dateHelpers'
 import BillItemRow from '../components/BillItemRow'
+import CustomerSelect from '../components/CustomerSelect'
 
 const Billing = () => {
   const navigate = useNavigate()
