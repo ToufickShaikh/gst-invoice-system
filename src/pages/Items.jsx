@@ -311,8 +311,11 @@ const Items = () => {
             headers.forEach((header, index) => {
               const lowerHeader = header.toLowerCase()
               const mappedKey = headerMap[lowerHeader]
-              if (mappedKey && values[index] !== undefined && values[index] !== null) {
-                item[mappedKey] = values[index].trim()
+              if (mappedKey) {
+                const value = values[index]
+                if (value !== undefined && value !== null) {
+                  item[mappedKey] = value.trim()
+                }
               }
             })
             
@@ -401,6 +404,11 @@ const Items = () => {
             continue
           }
           
+          // Debug: Log data being sent to API for 0% tax items
+          if (itemData.taxSlab === 0) {
+            console.log('Sending 0% tax item to API:', itemData)
+          }
+          
           await itemsAPI.create(itemData)
           successCount++
         } catch (error) {
@@ -415,7 +423,10 @@ const Items = () => {
 
       toast.success(`${successCount} items imported successfully`)
       if (duplicateCount > 0) {
-        toast.warning(`${duplicateCount} duplicate items were skipped`)
+        toast(`${duplicateCount} duplicate items were skipped`, { 
+          icon: '⚠️',
+          style: { background: '#fef3c7', color: '#92400e' }
+        })
       }
       if (errors.length > duplicateCount) {
         console.error('Import errors:', errors)
@@ -459,7 +470,7 @@ const Items = () => {
       })
       
       if (duplicates.length === 0) {
-        toast.info('No duplicate items found')
+        toast.success('No duplicate items found')
         return
       }
       
