@@ -264,6 +264,12 @@ const Items = () => {
         units: 'per piece',
         stock: 0
       }])
+    } catch (error) {
+      console.error('Error in bulk submit:', error)
+      toast.error('Failed to add items')
+    }
+  }
+
   // CSV import functions
   const handleCsvFileChange = (e) => {
     const file = e.target.files[0]
