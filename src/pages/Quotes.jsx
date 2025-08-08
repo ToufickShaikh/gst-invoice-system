@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
@@ -50,14 +48,12 @@ const Quotes = () => {
   const fetchQuotes = async () => {
     setLoading(true);
     try {
-      const response = await billingAPI.getAllQuotes();
-      // Ensure response is properly structured and filter out invalid quotes
-      const validQuotes = Array.isArray(response.data) 
-        ? response.data.filter(quote => quote && quote._id) 
-        : (Array.isArray(response) 
-          ? response.filter(quote => quote && quote._id) 
-          : []);
-      setQuotes(validQuotes);
+    // billingAPI.getAllQuotes returns an array of quotes
+    const quotesData = await billingAPI.getAllQuotes();
+    const validQuotes = Array.isArray(quotesData)
+      ? quotesData.filter(q => q && q._id)
+      : [];
+    setQuotes(validQuotes);
     } catch (error) {
       console.error('Error fetching quotes:', error);
       toast.error('Failed to fetch quotes');
@@ -122,7 +118,7 @@ const Quotes = () => {
   const handleAddItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { item: '', quantity: 1, rate: 0 }],
+      items: [...formData.items, { item: '', quantity: 1, rate: 0, priceType: 'Exclusive' }],
     });
   };
 
@@ -133,7 +129,15 @@ const Quotes = () => {
   };
 
   const calculateTotal = () => {
-    return formData.items.reduce((sum, item) => sum + (parseFloat(item.rate || 0) * parseInt(item.quantity || 0)), 0);
+    const GST_RATE = 0.18; // 18% default GST
+    return formData.items.reduce((sum, item) => {
+      const qty = parseInt(item.quantity || 0);
+      const rate = parseFloat(item.rate || 0);
+      const baseRate = item.priceType === 'Inclusive'
+        ? rate / (1 + GST_RATE)
+        : rate;
+      return sum + (baseRate * qty);
+    }, 0);
   };
 
   const handleSubmit = async (e) => {
@@ -189,7 +193,7 @@ const Quotes = () => {
       quoteDate: quote.quoteDate || '',
       status: quote.status || 'Draft',
       notes: quote.notes || '',
-      items: quote.items || [],
+      items: quote.items.map(i => ({ ...i, priceType: i.priceType || 'Exclusive' })),
     });
     setIsModalOpen(true);
   };
@@ -253,11 +257,11 @@ const Quotes = () => {
             />
             <div>
               <h3 className="text-lg font-medium">Items</h3>
-              {formData.items.map((item, index) => (
-                <div key={index} className="flex gap-4 items-center mt-2">
+              {formData.items.map((item, idx) => (
+                <div key={idx} className="item-row">
                   <select
                     value={item.item}
-                    onChange={(e) => handleItemChange(index, 'item', e.target.value)}
+                    onChange={(e) => handleItemChange(idx, 'item', e.target.value)}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     required
                   >
@@ -270,17 +274,26 @@ const Quotes = () => {
                     label="Quantity"
                     type="number"
                     value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                    onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
                     required
                   />
                   <InputField
                     label="Rate"
                     type="number"
                     value={item.rate}
-                    onChange={(e) => handleItemChange(index, 'rate', e.target.value)}
+                    onChange={(e) => handleItemChange(idx, 'rate', e.target.value)}
                     required
                   />
-                  <Button type="button" variant="danger" onClick={() => handleRemoveItem(index)}>Remove</Button>
+                  <select
+                    name="priceType"
+                    value={item.priceType || 'Exclusive'}
+                    onChange={e => handleItemChange(idx, 'priceType', e.target.value)}
+                    className="mt-1 block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option value="Exclusive">Exclusive of GST</option>
+                    <option value="Inclusive">Inclusive of GST</option>
+                  </select>
+                  <Button variant="danger" onClick={() => handleRemoveItem(idx)}>Remove</Button>
                 </div>
               ))}
               <Button type="button" onClick={handleAddItem} className="mt-2">Add Item</Button>
