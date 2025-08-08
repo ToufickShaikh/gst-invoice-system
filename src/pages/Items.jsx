@@ -297,12 +297,25 @@ const Items = () => {
           if (lines[i].trim()) {
             const values = lines[i].split(',').map(v => v.trim())
             const item = {}
+            
+            // Create a header mapping for case-insensitive matching
+            const headerMap = {
+              'name': 'name',
+              'hsncode': 'hsnCode',
+              'rate': 'rate', 
+              'pricetype': 'priceType',
+              'taxslab': 'taxSlab',
+              'units': 'units'
+            }
+            
             headers.forEach((header, index) => {
-              const key = header.toLowerCase()
-              if (expectedHeaders.includes(key)) {
-                item[key] = values[index] || ''
+              const lowerHeader = header.toLowerCase()
+              const mappedKey = headerMap[lowerHeader]
+              if (mappedKey && values[index]) {
+                item[mappedKey] = values[index].trim()
               }
             })
+            
             if (item.name && item.hsnCode) {
               data.push(item)
             }
@@ -720,10 +733,10 @@ const Items = () => {
                       {csvPreview.map((item, index) => (
                         <tr key={index}>
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.name}</td>
-                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.hsncode}</td>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.hsnCode}</td>
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.rate}</td>
-                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.pricetype || 'Exclusive'}</td>
-                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.taxslab}%</td>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.priceType || 'Exclusive'}</td>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.taxSlab}%</td>
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.units}</td>
                         </tr>
                       ))}
