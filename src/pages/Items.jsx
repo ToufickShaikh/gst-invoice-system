@@ -526,15 +526,25 @@ const Items = () => {
       
       console.log('About to show confirmation dialog for', uniqueDuplicates.length, 'duplicates')
       
-      // Show detailed confirmation with item names
-      const duplicatesList = uniqueDuplicates.map(item => `• ${item.name} (HSN: ${item.hsnCode})`).join('\n')
-      const message = `Found ${uniqueDuplicates.length} duplicate items:\n\n${duplicatesList.slice(0, 500)}${duplicatesList.length > 500 ? '\n...(truncated)' : ''}\n\nDo you want to delete these duplicates?`
+      // Show simple confirmation first
+      const simpleConfirm = window.confirm(
+        `Found ${uniqueDuplicates.length} duplicate items that can be deleted.\n\nDo you want to see the list and confirm deletion?`
+      )
       
-      const confirmed = window.confirm(message)
-      console.log('User confirmation result:', confirmed)
+      if (!simpleConfirm) {
+        console.log('User canceled at initial confirmation')
+        return
+      }
       
-      if (!confirmed) {
-        console.log('User canceled duplicate deletion')
+      // Show detailed list in a second confirmation
+      const duplicatesList = uniqueDuplicates.slice(0, 10).map(item => `• ${item.name}`).join('\n')
+      const detailedMessage = `These ${uniqueDuplicates.length} duplicate items will be deleted:\n\n${duplicatesList}${uniqueDuplicates.length > 10 ? '\n...and ' + (uniqueDuplicates.length - 10) + ' more' : ''}\n\nConfirm deletion?`
+      
+      const finalConfirm = window.confirm(detailedMessage)
+      console.log('User final confirmation result:', finalConfirm)
+      
+      if (!finalConfirm) {
+        console.log('User canceled at detailed confirmation')
         return
       }
       
