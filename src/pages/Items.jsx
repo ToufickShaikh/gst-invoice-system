@@ -224,7 +224,7 @@ const Items = () => {
     e.preventDefault()
     try {
       const validItems = bulkItems.filter(item => 
-        item.name.trim() && item.hsnCode.trim() && item.rate && item.taxSlab
+        item.name.trim() && item.hsnCode.trim() && item.rate && (item.taxSlab !== undefined && item.taxSlab !== '')
       )
       
       if (validItems.length === 0) {
@@ -238,7 +238,7 @@ const Items = () => {
           const itemData = {
             ...item,
             rate: parseFloat(item.rate),
-            taxSlab: parseFloat(item.taxSlab),
+            taxSlab: item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 18,
             quantityInStock: parseInt(item.stock) || 0
           }
           await itemsAPI.create(itemData)
@@ -363,7 +363,7 @@ const Items = () => {
             hsnCode: item.hsnCode,
             rate: parseFloat(item.rate) || 0,
             priceType: item.priceType || 'Exclusive',
-            taxSlab: parseFloat(item.taxSlab) || 18,
+            taxSlab: item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 18,
             units: item.units || 'per piece',
             quantityInStock: 0  // Always start with 0 stock, to be managed through purchase system
           }
