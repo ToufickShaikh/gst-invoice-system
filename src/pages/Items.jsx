@@ -14,7 +14,19 @@ const Items = () => {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
+  const [bulkItems, setBulkItems] = useState([
+    {
+      name: '',
+      hsnCode: '',
+      rate: '',
+      priceType: 'Exclusive',
+      taxSlab: '',
+      units: 'per piece',
+      stock: 0
+    }
+  ])
   const [formData, setFormData] = useState({
     name: '',
     hsnCode: '',
@@ -169,9 +181,88 @@ const Items = () => {
       name: '',
       hsnCode: '',
       rate: '',
+      priceType: 'Exclusive',
       taxSlab: '',
       units: 'per piece'
     })
+  }
+
+  // Bulk add functions
+  const handleBulkChange = (index, field, value) => {
+    const newBulkItems = [...bulkItems]
+    newBulkItems[index][field] = value
+    setBulkItems(newBulkItems)
+  }
+
+  const addBulkRow = () => {
+    setBulkItems([
+      ...bulkItems,
+      {
+        name: '',
+        hsnCode: '',
+        rate: '',
+        priceType: 'Exclusive',
+        taxSlab: '',
+        units: 'per piece',
+        stock: 0
+      }
+    ])
+  }
+
+  const removeBulkRow = (index) => {
+    if (bulkItems.length > 1) {
+      const newBulkItems = bulkItems.filter((_, i) => i !== index)
+      setBulkItems(newBulkItems)
+    }
+  }
+
+  const handleBulkSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const validItems = bulkItems.filter(item => 
+        item.name.trim() && item.hsnCode.trim() && item.rate && item.taxSlab
+      )
+      
+      if (validItems.length === 0) {
+        toast.error('Please fill at least one complete item')
+        return
+      }
+
+      let successCount = 0
+      for (const item of validItems) {
+        try {
+          const itemData = {
+            ...item,
+            rate: parseFloat(item.rate),
+            taxSlab: parseFloat(item.taxSlab),
+            quantityInStock: parseInt(item.stock) || 0
+          }
+          await itemsAPI.create(itemData)
+          successCount++
+        } catch (error) {
+          console.error('Error creating item:', item.name, error)
+        }
+      }
+
+      toast.success(`${successCount} items added successfully`)
+      if (successCount < validItems.length) {
+        toast.error(`${validItems.length - successCount} items failed to add`)
+      }
+      
+      fetchItems()
+      setIsBulkModalOpen(false)
+      setBulkItems([{
+        name: '',
+        hsnCode: '',
+        rate: '',
+        priceType: 'Exclusive',
+        taxSlab: '',
+        units: 'per piece',
+        stock: 0
+      }])
+    } catch (error) {
+      toast.error('Bulk add failed')
+    }
   }
 
   return (
@@ -202,6 +293,9 @@ const Items = () => {
           <div className="flex gap-3">
             <Button onClick={() => setIsModalOpen(true)}>
               Add Item
+            </Button>
+            <Button onClick={() => setIsBulkModalOpen(true)} variant="secondary">
+              Bulk Add Items
             </Button>
           </div>
         </div>
@@ -249,6 +343,20 @@ const Items = () => {
               onChange={handleChange}
               required
             />
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Price Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="priceType"
+                value={formData.priceType}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Exclusive">Exclusive of GST</option>
+                <option value="Inclusive">Inclusive of GST</option>
+              </select>
+            </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Units <span className="text-red-500">*</span>
@@ -304,6 +412,130 @@ const Items = () => {
               <Button type="submit" variant="primary">
                 {editingItem ? 'Update' : 'Add'} Item
               </Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Bulk Add Modal */}
+        <Modal
+          isOpen={isBulkModalOpen}
+          onClose={() => setIsBulkModalOpen(false)}
+          title="Bulk Add Items"
+          size="large"
+        >
+          <form onSubmit={handleBulkSubmit}>
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {bulkItems.map((item, index) => (
+                <div key={index} className="border p-4 rounded-lg bg-gray-50">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-medium">Item {index + 1}</h4>
+                    {bulkItems.length > 1 && (
+                      <Button 
+                        type="button" 
+                        variant="danger" 
+                        size="sm"
+                        onClick={() => removeBulkRow(index)}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputField
+                      label="Item Name"
+                      value={item.name}
+                      onChange={(e) => handleBulkChange(index, 'name', e.target.value)}
+                      required
+                    />
+                    <InputField
+                      label="HSN Code"
+                      value={item.hsnCode}
+                      onChange={(e) => handleBulkChange(index, 'hsnCode', e.target.value)}
+                      required
+                    />
+                    <InputField
+                      label="Rate (₹)"
+                      type="number"
+                      value={item.rate}
+                      onChange={(e) => handleBulkChange(index, 'rate', e.target.value)}
+                      required
+                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Price Type
+                      </label>
+                      <select
+                        value={item.priceType}
+                        onChange={(e) => handleBulkChange(index, 'priceType', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="Exclusive">Exclusive of GST</option>
+                        <option value="Inclusive">Inclusive of GST</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Units
+                      </label>
+                      <select
+                        value={item.units}
+                        onChange={(e) => handleBulkChange(index, 'units', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="per piece">per piece</option>
+                        <option value="per ft">per ft</option>
+                        <option value="per roll">per roll</option>
+                        <option value="per sqft">per sqft</option>
+                        <option value="per box">per box</option>
+                        <option value="per set">per set</option>
+                        <option value="per gram">per gram</option>
+                        <option value="per kg">per kg</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tax Slab
+                      </label>
+                      <select
+                        value={item.taxSlab}
+                        onChange={(e) => handleBulkChange(index, 'taxSlab', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select Tax Slab</option>
+                        <option value="0">0%</option>
+                        <option value="5">5%</option>
+                        <option value="12">12%</option>
+                        <option value="18">18%</option>
+                        <option value="28">28%</option>
+                      </select>
+                    </div>
+                    <InputField
+                      label="Initial Stock"
+                      type="number"
+                      value={item.stock}
+                      onChange={(e) => handleBulkChange(index, 'stock', e.target.value)}
+                      min={0}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-between items-center mt-4">
+              <Button type="button" onClick={addBulkRow} variant="secondary">
+                + Add Another Item
+              </Button>
+              <div className="flex space-x-2">
+                <Button type="button" variant="secondary" onClick={() => setIsBulkModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary">
+                  Add All Items ({bulkItems.filter(item => 
+                    item.name.trim() && item.hsnCode.trim() && item.rate && item.taxSlab
+                  ).length})
+                </Button>
+              </div>
             </div>
           </form>
         </Modal>
