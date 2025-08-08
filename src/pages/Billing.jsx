@@ -379,10 +379,10 @@ const Billing = () => {
         pdfUrl: (() => {
           const pdfPath = response.pdfPath || response.pdfUrl || response.invoice?.pdfPath;
           if (pdfPath) {
-            // For static files, use the direct server URL (not through Nginx proxy)
-            const staticBaseUrl = 'http://185.52.53.253:3000';
+            // Use the Nginx proxy URL for PDF serving
+            const baseUrl = 'http://185.52.53.253/shaikh_carpets';
             const normalizedPath = pdfPath.startsWith('/') ? pdfPath : `/${pdfPath}`;
-            return `${staticBaseUrl}${normalizedPath}`;
+            return `${baseUrl}${normalizedPath}`;
           }
           return null;
         })(),

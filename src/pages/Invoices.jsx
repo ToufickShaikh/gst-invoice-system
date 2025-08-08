@@ -82,14 +82,13 @@ const Invoices = () => {
                 toast.success('Invoice generated successfully!');
                 console.log('📄 PDF Path received:', res.pdfPath);
 
-                // For static files, use the direct server URL (not through Nginx proxy)
-                // Since static files are served directly by Express on port 3000
-                const staticBaseUrl = 'http://185.52.53.253:3000';
-                console.log('🌐 Using static base URL:', staticBaseUrl);
+                // Use the Nginx proxy URL for PDF serving
+                const baseUrl = 'http://185.52.53.253/shaikh_carpets';
+                console.log('🌐 Using base URL:', baseUrl);
 
-                // Construct the PDF URL for static file serving
+                // Construct the PDF URL through Nginx proxy
                 const normalizedPath = res.pdfPath.startsWith('/') ? res.pdfPath : `/${res.pdfPath}`;
-                const pdfUrl = `${staticBaseUrl}${normalizedPath}`;
+                const pdfUrl = `${baseUrl}${normalizedPath}`;
                 console.log('🔗 Final PDF URL:', pdfUrl);
 
                 // Determine if it's a PDF or HTML file to set proper MIME type
