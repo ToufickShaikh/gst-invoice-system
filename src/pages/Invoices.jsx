@@ -82,8 +82,8 @@ const Invoices = () => {
                 toast.success('Invoice generated successfully!');
                 console.log('📄 PDF Path received:', res.pdfPath);
 
-                // Get the base URL from environment variable or fallback to default
-                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
+                // Get the base URL from environment variable or fallback to VPS URL
+                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://185.52.53.253/shaikh_carpets/api';
                 console.log('🌐 Using base URL:', baseUrl);
 
                 // Clean the base URL

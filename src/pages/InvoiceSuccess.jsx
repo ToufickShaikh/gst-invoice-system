@@ -464,7 +464,7 @@ const InvoiceSuccess = () => {
                   <div className="mt-3 flex flex-wrap gap-2 justify-center">
                     <Button
                       onClick={() => {
-                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'https://gst-invoice-system-back.onrender.com';
+                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://185.52.53.253/shaikh_carpets';
                         const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
 
                         if (navigator.share) {
@@ -496,7 +496,7 @@ const InvoiceSuccess = () => {
 
                     <Button
                       onClick={() => {
-                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'https://gst-invoice-system-back.onrender.com';
+                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://185.52.53.253/shaikh_carpets';
                         const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
 
                         const emailSubject = encodeURIComponent(`Invoice ${invoiceNumber || invoiceId}`);
