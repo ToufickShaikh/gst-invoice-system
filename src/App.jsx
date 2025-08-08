@@ -12,7 +12,7 @@ import ErrorBoundary from './components/ErrorBoundary' // Error boundary
 function App() {
   return (
     <ErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename="/shaikh_carpets">
         <AuthProvider>
           {/* Toast notifications */}
           <Toaster position="top-right" />
