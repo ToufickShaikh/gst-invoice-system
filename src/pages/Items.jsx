@@ -447,45 +447,110 @@ const Items = () => {
   const findAndDeleteDuplicates = async () => {
     try {
       const response = await itemsAPI.getAll()
-      const allItems = response.data || []
+      console.log('API Response:', response)
+      
+      // Handle different response structures
+      const allItems = Array.isArray(response.data) ? response.data : 
+                      Array.isArray(response) ? response : []
+      
+      console.log('All items:', allItems.length, allItems)
+      
+      if (allItems.length === 0) {
+        toast.success('No items found in database')
+        return
+      }
       
       // Group items by name (case-insensitive) and HSN code
       const itemGroups = {}
       const duplicates = []
       
       allItems.forEach(item => {
-        const key = `${item.name.toLowerCase()}_${item.hsnCode}`
-        if (!itemGroups[key]) {
-          itemGroups[key] = []
+        if (item && item.name && item.hsnCode) {
+          const key = `${item.name.toLowerCase()}_${item.hsnCode}`
+          if (!itemGroups[key]) {
+            itemGroups[key] = []
+          }
+          itemGroups[key].push(item)
         }
-        itemGroups[key].push(item)
       })
       
+      console.log('Item groups:', itemGroups)
+      
       // Find duplicates (groups with more than 1 item)
-      Object.values(itemGroups).forEach(group => {
+      Object.entries(itemGroups).forEach(([key, group]) => {
         if (group.length > 1) {
+          console.log(`Found duplicates for key "${key}":`, group.map(item => ({ id: item._id, name: item.name })))
           // Keep the first item, mark others as duplicates
           duplicates.push(...group.slice(1))
         }
       })
       
-      if (duplicates.length === 0) {
+      console.log('Total duplicates found:', duplicates.length)
+      
+      // Also check for duplicates by name only
+      const nameGroups = {}
+      allItems.forEach(item => {
+        if (item && item.name) {
+          const nameKey = item.name.toLowerCase()
+          if (!nameGroups[nameKey]) {
+            nameGroups[nameKey] = []
+          }
+          nameGroups[nameKey].push(item)
+        }
+      })
+      
+      const nameDuplicates = []
+      Object.entries(nameGroups).forEach(([name, group]) => {
+        if (group.length > 1) {
+          console.log(`Found name duplicates for "${name}":`, group.map(item => ({ id: item._id, hsnCode: item.hsnCode })))
+          nameDuplicates.push(...group.slice(1))
+        }
+      })
+      
+      // Also check for duplicates by HSN only
+      const hsnGroups = {}
+      allItems.forEach(item => {
+        if (item && item.hsnCode) {
+          if (!hsnGroups[item.hsnCode]) {
+            hsnGroups[item.hsnCode] = []
+          }
+          hsnGroups[item.hsnCode].push(item)
+        }
+      })
+      
+      const hsnDuplicates = []
+      Object.entries(hsnGroups).forEach(([hsn, group]) => {
+        if (group.length > 1) {
+          console.log(`Found HSN duplicates for "${hsn}":`, group.map(item => ({ id: item._id, name: item.name })))
+          hsnDuplicates.push(...group.slice(1))
+        }
+      })
+      
+      // Combine all duplicates (remove duplicates from the duplicate list itself)
+      const allDuplicates = [...duplicates, ...nameDuplicates, ...hsnDuplicates]
+      const uniqueDuplicates = allDuplicates.filter((item, index, self) => 
+        index === self.findIndex(t => t._id === item._id)
+      )
+      
+      console.log('Total unique duplicates found:', uniqueDuplicates.length)
+      
+      if (uniqueDuplicates.length === 0) {
         toast.success('No duplicate items found')
         return
       }
       
       // Confirm deletion
       const confirmed = window.confirm(
-        `Found ${duplicates.length} duplicate items. Do you want to delete them?\n\n` +
-        duplicates.map(item => `• ${item.name} (${item.hsnCode})`).slice(0, 5).join('\n') +
-        (duplicates.length > 5 ? `\n... and ${duplicates.length - 5} more` : '')
+        `Found ${uniqueDuplicates.length} duplicate items. Do you want to delete them?\n\n` +
+        uniqueDuplicates.map(item => `• ${item.name} (${item.hsnCode})`).slice(0, 5).join('\n') +
+        (uniqueDuplicates.length > 5 ? `\n... and ${uniqueDuplicates.length - 5} more` : '')
       )
       
       if (!confirmed) return
       
       // Delete duplicates
       let deletedCount = 0
-      for (const duplicate of duplicates) {
+      for (const duplicate of uniqueDuplicates) {
         try {
           await itemsAPI.delete(duplicate._id)
           deletedCount++
