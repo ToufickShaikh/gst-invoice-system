@@ -35,12 +35,15 @@ const Quotes = () => {
     {
       key: 'actions',
       label: 'Actions',
-      render: (quote) => (
-        <div className="flex space-x-2">
-          <Button onClick={() => handleEdit(quote)}>Edit</Button>
-          <Button variant="danger" onClick={() => handleDelete(quote._id)}>Delete</Button>
-        </div>
-      ),
+      render: (value, quote) => {
+        if (!quote) return <div>No actions</div>;
+        return (
+          <div className="flex space-x-2">
+            <Button onClick={() => handleEdit(quote)}>Edit</Button>
+            <Button variant="danger" onClick={() => handleDelete(quote._id)}>Delete</Button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -48,8 +51,15 @@ const Quotes = () => {
     setLoading(true);
     try {
       const response = await billingAPI.getAllQuotes();
-      setQuotes(response.data);
+      // Ensure response is properly structured and filter out invalid quotes
+      const validQuotes = Array.isArray(response.data) 
+        ? response.data.filter(quote => quote && quote._id) 
+        : (Array.isArray(response) 
+          ? response.filter(quote => quote && quote._id) 
+          : []);
+      setQuotes(validQuotes);
     } catch (error) {
+      console.error('Error fetching quotes:', error);
       toast.error('Failed to fetch quotes');
     } finally {
       setLoading(false);
@@ -167,10 +177,15 @@ const Quotes = () => {
   };
 
   const handleEdit = (quote) => {
+    if (!quote || !quote._id) {
+      toast.error('Invalid quote data');
+      return;
+    }
+    
     setIsEditMode(true);
     setEditingQuoteId(quote._id);
     setFormData({
-      customer: quote.customer._id || '',
+      customer: quote.customer?._id || '',
       quoteDate: quote.quoteDate || '',
       status: quote.status || 'Draft',
       notes: quote.notes || '',

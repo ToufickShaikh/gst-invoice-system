@@ -32,7 +32,7 @@ const Items = () => {
     { 
       key: 'stockDisplay', 
       label: 'Stock',
-      render: (item) => {
+      render: (value, item) => {
         // Defensive check to handle undefined items
         if (!item) return <span>-</span>;
         
@@ -108,6 +108,10 @@ const Items = () => {
     }
     try {
       if (editingItem) {
+        if (!editingItem._id) {
+          toast.error('Invalid item data');
+          return;
+        }
         await itemsAPI.update(editingItem._id, itemData)
         toast.success('Item updated successfully')
       } else {
@@ -140,6 +144,11 @@ const Items = () => {
   }
 
   const handleDelete = async (item) => {
+    if (!item || !item._id) {
+      toast.error('Invalid item data');
+      return;
+    }
+    
     if (window.confirm('Are you sure you want to delete this item?')) {
       try {
         await itemsAPI.delete(item._id)

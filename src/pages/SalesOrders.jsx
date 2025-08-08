@@ -30,12 +30,15 @@ const SalesOrders = () => {
     {
       key: 'actions',
       label: 'Actions',
-      render: (order) => (
-        <div className="flex space-x-2">
-          <Button onClick={() => handleEdit(order)}>Edit</Button>
-          <Button variant="danger" onClick={() => handleDelete(order._id)}>Delete</Button>
-        </div>
-      ),
+      render: (value, order) => {
+        if (!order) return <div>No actions</div>;
+        return (
+          <div className="flex space-x-2">
+            <Button onClick={() => handleEdit(order)}>Edit</Button>
+            <Button variant="danger" onClick={() => handleDelete(order._id)}>Delete</Button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -43,8 +46,15 @@ const SalesOrders = () => {
     setLoading(true);
     try {
       const response = await salesOrdersAPI.getAll();
-      setOrders(response.data);
+      // Ensure response is properly structured and filter out invalid orders
+      const validOrders = Array.isArray(response.data) 
+        ? response.data.filter(order => order && order._id) 
+        : (Array.isArray(response) 
+          ? response.filter(order => order && order._id) 
+          : []);
+      setOrders(validOrders);
     } catch (error) {
+      console.error('Error fetching sales orders:', error);
       toast.error('Failed to fetch sales orders');
     } finally {
       setLoading(false);
@@ -104,10 +114,15 @@ const SalesOrders = () => {
   };
 
   const handleEdit = (order) => {
+    if (!order || !order._id) {
+      toast.error('Invalid order data');
+      return;
+    }
+    
     setIsEditMode(true);
     setEditingOrderId(order._id);
     setFormData({
-      customer: order.customer._id || '',
+      customer: order.customer?._id || '',
       orderDate: order.orderDate || '',
       status: order.status || 'Draft',
       notes: order.notes || '',

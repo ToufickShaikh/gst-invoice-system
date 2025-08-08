@@ -27,44 +27,61 @@ const Purchases = () => {
     { 
       key: 'purchaseNumber', 
       label: 'Purchase #',
-      render: (purchase) => `PUR-${purchase._id.slice(-6).toUpperCase()}`
+      render: (value, purchase) => {
+        if (!purchase || !purchase._id) return 'PUR-UNKNOWN';
+        return `PUR-${purchase._id.slice(-6).toUpperCase()}`;
+      }
     },
     { 
       key: 'supplier.name', 
       label: 'Supplier',
-      render: (purchase) => purchase.supplier?.name || 'Unknown Supplier'
+      render: (value, purchase) => {
+        if (!purchase) return 'Unknown Supplier';
+        return purchase.supplier?.name || 'Unknown Supplier';
+      }
     },
     { 
       key: 'purchaseDate', 
       label: 'Date',
-      render: (purchase) => new Date(purchase.purchaseDate).toLocaleDateString()
+      render: (value, purchase) => {
+        if (!purchase || !purchase.purchaseDate) return 'Unknown Date';
+        return new Date(purchase.purchaseDate).toLocaleDateString();
+      }
     },
     {
       key: 'itemsCount',
       label: 'Items',
-      render: (purchase) => (
-        <div>
-          <span className="font-semibold">{purchase.items?.length || 0} items</span>
-          <div className="text-xs text-gray-500 mt-1">
-            {purchase.items?.map(item => item.item?.name || 'Unknown Item').join(', ').substring(0, 50)}
-            {purchase.items?.map(item => item.item?.name || 'Unknown Item').join(', ').length > 50 && '...'}
+      render: (value, purchase) => {
+        if (!purchase) return <div><span className="font-semibold">0 items</span></div>;
+        return (
+          <div>
+            <span className="font-semibold">{purchase.items?.length || 0} items</span>
+            <div className="text-xs text-gray-500 mt-1">
+              {purchase.items?.map(item => item.item?.name || 'Unknown Item').join(', ').substring(0, 50)}
+              {purchase.items?.map(item => item.item?.name || 'Unknown Item').join(', ').length > 50 && '...'}
+            </div>
           </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'totalQuantity',
       label: 'Total Qty',
-      render: (purchase) => (
-        <span className="font-semibold text-blue-600">
-          {purchase.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
-        </span>
-      )
+      render: (value, purchase) => {
+        if (!purchase) return <span className="font-semibold text-blue-600">0</span>;
+        const total = purchase.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+        return (
+          <span className="font-semibold text-blue-600">
+            {total}
+          </span>
+        );
+      }
     },
     {
       key: 'totalAmount',
       label: 'Total Amount',
-      render: (purchase) => {
+      render: (value, purchase) => {
+        if (!purchase) return <span className="font-semibold text-green-600">₹0.00</span>;
         const total = purchase.items?.reduce((sum, item) => 
           sum + ((item.quantity || 0) * (item.purchasePrice || 0)), 0) || 0;
         return (
@@ -77,34 +94,40 @@ const Purchases = () => {
     {
       key: 'notes',
       label: 'Notes',
-      render: (purchase) => (
-        <span className="text-sm text-gray-600">
-          {purchase.notes ? (purchase.notes.length > 30 ? purchase.notes.substring(0, 30) + '...' : purchase.notes) : 'No notes'}
-        </span>
-      )
+      render: (value, purchase) => {
+        if (!purchase) return <span className="text-sm text-gray-600">No notes</span>;
+        return (
+          <span className="text-sm text-gray-600">
+            {purchase.notes ? (purchase.notes.length > 30 ? purchase.notes.substring(0, 30) + '...' : purchase.notes) : 'No notes'}
+          </span>
+        );
+      }
     },
     {
       key: 'actions',
       label: 'Actions',
-      render: (purchase) => (
-        <div className="flex space-x-2">
-          <Button 
-            size="sm" 
-            onClick={() => handleEdit(purchase)}
-            className="text-xs"
-          >
-            Edit
-          </Button>
-          <Button 
-            variant="danger" 
-            size="sm" 
-            onClick={() => handleDelete(purchase._id)}
-            className="text-xs"
-          >
-            Delete
-          </Button>
-        </div>
-      ),
+      render: (value, purchase) => {
+        if (!purchase) return <div>No actions</div>;
+        return (
+          <div className="flex space-x-2">
+            <Button 
+              size="sm" 
+              onClick={() => handleEdit(purchase)}
+              className="text-xs"
+            >
+              Edit
+            </Button>
+            <Button 
+              variant="danger" 
+              size="sm" 
+              onClick={() => handleDelete(purchase._id)}
+              className="text-xs"
+            >
+              Delete
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -112,8 +135,13 @@ const Purchases = () => {
     setLoading(true);
     try {
       const response = await purchasesAPI.getAllPurchases();
-      setPurchases(response);
+      // Ensure response is an array and filter out null/undefined items
+      const validPurchases = Array.isArray(response) 
+        ? response.filter(purchase => purchase && purchase._id) 
+        : [];
+      setPurchases(validPurchases);
     } catch (error) {
+      console.error('Error fetching purchases:', error);
       toast.error('Failed to fetch purchases');
     } finally {
       setLoading(false);
@@ -180,16 +208,21 @@ const Purchases = () => {
   };
 
   const handleEdit = (purchase) => {
+    if (!purchase || !purchase._id) {
+      toast.error('Invalid purchase data');
+      return;
+    }
+    
     setIsEditMode(true);
     setCurrentPurchaseId(purchase._id);
     setFormData({
-      supplier: purchase.supplier._id,
-      items: purchase.items.map((item) => ({
-        item: item.item._id,
-        quantity: item.quantity,
-        purchasePrice: item.purchasePrice,
-      })),
-      notes: purchase.notes,
+      supplier: purchase.supplier?._id || '',
+      items: purchase.items?.map((item) => ({
+        item: item.item?._id || '',
+        quantity: item.quantity || 0,
+        purchasePrice: item.purchasePrice || 0,
+      })) || [],
+      notes: purchase.notes || '',
     });
     setIsModalOpen(true);
   };

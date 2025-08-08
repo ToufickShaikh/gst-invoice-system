@@ -6,18 +6,21 @@ import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import AppRoutes from '../routes/AppRoutes.jsx' // App routes
 import { AuthProvider } from './context/AuthContext' // Auth context provider
+import ErrorBoundary from './components/ErrorBoundary' // Error boundary
 
 // App is the root component that sets up routing and context
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        {/* Toast notifications */}
-        <Toaster position="top-right" />
-        {/* Main app routes */}
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          {/* Toast notifications */}
+          <Toaster position="top-right" />
+          {/* Main app routes */}
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

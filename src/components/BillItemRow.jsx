@@ -25,10 +25,15 @@ const BillItemRow = ({
   };
 
   const handleItemSelect = (item) => {
+    if (!item || !item._id) {
+      console.warn('Invalid item selected:', item);
+      return;
+    }
+    
     onItemChange(index, 'item', item);
     onItemChange(index, 'itemId', item._id);
-    onItemChange(index, 'customRate', item.rate);
-    onItemChange(index, 'searchValue', `${item.name} - ${formatCurrency(item.rate)} ${item.units || 'per piece'} - ${item.taxSlab}% GST`);
+    onItemChange(index, 'customRate', item.rate || 0);
+    onItemChange(index, 'searchValue', `${item.name || 'Unknown'} - ${formatCurrency(item.rate || 0)} ${item.units || 'per piece'} - ${item.taxSlab || 0}% GST`);
     setShowDropdown(false);
   };
 
