@@ -487,7 +487,11 @@ const Items = () => {
       
       console.log('Total duplicates found:', duplicates.length)
       
-      // Also check for duplicates by name only
+      // For carpet business, HSN codes can be legitimately shared
+      // Focus on exact duplicates (same name + same HSN)
+      const exactDuplicates = duplicates
+      
+      // Also check for name-only duplicates (these are likely real duplicates)
       const nameGroups = {}
       allItems.forEach(item => {
         if (item && item.name) {
@@ -507,59 +511,52 @@ const Items = () => {
         }
       })
       
-      // Also check for duplicates by HSN only
-      const hsnGroups = {}
-      allItems.forEach(item => {
-        if (item && item.hsnCode) {
-          if (!hsnGroups[item.hsnCode]) {
-            hsnGroups[item.hsnCode] = []
-          }
-          hsnGroups[item.hsnCode].push(item)
-        }
-      })
-      
-      const hsnDuplicates = []
-      Object.entries(hsnGroups).forEach(([hsn, group]) => {
-        if (group.length > 1) {
-          console.log(`Found HSN duplicates for "${hsn}":`, group.map(item => ({ id: item._id, name: item.name })))
-          hsnDuplicates.push(...group.slice(1))
-        }
-      })
-      
-      // Combine all duplicates (remove duplicates from the duplicate list itself)
-      const allDuplicates = [...duplicates, ...nameDuplicates, ...hsnDuplicates]
+      // Combine exact duplicates and name duplicates (ignore HSN-only duplicates as they're normal)
+      const allDuplicates = [...exactDuplicates, ...nameDuplicates]
       const uniqueDuplicates = allDuplicates.filter((item, index, self) => 
         index === self.findIndex(t => t._id === item._id)
       )
       
-      console.log('Total unique duplicates found:', uniqueDuplicates.length)
+      console.log('Total unique duplicates found (excluding normal HSN sharing):', uniqueDuplicates.length)
       
       if (uniqueDuplicates.length === 0) {
         toast.success('No duplicate items found')
         return
       }
       
-      // Confirm deletion
-      const confirmed = window.confirm(
-        `Found ${uniqueDuplicates.length} duplicate items. Do you want to delete them?\n\n` +
-        uniqueDuplicates.map(item => `• ${item.name} (${item.hsnCode})`).slice(0, 5).join('\n') +
-        (uniqueDuplicates.length > 5 ? `\n... and ${uniqueDuplicates.length - 5} more` : '')
-      )
+      console.log('About to show confirmation dialog for', uniqueDuplicates.length, 'duplicates')
       
-      if (!confirmed) return
+      // Show detailed confirmation with item names
+      const duplicatesList = uniqueDuplicates.map(item => `• ${item.name} (HSN: ${item.hsnCode})`).join('\n')
+      const message = `Found ${uniqueDuplicates.length} duplicate items:\n\n${duplicatesList.slice(0, 500)}${duplicatesList.length > 500 ? '\n...(truncated)' : ''}\n\nDo you want to delete these duplicates?`
+      
+      const confirmed = window.confirm(message)
+      console.log('User confirmation result:', confirmed)
+      
+      if (!confirmed) {
+        console.log('User canceled duplicate deletion')
+        return
+      }
       
       // Delete duplicates
+      console.log('Starting deletion process for', uniqueDuplicates.length, 'items')
       let deletedCount = 0
+      let failedCount = 0
+      
       for (const duplicate of uniqueDuplicates) {
         try {
+          console.log(`Deleting item: ${duplicate.name} (ID: ${duplicate._id})`)
           await itemsAPI.delete(duplicate._id)
           deletedCount++
+          console.log(`Successfully deleted: ${duplicate.name}`)
         } catch (error) {
+          failedCount++
           console.error('Error deleting duplicate:', duplicate.name, error)
         }
       }
       
-      toast.success(`${deletedCount} duplicate items deleted`)
+      console.log(`Deletion complete. Deleted: ${deletedCount}, Failed: ${failedCount}`)
+      toast.success(`${deletedCount} duplicate items deleted${failedCount > 0 ? `, ${failedCount} failed` : ''}`)
       fetchItems() // Refresh the list
       
     } catch (error) {
