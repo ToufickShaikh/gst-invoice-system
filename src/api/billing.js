@@ -60,4 +60,21 @@ export const billingAPI = {
       throw error;
     }
   },
+  // --- Quote operations ---
+  getAllQuotes: async () => {
+    const res = await axiosInstance.get(`/quotes`);
+    return res.data;
+  },
+  createQuote: async (quoteData) => {
+    const res = await axiosInstance.post(`/quotes`, quoteData);
+    return res.data;
+  },
+  updateQuote: async (id, quoteData) => {
+    const res = await axiosInstance.put(`/quotes/${id}`, quoteData);
+    return res.data;
+  },
+  deleteQuote: async (id) => {
+    const res = await axiosInstance.delete(`/quotes/${id}`);
+    return res.data;
+  },
 };

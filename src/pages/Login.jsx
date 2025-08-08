@@ -49,7 +49,7 @@ const Login = () => {
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-800">GST Billing System</h2>
             <div className="mt-2 bg-gradient-to-r from-yellow-600 to-yellow-800 text-white py-2 px-4 rounded-lg">
-              <p className="text-sm font-medium">Shaikh Tools and Dies</p>
+              <p className="text-sm font-medium">Shaikh Carpets and Mats</p>
               <p className="text-xs opacity-75">Professional Invoice Management</p>
             </div>
           </div>
