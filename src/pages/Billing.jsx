@@ -376,7 +376,16 @@ const Billing = () => {
       const successState = {
         invoiceId: response.invoice?._id || response.invoiceId || response._id || editingInvoice?._id,
         invoiceNumber: response.invoice?.invoiceNumber || response.invoiceNumber,
-        pdfUrl: response.pdfPath || response.pdfUrl || response.invoice?.pdfPath,
+        pdfUrl: (() => {
+          const pdfPath = response.pdfPath || response.pdfUrl || response.invoice?.pdfPath;
+          if (pdfPath) {
+            // For static files, use the direct server URL (not through Nginx proxy)
+            const staticBaseUrl = 'http://185.52.53.253:3000';
+            const normalizedPath = pdfPath.startsWith('/') ? pdfPath : `/${pdfPath}`;
+            return `${staticBaseUrl}${normalizedPath}`;
+          }
+          return null;
+        })(),
         upiQr: response.upiQr,
         balance: Number(grandTotal) - Number(paidAmount),
         // Pass data for WhatsApp integration

@@ -82,14 +82,14 @@ const Invoices = () => {
                 toast.success('Invoice generated successfully!');
                 console.log('📄 PDF Path received:', res.pdfPath);
 
-                // Get the base URL from environment variable or fallback to VPS URL
-                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://185.52.53.253/shaikh_carpets/api';
-                console.log('🌐 Using base URL:', baseUrl);
+                // For static files, use the direct server URL (not through Nginx proxy)
+                // Since static files are served directly by Express on port 3000
+                const staticBaseUrl = 'http://185.52.53.253:3000';
+                console.log('🌐 Using static base URL:', staticBaseUrl);
 
-                // Clean the base URL
-                const cleanBaseUrl = baseUrl.replace('/api', '');
+                // Construct the PDF URL for static file serving
                 const normalizedPath = res.pdfPath.startsWith('/') ? res.pdfPath : `/${res.pdfPath}`;
-                const pdfUrl = `${cleanBaseUrl}${normalizedPath}`;
+                const pdfUrl = `${staticBaseUrl}${normalizedPath}`;
                 console.log('🔗 Final PDF URL:', pdfUrl);
 
                 // Determine if it's a PDF or HTML file to set proper MIME type
