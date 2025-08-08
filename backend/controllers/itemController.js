@@ -35,7 +35,7 @@ const getItems = async (req, res) => {
 // @route   POST /api/items
 // @access  Private
 const createItem = async (req, res) => {
-    const { name, hsnCode, rate, taxSlab, units, quantityInStock } = req.body;
+    const { name, hsnCode, rate, priceType, taxSlab, units, quantityInStock } = req.body;
 
     // Basic input validation
     if (!name || !hsnCode || !rate || !taxSlab || !units) {
@@ -48,6 +48,7 @@ const createItem = async (req, res) => {
             name,
             hsnCode,
             rate,
+            priceType: priceType || 'Exclusive', // Default to Exclusive if not provided
             taxSlab,
             units,
             quantityInStock: quantityInStock || 0, // Default to 0 if not provided

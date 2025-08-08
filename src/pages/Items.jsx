@@ -281,14 +281,14 @@ const Items = () => {
         const lines = csv.split('\n')
         const headers = lines[0].split(',').map(h => h.trim())
         
-        // Expected headers: name,hsnCode,rate,priceType,taxSlab,units,stock
-        const expectedHeaders = ['name', 'hsnCode', 'rate', 'priceType', 'taxSlab', 'units', 'stock']
+        // Expected headers: name,hsnCode,rate,priceType,taxSlab,units (stock will be set to 0)
+        const expectedHeaders = ['name', 'hsnCode', 'rate', 'priceType', 'taxSlab', 'units']
         const isValidFormat = expectedHeaders.every(header => 
           headers.some(h => h.toLowerCase() === header.toLowerCase())
         )
         
         if (!isValidFormat) {
-          toast.error('Invalid CSV format. Expected headers: name,hsnCode,rate,priceType,taxSlab,units,stock')
+          toast.error('Invalid CSV format. Expected headers: name,hsnCode,rate,priceType,taxSlab,units')
           return
         }
         
@@ -320,8 +320,8 @@ const Items = () => {
   }
 
   const downloadCsvTemplate = () => {
-    const headers = 'name,hsnCode,rate,priceType,taxSlab,units,stock\n'
-    const sample = 'Sample Carpet,12345678,1000,Exclusive,18,per piece,50\n'
+    const headers = 'name,hsnCode,rate,priceType,taxSlab,units\n'
+    const sample = 'Sample Carpet,12345678,1000,Exclusive,18,per piece\n'
     const csvContent = headers + sample
     
     const blob = new Blob([csvContent], { type: 'text/csv' })
@@ -352,7 +352,7 @@ const Items = () => {
             priceType: item.priceType || 'Exclusive',
             taxSlab: parseFloat(item.taxSlab) || 18,
             units: item.units || 'per piece',
-            quantityInStock: parseInt(item.stock) || 0
+            quantityInStock: 0  // Always start with 0 stock, to be managed through purchase system
           }
           
           // Validate required fields
@@ -674,7 +674,8 @@ const Items = () => {
             <div className="bg-blue-50 p-4 rounded-lg">
               <h4 className="font-medium text-blue-900 mb-2">CSV Format Required</h4>
               <p className="text-blue-800 text-sm mb-3">
-                Your CSV file must have these columns: name, hsnCode, rate, priceType, taxSlab, units, stock
+                Your CSV file must have these columns: name, hsnCode, rate, priceType, taxSlab, units<br/>
+                <span className="text-xs">Note: Stock will be set to 0 for all imported items. Use Purchase system to manage stock.</span>
               </p>
               <Button 
                 type="button" 
@@ -713,7 +714,6 @@ const Items = () => {
                         <th className="border border-gray-300 px-2 py-1 text-left text-xs">Price Type</th>
                         <th className="border border-gray-300 px-2 py-1 text-left text-xs">Tax</th>
                         <th className="border border-gray-300 px-2 py-1 text-left text-xs">Units</th>
-                        <th className="border border-gray-300 px-2 py-1 text-left text-xs">Stock</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -725,7 +725,6 @@ const Items = () => {
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.pricetype || 'Exclusive'}</td>
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.taxslab}%</td>
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.units}</td>
-                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.stock}</td>
                         </tr>
                       ))}
                     </tbody>
