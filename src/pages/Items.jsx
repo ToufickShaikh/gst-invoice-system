@@ -15,7 +15,11 @@ const Items = () => {
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
+  const [csvFile, setCsvFile] = useState(null)
+  const [csvData, setCsvData] = useState([])
+  const [csvPreview, setCsvPreview] = useState([])
   const [bulkItems, setBulkItems] = useState([
     {
       name: '',
@@ -260,8 +264,117 @@ const Items = () => {
         units: 'per piece',
         stock: 0
       }])
+  // CSV import functions
+  const handleCsvFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file && file.type === 'text/csv') {
+      setCsvFile(file)
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const csv = event.target.result
+        const lines = csv.split('\n')
+        const headers = lines[0].split(',').map(h => h.trim())
+        
+        // Expected headers: name,hsnCode,rate,priceType,taxSlab,units,stock
+        const expectedHeaders = ['name', 'hsnCode', 'rate', 'priceType', 'taxSlab', 'units', 'stock']
+        const isValidFormat = expectedHeaders.every(header => 
+          headers.some(h => h.toLowerCase() === header.toLowerCase())
+        )
+        
+        if (!isValidFormat) {
+          toast.error('Invalid CSV format. Expected headers: name,hsnCode,rate,priceType,taxSlab,units,stock')
+          return
+        }
+        
+        const data = []
+        for (let i = 1; i < lines.length; i++) {
+          if (lines[i].trim()) {
+            const values = lines[i].split(',').map(v => v.trim())
+            const item = {}
+            headers.forEach((header, index) => {
+              const key = header.toLowerCase()
+              if (expectedHeaders.includes(key)) {
+                item[key] = values[index] || ''
+              }
+            })
+            if (item.name && item.hsnCode) {
+              data.push(item)
+            }
+          }
+        }
+        
+        setCsvData(data)
+        setCsvPreview(data.slice(0, 5)) // Show first 5 rows for preview
+        toast.success(`${data.length} items loaded from CSV`)
+      }
+      reader.readAsText(file)
+    } else {
+      toast.error('Please select a valid CSV file')
+    }
+  }
+
+  const downloadCsvTemplate = () => {
+    const headers = 'name,hsnCode,rate,priceType,taxSlab,units,stock\n'
+    const sample = 'Sample Carpet,12345678,1000,Exclusive,18,per piece,50\n'
+    const csvContent = headers + sample
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'items_template.csv'
+    link.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleCsvImport = async () => {
+    if (csvData.length === 0) {
+      toast.error('No data to import')
+      return
+    }
+
+    try {
+      let successCount = 0
+      const errors = []
+
+      for (const item of csvData) {
+        try {
+          const itemData = {
+            name: item.name,
+            hsnCode: item.hsnCode,
+            rate: parseFloat(item.rate) || 0,
+            priceType: item.priceType || 'Exclusive',
+            taxSlab: parseFloat(item.taxSlab) || 18,
+            units: item.units || 'per piece',
+            quantityInStock: parseInt(item.stock) || 0
+          }
+          
+          // Validate required fields
+          if (!itemData.name || !itemData.hsnCode || itemData.rate <= 0) {
+            errors.push(`Skipped "${item.name || 'unnamed'}": Missing required fields`)
+            continue
+          }
+          
+          await itemsAPI.create(itemData)
+          successCount++
+        } catch (error) {
+          errors.push(`Failed to add "${item.name}": ${error.message}`)
+        }
+      }
+
+      toast.success(`${successCount} items imported successfully`)
+      if (errors.length > 0) {
+        console.error('Import errors:', errors)
+        toast.error(`${errors.length} items failed to import`)
+      }
+      
+      fetchItems()
+      setIsCsvModalOpen(false)
+      setCsvFile(null)
+      setCsvData([])
+      setCsvPreview([])
     } catch (error) {
-      toast.error('Bulk add failed')
+      toast.error('CSV import failed')
     }
   }
 
@@ -296,6 +409,9 @@ const Items = () => {
             </Button>
             <Button onClick={() => setIsBulkModalOpen(true)} variant="secondary">
               Bulk Add Items
+            </Button>
+            <Button onClick={() => setIsCsvModalOpen(true)} variant="secondary">
+              Import CSV
             </Button>
           </div>
         </div>
@@ -538,6 +654,103 @@ const Items = () => {
               </div>
             </div>
           </form>
+        </Modal>
+
+        {/* CSV Import Modal */}
+        <Modal
+          isOpen={isCsvModalOpen}
+          onClose={() => setIsCsvModalOpen(false)}
+          title="Import Items from CSV"
+          size="large"
+        >
+          <div className="space-y-6">
+            {/* CSV Template Download */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-medium text-blue-900 mb-2">CSV Format Required</h4>
+              <p className="text-blue-800 text-sm mb-3">
+                Your CSV file must have these columns: name, hsnCode, rate, priceType, taxSlab, units, stock
+              </p>
+              <Button 
+                type="button" 
+                onClick={downloadCsvTemplate}
+                variant="secondary"
+                size="sm"
+              >
+                Download Template CSV
+              </Button>
+            </div>
+
+            {/* File Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select CSV File
+              </label>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleCsvFileChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Preview */}
+            {csvPreview.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2">Preview (First 5 items)</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-300 px-2 py-1 text-left text-xs">Name</th>
+                        <th className="border border-gray-300 px-2 py-1 text-left text-xs">HSN</th>
+                        <th className="border border-gray-300 px-2 py-1 text-left text-xs">Rate</th>
+                        <th className="border border-gray-300 px-2 py-1 text-left text-xs">Price Type</th>
+                        <th className="border border-gray-300 px-2 py-1 text-left text-xs">Tax</th>
+                        <th className="border border-gray-300 px-2 py-1 text-left text-xs">Units</th>
+                        <th className="border border-gray-300 px-2 py-1 text-left text-xs">Stock</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreview.map((item, index) => (
+                        <tr key={index}>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.name}</td>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.hsncode}</td>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.rate}</td>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.pricetype || 'Exclusive'}</td>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.taxslab}%</td>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.units}</td>
+                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.stock}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  Total items to import: {csvData.length}
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-2">
+              <Button 
+                type="button" 
+                variant="secondary" 
+                onClick={() => setIsCsvModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              {csvData.length > 0 && (
+                <Button 
+                  type="button" 
+                  variant="primary"
+                  onClick={handleCsvImport}
+                >
+                  Import {csvData.length} Items
+                </Button>
+              )}
+            </div>
+          </div>
         </Modal>
       </div>
     </Layout>
