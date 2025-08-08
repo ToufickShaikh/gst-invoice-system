@@ -358,7 +358,7 @@ export default Layout
               </div>
               <div className="hidden sm:block">
                 <h1 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                  Shaikh Tools and Dies
+                  Shaikh Carpets And Mats
                 </h1>
                 <p className="text-xs lg:text-sm text-gray-500 font-medium">
                   Professional GST Billing
@@ -497,7 +497,7 @@ export default Layout
           <div className="branding-section">
             <div className="relative z-10">
               <h3 className="text-lg lg:text-xl font-bold mb-2">
-                Shaikh Tools and Dies - Professional Billing System
+                Shaikh Carpets And Mats - Professional Billing System
               </h3>
               <p className="text-sm opacity-90 mb-4">
                 Streamlined GST invoicing with real-time verification

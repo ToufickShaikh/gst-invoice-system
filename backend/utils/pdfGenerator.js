@@ -50,11 +50,11 @@ async function generateInvoicePDF(invoiceData) {
 
 async function replacePlaceholders(html, invoiceData) {
     // Company details
-    html = html.replace(/{{companyName}}/g, 'Shaikh Tools And Dies');
-    html = html.replace(/{{companyAddress}}/g, 'NO.11/44 EDAPALLAM STREET PARK TOWN');
-    html = html.replace(/{{companyPhone}}/g, '8939487096');
-    html = html.replace(/{{companyEmail}}/g, 'shaikhtoolsanddies@yahoo.com');
-    html = html.replace(/{{companyGSTIN}}/g, '33BVRPS2849Q1ZH');
+    html = html.replace(/{{companyName}}/g, 'Shaikh Carpets And Mats');
+    html = html.replace(/{{companyAddress}}/g, '11 Trevelyan Basin Street,Sowcarpet,Chennai-600079');
+    html = html.replace(/{{companyPhone}}/g, '9840844026/8939487096');
+    html = html.replace(/{{companyEmail}}/g, 'shaikhcarpetsandmats@gmail.com');
+    html = html.replace(/{{companyGSTIN}}/g, '33BVRPS2849Q2ZG');
     html = html.replace(/{{companyState}}/g, '33-Tamil Nadu');
     html = html.replace(/{{companyLogo}}/g, 'https://bri.ct.ws/include/logo.png');
 
@@ -209,9 +209,9 @@ async function replacePlaceholders(html, invoiceData) {
     }
 
     html = html.replace(/{{bankName}}/g, 'INDIAN OVERSEAS BANK, B RDWAY');
-    html = html.replace(/{{bankAccount}}/g, '130702000003546');
+    html = html.replace(/{{bankAccount}}/g, '130702000003731');
     html = html.replace(/{{bankIFSC}}/g, 'IOBA0001307');
-    html = html.replace(/{{bankHolder}}/g, 'Shaikh Tools And Dies');
+    html = html.replace(/{{bankHolder}}/g, 'Shaikh Carpets And Mats');
     html = html.replace(/{{upiQrImage}}/g, upiQrDataUrl);
     html = html.replace(/{{signatureImage}}/g, 'https://bri.ct.ws/include/sign.png');
 

@@ -83,7 +83,7 @@ const Invoices = () => {
                 console.log('📄 PDF Path received:', res.pdfPath);
 
                 // Get the base URL from environment variable or fallback to default
-                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
                 console.log('🌐 Using base URL:', baseUrl);
 
                 // Clean the base URL
