@@ -21,7 +21,8 @@ app.use(cors({
     origin: [
         'https://shaikhgst.netlify.app',
         'http://localhost:5173',
-        'http://localhost:3000'
+        'http://localhost:3000',
+        'http://185.52.53.253'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
