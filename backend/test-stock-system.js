@@ -5,7 +5,7 @@ const Supplier = require('./models/Supplier');
 
 async function testStockSystem() {
     try {
-        // Connect to MongoDB
+        // Conect to MongoDB
         await mongoose.connect('mongodb://localhost:27017/gst-invoice-system');
         console.log('✅ Connected to MongoDB');
 
