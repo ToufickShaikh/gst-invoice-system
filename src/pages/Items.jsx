@@ -19,6 +19,7 @@ const Items = () => {
     name: '',
     hsnCode: '',
     rate: '',
+    priceType: 'Exclusive',  // GST price type selection
     taxSlab: '',
     units: 'per piece'
   })
@@ -26,6 +27,7 @@ const Items = () => {
   const columns = [
     { key: 'name', label: 'Item Name' },
     { key: 'hsnCode', label: 'HSN Code' },
+    { key: 'priceType', label: 'Price Type' },
     { key: 'formattedRate', label: 'Rate' },
     { key: 'units', label: 'Units' },
     { key: 'taxSlabDisplay', label: 'Tax Slab' },

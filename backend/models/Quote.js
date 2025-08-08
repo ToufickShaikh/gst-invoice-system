@@ -21,6 +21,11 @@ const quoteSchema = new mongoose.Schema({
         type: Number,
         required: true,
       },
+      priceType: {
+        type: String,
+        enum: ['Exclusive', 'Inclusive'],
+        default: 'Exclusive'
+      }
     },
   ],
   status: {
