@@ -443,6 +443,43 @@ const Items = () => {
     }
   }
 
+  // Test function to verify delete API (for debugging)
+  const testDeleteAPI = async () => {
+    try {
+      console.log('Testing delete API...')
+      const response = await itemsAPI.getAll()
+      const allItems = Array.isArray(response.data) ? response.data : Array.isArray(response) ? response : []
+      
+      if (allItems.length === 0) {
+        console.log('No items to test delete with')
+        return
+      }
+      
+      // Find a test item (look for one we created for testing)
+      const testItem = allItems.find(item => item.name.toLowerCase().includes('test') || item.name.toLowerCase().includes('sample'))
+      
+      if (!testItem) {
+        console.log('No test item found to delete')
+        return
+      }
+      
+      console.log('Found test item to delete:', testItem)
+      
+      const confirmed = window.confirm(`Test delete API with item: "${testItem.name}"?`)
+      if (!confirmed) return
+      
+      const deleteResult = await itemsAPI.delete(testItem._id)
+      console.log('Delete test result:', deleteResult)
+      toast.success(`Test delete successful: ${testItem.name}`)
+      
+      await fetchItems()
+      
+    } catch (error) {
+      console.error('Delete test failed:', error)
+      toast.error('Delete test failed - check console')
+    }
+  }
+
   // Function to find and delete duplicate items
   const findAndDeleteDuplicates = async () => {
     try {
@@ -553,21 +590,37 @@ const Items = () => {
       let deletedCount = 0
       let failedCount = 0
       
-      for (const duplicate of uniqueDuplicates) {
+      for (let i = 0; i < uniqueDuplicates.length; i++) {
+        const duplicate = uniqueDuplicates[i]
         try {
-          console.log(`Deleting item: ${duplicate.name} (ID: ${duplicate._id})`)
-          await itemsAPI.delete(duplicate._id)
+          console.log(`[${i+1}/${uniqueDuplicates.length}] Deleting item: ${duplicate.name} (ID: ${duplicate._id})`)
+          
+          const deleteResponse = await itemsAPI.delete(duplicate._id)
+          console.log(`Delete API response:`, deleteResponse)
+          
           deletedCount++
-          console.log(`Successfully deleted: ${duplicate.name}`)
+          console.log(`✅ Successfully deleted: ${duplicate.name}`)
         } catch (error) {
           failedCount++
-          console.error('Error deleting duplicate:', duplicate.name, error)
+          console.error(`❌ Error deleting duplicate "${duplicate.name}":`, error)
+          console.error('Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+          })
         }
       }
       
-      console.log(`Deletion complete. Deleted: ${deletedCount}, Failed: ${failedCount}`)
-      toast.success(`${deletedCount} duplicate items deleted${failedCount > 0 ? `, ${failedCount} failed` : ''}`)
-      fetchItems() // Refresh the list
+      console.log(`🎯 Deletion complete. Deleted: ${deletedCount}, Failed: ${failedCount}`)
+      
+      if (deletedCount > 0) {
+        toast.success(`${deletedCount} duplicate items deleted${failedCount > 0 ? `, ${failedCount} failed` : ''}`)
+        console.log('Refreshing items list...')
+        await fetchItems() // Refresh the list
+        console.log('Items list refreshed')
+      } else {
+        toast.error('No items could be deleted. Check console for errors.')
+      }
       
     } catch (error) {
       console.error('Error finding duplicates:', error)
