@@ -311,7 +311,7 @@ const Items = () => {
             headers.forEach((header, index) => {
               const lowerHeader = header.toLowerCase()
               const mappedKey = headerMap[lowerHeader]
-              if (mappedKey && values[index]) {
+              if (mappedKey && values[index] !== undefined && values[index] !== null) {
                 item[mappedKey] = values[index].trim()
               }
             })
@@ -324,6 +324,13 @@ const Items = () => {
         
         setCsvData(data)
         setCsvPreview(data.slice(0, 5)) // Show first 5 rows for preview
+        
+        // Debug: Log items with 0% tax
+        const zeroTaxItems = data.filter(item => parseFloat(item.taxSlab) === 0)
+        if (zeroTaxItems.length > 0) {
+          console.log('Found 0% tax items in CSV:', zeroTaxItems.map(item => ({ name: item.name, taxSlab: item.taxSlab })))
+        }
+        
         toast.success(`${data.length} items loaded from CSV`)
       }
       reader.readAsText(file)
@@ -354,6 +361,7 @@ const Items = () => {
 
     try {
       let successCount = 0
+      let duplicateCount = 0
       const errors = []
 
       for (const item of csvData) {
@@ -368,23 +376,50 @@ const Items = () => {
             quantityInStock: 0  // Always start with 0 stock, to be managed through purchase system
           }
           
+          // Debug logging for 0% tax items
+          if (parseFloat(item.taxSlab) === 0) {
+            console.log('Processing 0% tax item:', item.name, 'Original taxSlab:', item.taxSlab, 'Parsed taxSlab:', itemData.taxSlab)
+          }
+          
           // Validate required fields
           if (!itemData.name || !itemData.hsnCode || itemData.rate <= 0) {
-            errors.push(`Skipped "${item.name || 'unnamed'}": Missing required fields`)
+            console.log('Validation failed for item:', itemData)
+            errors.push(`Skipped "${item.name || 'unnamed'}": Missing required fields (name: ${!!itemData.name}, hsnCode: ${!!itemData.hsnCode}, rate: ${itemData.rate})`)
+            continue
+          }
+
+          // Check for existing item by name or HSN code
+          const existingItems = await itemsAPI.getAll()
+          const isDuplicate = existingItems.data.some(existing => 
+            existing.name.toLowerCase() === itemData.name.toLowerCase() || 
+            existing.hsnCode === itemData.hsnCode
+          )
+
+          if (isDuplicate) {
+            duplicateCount++
+            errors.push(`Skipped "${item.name}": Item already exists`)
             continue
           }
           
           await itemsAPI.create(itemData)
           successCount++
         } catch (error) {
-          errors.push(`Failed to add "${item.name}": ${error.message}`)
+          if (error.message && error.message.includes('already exists')) {
+            duplicateCount++
+            errors.push(`Skipped "${item.name}": Item already exists`)
+          } else {
+            errors.push(`Failed to add "${item.name}": ${error.message}`)
+          }
         }
       }
 
       toast.success(`${successCount} items imported successfully`)
-      if (errors.length > 0) {
+      if (duplicateCount > 0) {
+        toast.warning(`${duplicateCount} duplicate items were skipped`)
+      }
+      if (errors.length > duplicateCount) {
         console.error('Import errors:', errors)
-        toast.error(`${errors.length} items failed to import`)
+        toast.error(`${errors.length - duplicateCount} items failed to import`)
       }
       
       fetchItems()
@@ -394,6 +429,66 @@ const Items = () => {
       setCsvPreview([])
     } catch (error) {
       toast.error('CSV import failed')
+    }
+  }
+
+  // Function to find and delete duplicate items
+  const findAndDeleteDuplicates = async () => {
+    try {
+      const response = await itemsAPI.getAll()
+      const allItems = response.data || []
+      
+      // Group items by name (case-insensitive) and HSN code
+      const itemGroups = {}
+      const duplicates = []
+      
+      allItems.forEach(item => {
+        const key = `${item.name.toLowerCase()}_${item.hsnCode}`
+        if (!itemGroups[key]) {
+          itemGroups[key] = []
+        }
+        itemGroups[key].push(item)
+      })
+      
+      // Find duplicates (groups with more than 1 item)
+      Object.values(itemGroups).forEach(group => {
+        if (group.length > 1) {
+          // Keep the first item, mark others as duplicates
+          duplicates.push(...group.slice(1))
+        }
+      })
+      
+      if (duplicates.length === 0) {
+        toast.info('No duplicate items found')
+        return
+      }
+      
+      // Confirm deletion
+      const confirmed = window.confirm(
+        `Found ${duplicates.length} duplicate items. Do you want to delete them?\n\n` +
+        duplicates.map(item => `• ${item.name} (${item.hsnCode})`).slice(0, 5).join('\n') +
+        (duplicates.length > 5 ? `\n... and ${duplicates.length - 5} more` : '')
+      )
+      
+      if (!confirmed) return
+      
+      // Delete duplicates
+      let deletedCount = 0
+      for (const duplicate of duplicates) {
+        try {
+          await itemsAPI.delete(duplicate._id)
+          deletedCount++
+        } catch (error) {
+          console.error('Error deleting duplicate:', duplicate.name, error)
+        }
+      }
+      
+      toast.success(`${deletedCount} duplicate items deleted`)
+      fetchItems() // Refresh the list
+      
+    } catch (error) {
+      console.error('Error finding duplicates:', error)
+      toast.error('Failed to find duplicates')
     }
   }
 
@@ -431,6 +526,9 @@ const Items = () => {
             </Button>
             <Button onClick={() => setIsCsvModalOpen(true)} variant="secondary">
               Import CSV
+            </Button>
+            <Button onClick={findAndDeleteDuplicates} variant="outline" className="text-red-600 border-red-300 hover:bg-red-50">
+              Clean Duplicates
             </Button>
           </div>
         </div>
