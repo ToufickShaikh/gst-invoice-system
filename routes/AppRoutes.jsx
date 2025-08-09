@@ -2,6 +2,7 @@ import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from "../src/context/AuthContext";
 import Dashboard from '../src/pages/Dashboard'
+import AdvancedDashboard from '../src/pages/AdvancedDashboard'
 import Customers from '../src/pages/Customers'
 import Items from '../src/pages/Items'
 import Billing from '../src/pages/Billing'
@@ -39,7 +40,8 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
-      <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+      <Route path="/dashboard" element={<PrivateRoute><AdvancedDashboard /></PrivateRoute>} />
+      <Route path="/dashboard-simple" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
       <Route path="/items" element={<PrivateRoute><Items /></PrivateRoute>} />
       <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />

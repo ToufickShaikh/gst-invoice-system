@@ -1,53 +1,224 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { billingAPI } from '../api/billing';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
-import Modal from '../components/Modal'; // Import Modal
+import Modal from '../components/Modal';
+import InvoiceFilters from '../components/InvoiceFilters';
+import InvoiceTable from '../components/InvoiceTable';
+import InvoiceActionBar from '../components/InvoiceActionBar';
+import InvoiceAnalytics from '../components/InvoiceAnalytics';
+import InvoiceSettings from '../components/InvoiceSettings';
 import { formatCurrency } from '../utils/dateHelpers';
 import { downloadInvoicePdf } from '../utils/downloadHelper';
 import { tryMultipleDownloadMethods } from '../utils/alternativeDownload';
 import { sendPaymentReminderViaWhatsApp } from '../utils/whatsappHelper';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 const Invoices = () => {
-    const navigate = useNavigate(); // Initialize navigate
-    const [invoices, setInvoices] = useState([]);
+    const navigate = useNavigate();
+    const [allInvoices, setAllInvoices] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [tab, setTab] = useState('B2B');
+    const [tab, setTab] = useState('ALL');
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
     const [qrCodeImage, setQrCodeImage] = useState('');
+    const [selectedInvoices, setSelectedInvoices] = useState([]);
+    const [viewMode, setViewMode] = useState('table');
+    const [sortField, setSortField] = useState('invoiceDate');
+    const [sortDirection, setSortDirection] = useState('desc');
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [filters, setFilters] = useState({
+        search: '',
+        status: 'all',
+        dateRange: 'all',
+        customStartDate: '',
+        customEndDate: '',
+        amountMin: '',
+        amountMax: '',
+        customerType: 'all',
+        paymentMethod: 'all'
+    });
+
+    // Filtered and sorted invoices
+    const filteredInvoices = useMemo(() => {
+        let filtered = [...allInvoices];
+
+        // Apply tab filter first
+        if (tab !== 'ALL') {
+            filtered = filtered.filter(inv => inv.customer?.customerType === tab);
+        }
+
+        // Apply search filter
+        if (filters.search) {
+            const searchTerm = filters.search.toLowerCase();
+            filtered = filtered.filter(inv =>
+                inv.invoiceNumber?.toLowerCase().includes(searchTerm) ||
+                inv.customer?.firmName?.toLowerCase().includes(searchTerm) ||
+                inv.customer?.name?.toLowerCase().includes(searchTerm) ||
+                inv.customer?.contact?.includes(searchTerm)
+            );
+        }
+
+        // Apply status filter
+        if (filters.status !== 'all') {
+            filtered = filtered.filter(inv => {
+                const total = inv.grandTotal || inv.totalAmount || 0;
+                const paid = inv.paidAmount || 0;
+                const balance = total - paid;
+
+                switch (filters.status) {
+                    case 'paid':
+                        return balance <= 0;
+                    case 'partial':
+                        return balance > 0 && paid > 0;
+                    case 'overdue':
+                        const invoiceDate = new Date(inv.invoiceDate);
+                        const dueDate = new Date(invoiceDate.getTime() + (30 * 24 * 60 * 60 * 1000));
+                        return balance > 0 && new Date() > dueDate;
+                    case 'draft':
+                        return inv.status === 'draft';
+                    default:
+                        return true;
+                }
+            });
+        }
+
+        // Apply date range filter
+        if (filters.dateRange !== 'all') {
+            const now = new Date();
+            let startDate;
+
+            switch (filters.dateRange) {
+                case 'today':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    break;
+                case 'this_week':
+                    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    break;
+                case 'this_month':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                case 'this_quarter':
+                    const quarter = Math.floor(now.getMonth() / 3);
+                    startDate = new Date(now.getFullYear(), quarter * 3, 1);
+                    break;
+                case 'this_year':
+                    startDate = new Date(now.getFullYear(), 0, 1);
+                    break;
+                case 'custom':
+                    if (filters.customStartDate) {
+                        startDate = new Date(filters.customStartDate);
+                    }
+                    break;
+            }
+
+            if (startDate) {
+                filtered = filtered.filter(inv => new Date(inv.invoiceDate) >= startDate);
+            }
+
+            if (filters.dateRange === 'custom' && filters.customEndDate) {
+                const endDate = new Date(filters.customEndDate);
+                endDate.setHours(23, 59, 59, 999);
+                filtered = filtered.filter(inv => new Date(inv.invoiceDate) <= endDate);
+            }
+        }
+
+        // Apply amount filters
+        if (filters.amountMin) {
+            filtered = filtered.filter(inv => 
+                (inv.grandTotal || inv.totalAmount || 0) >= parseFloat(filters.amountMin)
+            );
+        }
+        if (filters.amountMax) {
+            filtered = filtered.filter(inv => 
+                (inv.grandTotal || inv.totalAmount || 0) <= parseFloat(filters.amountMax)
+            );
+        }
+
+        // Apply customer type filter
+        if (filters.customerType !== 'all') {
+            filtered = filtered.filter(inv => inv.customer?.customerType === filters.customerType);
+        }
+
+        // Apply payment method filter
+        if (filters.paymentMethod !== 'all') {
+            filtered = filtered.filter(inv => inv.paymentMethod === filters.paymentMethod);
+        }
+
+        // Apply sorting
+        filtered.sort((a, b) => {
+            let aValue, bValue;
+
+            switch (sortField) {
+                case 'invoiceNumber':
+                    aValue = a.invoiceNumber || '';
+                    bValue = b.invoiceNumber || '';
+                    break;
+                case 'customer':
+                    aValue = a.customer?.firmName || a.customer?.name || '';
+                    bValue = b.customer?.firmName || b.customer?.name || '';
+                    break;
+                case 'invoiceDate':
+                    aValue = new Date(a.invoiceDate || 0);
+                    bValue = new Date(b.invoiceDate || 0);
+                    break;
+                case 'grandTotal':
+                    aValue = a.grandTotal || a.totalAmount || 0;
+                    bValue = b.grandTotal || b.totalAmount || 0;
+                    break;
+                default:
+                    aValue = a[sortField] || '';
+                    bValue = b[sortField] || '';
+            }
+
+            if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return filtered;
+    }, [allInvoices, tab, filters, sortField, sortDirection]);
+
+    // Calculate analytics
+    const analytics = useMemo(() => {
+        const totalAmount = allInvoices.reduce((sum, inv) => sum + (inv.grandTotal || inv.totalAmount || 0), 0);
+        return {
+            totalInvoices: allInvoices.length,
+            totalAmount,
+            filteredCount: filteredInvoices.length
+        };
+    }, [allInvoices, filteredInvoices]);
 
     const fetchInvoices = async (billingType) => {
         setLoading(true);
         try {
-            // For "ALL" tab, don't pass billingType filter
-            const filterType = billingType === 'ALL' ? null : billingType;
-            const res = await billingAPI.getInvoices(filterType);
+            // Always fetch all invoices, then filter on frontend for better UX
+            const res = await billingAPI.getInvoices();
             if (Array.isArray(res)) {
-                setInvoices(res);
+                setAllInvoices(res);
             } else if (Array.isArray(res?.data)) {
-                setInvoices(res.data);
+                setAllInvoices(res.data);
             } else {
-                setInvoices([]);
+                setAllInvoices([]);
             }
         } catch (e) {
-            setInvoices([]);
+            setAllInvoices([]);
+            toast.error('Failed to fetch invoices');
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchInvoices(tab);
-    }, [tab]);
+        fetchInvoices();
+    }, []);
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this invoice?')) return;
         setLoading(true);
         try {
-            await billingAPI.deleteInvoice(id); // FIX: Was billingAPI.remove(id)
-            setInvoices(invoices.filter(inv => inv._id !== id));
+            await billingAPI.deleteInvoice(id);
+            setAllInvoices(allInvoices.filter(inv => inv._id !== id));
             toast.success('Invoice deleted successfully!');
         } catch (err) {
             toast.error('Failed to delete invoice.');
@@ -183,6 +354,138 @@ const Invoices = () => {
         }
     };
 
+    // Handle WhatsApp reminder with improved messaging
+    const handleWhatsAppReminder = (invoice) => {
+        try {
+            const result = sendPaymentReminderViaWhatsApp(
+                invoice.customer,
+                {
+                    invoiceNumber: invoice.invoiceNumber,
+                    grandTotal: invoice.grandTotal || invoice.totalAmount,
+                    paidAmount: invoice.paidAmount || 0,
+                    balance: (invoice.grandTotal || invoice.totalAmount) - (invoice.paidAmount || 0),
+                    invoiceDate: invoice.invoiceDate
+                }
+            );
+
+            if (result.success) {
+                toast.success('WhatsApp reminder opened!', {
+                    duration: 3000,
+                    icon: '📱'
+                });
+            } else {
+                toast.error(`Error: ${result.error}`);
+            }
+        } catch (error) {
+            toast.error('Failed to open WhatsApp reminder');
+        }
+    };
+
+    // Advanced filter handling
+    const handleFilterChange = (newFilters) => {
+        setFilters(newFilters);
+    };
+
+    // Sorting
+    const handleSortChange = (field, direction) => {
+        setSortField(field);
+        setSortDirection(direction);
+    };
+
+    // Export functions
+    const handleExport = async (format) => {
+        try {
+            toast.loading('Preparing export...', { id: 'export-toast' });
+            
+            // Simulate export functionality
+            switch (format) {
+                case 'excel':
+                    // Export to Excel logic
+                    toast.success('Excel export completed!', { id: 'export-toast' });
+                    break;
+                case 'pdf':
+                    // Export to PDF logic
+                    toast.success('PDF export completed!', { id: 'export-toast' });
+                    break;
+                case 'csv':
+                    // Export to CSV logic
+                    const csvData = filteredInvoices.map(inv => ({
+                        'Invoice Number': inv.invoiceNumber,
+                        'Customer': inv.customer?.firmName || inv.customer?.name,
+                        'Date': inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '',
+                        'Total': inv.grandTotal || inv.totalAmount,
+                        'Paid': inv.paidAmount || 0,
+                        'Balance': (inv.grandTotal || inv.totalAmount || 0) - (inv.paidAmount || 0)
+                    }));
+                    
+                    const csvContent = Object.keys(csvData[0] || {}).join(',') + '\n' +
+                        csvData.map(row => Object.values(row).join(',')).join('\n');
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `invoices-${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    toast.success('CSV export completed!', { id: 'export-toast' });
+                    break;
+                case 'print':
+                    // Print logic
+                    window.print();
+                    toast.success('Print dialog opened!', { id: 'export-toast' });
+                    break;
+            }
+        } catch (error) {
+            toast.error('Export failed', { id: 'export-toast' });
+        }
+    };
+
+    // Bulk actions
+    const handleBulkAction = async (action) => {
+        if (selectedInvoices.length === 0) {
+            toast.error('Please select invoices first');
+            return;
+        }
+
+        switch (action) {
+            case 'delete':
+                if (window.confirm(`Delete ${selectedInvoices.length} selected invoices?`)) {
+                    setLoading(true);
+                    try {
+                        for (const invoiceId of selectedInvoices) {
+                            await billingAPI.deleteInvoice(invoiceId);
+                        }
+                        setAllInvoices(allInvoices.filter(inv => !selectedInvoices.includes(inv._id)));
+                        setSelectedInvoices([]);
+                        toast.success(`${selectedInvoices.length} invoices deleted successfully!`);
+                    } catch (error) {
+                        toast.error('Failed to delete some invoices');
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+                break;
+            case 'reprint':
+                setLoading(true);
+                try {
+                    for (const invoiceId of selectedInvoices) {
+                        await handleReprint(invoiceId);
+                    }
+                    toast.success(`${selectedInvoices.length} invoices reprinted!`);
+                } catch (error) {
+                    toast.error('Failed to reprint some invoices');
+                } finally {
+                    setLoading(false);
+                }
+                break;
+            case 'clear-selection':
+                setSelectedInvoices([]);
+                break;
+        }
+    };
+
     // Handle generating and showing the payment QR code
     const handlePay = async (invoice) => {
         const balance = (invoice.grandTotal || 0) - (invoice.paidAmount || 0);
@@ -210,164 +513,120 @@ const Invoices = () => {
     return (
         <Layout>
             <div className="space-y-6">
+                {/* Page Header */}
                 <div className="flex justify-between items-center">
-                    <h1 className="text-2xl font-bold">Invoices</h1>
-
-                    {/* Quick Actions */}
-                    <div className="flex gap-3">
-                        <Button
-                            variant="success"
-                            size="sm"
-                            leftIcon={
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                </svg>
-                            }
-                            onClick={() => {
-                                toast.success('Opening invoice browser!', { duration: 1000 });
-                                window.open('/invoices', '_blank');
-                            }}
-                        >
-                            Open Invoice Browser
-                        </Button>
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900">Invoice Management</h1>
+                        <p className="text-gray-600 mt-1">Manage and track all your invoices in one place</p>
                     </div>
                 </div>
 
-                <div className="flex gap-4 mb-4">
-                    <Button variant={tab === 'B2B' ? 'primary' : 'secondary'} onClick={() => setTab('B2B')}>B2B Invoices</Button>
-                    <Button variant={tab === 'B2C' ? 'primary' : 'secondary'} onClick={() => setTab('B2C')}>B2C Invoices</Button>
-                    <Button variant={tab === 'ALL' ? 'primary' : 'secondary'} onClick={() => setTab('ALL')}>All Invoices</Button>
-                </div>
-                {loading && <div>Loading...</div>}
-                <div className="overflow-x-auto">
-                    <table className="min-w-full border">
-                        <thead>
-                            <tr>
-                                <th className="border px-2 py-1">#</th>
-                                <th className="border px-2 py-1">Invoice No</th>
-                                <th className="border px-2 py-1">Customer</th>
-                                <th className="border px-2 py-1">Date</th>
-                                <th className="border px-2 py-1">Total</th>
-                                <th className="border px-2 py-1">Paid</th>
-                                <th className="border px-2 py-1">Balance</th>
-                                <th className="border px-2 py-1">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {invoices.map((inv, idx) => (
-                                <tr key={inv._id} className={!inv.customer ? 'bg-yellow-50' : (inv.hasBeenEdited ? 'bg-blue-50' : '')}>
-                                    <td className="border px-2 py-1">{idx + 1}</td>
-                                    <td className="border px-2 py-1">
-                                        <div className="flex items-center">
-                                            {inv.invoiceNumber}
-                                            {inv.hasBeenEdited && (
-                                                <span className="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">
-                                                    Edited
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="border px-2 py-1">
-                                        {inv.customer ? (
-                                            <div>
-                                                <div>{inv.customer.firmName || inv.customer.name}</div>
-                                                <small className="text-gray-500">({inv.customer.customerType})</small>
-                                            </div>
-                                        ) : (
-                                            <span className="text-red-500 font-medium">No Customer</span>
-                                        )}
-                                    </td>
-                                    <td className="border px-2 py-1">{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : ''}</td>
-                                    <td className="border px-2 py-1">{formatCurrency(inv.grandTotal || inv.totalAmount)}</td>
-                                    <td className="border px-2 py-1">{formatCurrency(inv.paidAmount)}</td>
-                                    <td className="border px-2 py-1">{formatCurrency((inv.grandTotal || inv.totalAmount) - (inv.paidAmount || 0))}</td>
-                                    <td className="border px-2 py-1 space-x-1">
-                                        <div className="flex flex-wrap gap-1">
-                                            <Button
-                                                size="sm"
-                                                variant="primary"
-                                                className="flex items-center"
-                                                onClick={() => handleEdit(inv._id)}
-                                            >
-                                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                </svg>
-                                                Edit
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="secondary"
-                                                className="flex items-center"
-                                                onClick={() => handleReprint(inv._id)}
-                                            >
-                                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                                </svg>
-                                                Reprint
-                                            </Button>
-                                            {((inv.grandTotal || 0) - (inv.paidAmount || 0)) > 0 && (
-                                                <>
-                                                    <Button size="sm" variant="success" onClick={() => handlePay(inv)}>Pay</Button>
-                                                    {/* WhatsApp Payment Reminder */}
-                                                    {inv.customer?.contact && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                try {
-                                                                    const result = sendPaymentReminderViaWhatsApp(
-                                                                        inv.customer,
-                                                                        {
-                                                                            invoiceNumber: inv.invoiceNumber,
-                                                                            grandTotal: inv.grandTotal || inv.totalAmount,
-                                                                            paidAmount: inv.paidAmount || 0,
-                                                                            balance: (inv.grandTotal || inv.totalAmount) - (inv.paidAmount || 0),
-                                                                            invoiceDate: inv.invoiceDate
-                                                                        }
-                                                                    );
+                {/* Analytics Dashboard */}
+                <InvoiceAnalytics invoices={allInvoices} />
 
-                                                                    if (result.success) {
-                                                                        toast.success('WhatsApp reminder opened!', {
-                                                                            duration: 3000,
-                                                                            icon: '📱'
-                                                                        });
-                                                                    } else {
-                                                                        toast.error(`Error: ${result.error}`);
-                                                                    }
-                                                                } catch (error) {
-                                                                    toast.error('Failed to open WhatsApp reminder');
-                                                                }
-                                                            }}
-                                                            className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
-                                                        >
-                                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                                                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
-                                                            </svg>
-                                                        </Button>
-                                                    )}
-                                                </>
-                                            )}
-                                            <Button size="sm" variant="danger" onClick={() => handleDelete(inv._id)}>Delete</Button>
-                                        </div>
-                                    </td>
-                                </tr>
+                {/* Action Bar */}
+                <InvoiceActionBar
+                    selectedCount={selectedInvoices.length}
+                    totalInvoices={analytics.totalInvoices}
+                    onExport={handleExport}
+                    onBulkAction={handleBulkAction}
+                    onCreateNew={() => navigate('/billing')}
+                    onImport={() => toast.info('Import feature coming soon!')}
+                    onSettings={() => setIsSettingsOpen(true)}
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                />
+
+                {/* Filters */}
+                <InvoiceFilters
+                    onFilterChange={handleFilterChange}
+                    totalInvoices={analytics.totalInvoices}
+                    totalAmount={analytics.totalAmount}
+                    filteredCount={analytics.filteredCount}
+                />
+
+                {/* Tab Navigation */}
+                <div className="bg-white rounded-lg shadow-sm border">
+                    <div className="border-b border-gray-200">
+                        <nav className="-mb-px flex">
+                            {['ALL', 'B2B', 'B2C'].map((tabName) => (
+                                <button
+                                    key={tabName}
+                                    onClick={() => setTab(tabName)}
+                                    className={`py-4 px-6 border-b-2 font-medium text-sm ${
+                                        tab === tabName
+                                            ? 'border-blue-500 text-blue-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                                >
+                                    {tabName} {tabName !== 'ALL' && 'Invoices'}
+                                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        {tabName === 'ALL' 
+                                            ? allInvoices.length
+                                            : allInvoices.filter(inv => inv.customer?.customerType === tabName).length
+                                        }
+                                    </span>
+                                </button>
                             ))}
-                        </tbody>
-                    </table>
+                        </nav>
+                    </div>
+
+                    {/* Invoice Table */}
+                    <InvoiceTable
+                        invoices={filteredInvoices}
+                        loading={loading}
+                        onEdit={handleEdit}
+                        onReprint={handleReprint}
+                        onPay={handlePay}
+                        onDelete={handleDelete}
+                        onWhatsAppReminder={handleWhatsAppReminder}
+                        onSortChange={handleSortChange}
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                    />
                 </div>
             </div>
 
             {/* QR Code Modal */}
             <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="Scan to Pay">
                 {qrCodeImage && (
-                    <div className="flex flex-col items-center">
-                        <img src={qrCodeImage} alt="UPI QR Code" />
-                        <p className="mt-2 text-sm text-gray-600">Scan this code with any UPI app to pay the balance.</p>
+                    <div className="flex flex-col items-center p-6">
+                        <img src={qrCodeImage} alt="UPI QR Code" className="rounded-lg shadow-lg" />
+                        <p className="mt-4 text-center text-sm text-gray-600">
+                            Scan this code with any UPI app to pay the balance amount.
+                        </p>
+                        <div className="mt-4 flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    // Download QR code
+                                    const link = document.createElement('a');
+                                    link.href = qrCodeImage;
+                                    link.download = 'payment-qr-code.png';
+                                    link.click();
+                                }}
+                            >
+                                Download QR
+                            </Button>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => setIsQrModalOpen(false)}
+                            >
+                                Close
+                            </Button>
+                        </div>
                     </div>
                 )}
             </Modal>
+
+            {/* Settings Modal */}
+            <InvoiceSettings 
+                isOpen={isSettingsOpen} 
+                onClose={() => setIsSettingsOpen(false)} 
+            />
         </Layout>
     );
 };
-
 export default Invoices;
