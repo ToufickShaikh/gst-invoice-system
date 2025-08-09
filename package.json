@@ -25,12 +25,7 @@
     "xlsx": "^0.18.5",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
-    "lodash": "^4.17.21",
-    "react-select": "^5.8.3",
-    "react-datepicker": "^7.5.0",
-    "react-modal": "^3.16.1",
-    "react-beautiful-dnd": "^13.1.1",
-    "react-virtualized": "^9.22.5"
+    "lodash": "^4.17.21"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
