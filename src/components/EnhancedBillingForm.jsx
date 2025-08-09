@@ -352,9 +352,15 @@ const EnhancedBillingForm = () => {
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-white">
+      {/* Debug identifier - Enhanced Version */}
+      <div className="hidden" id="enhanced-billing-form-v2.0" data-version="enhanced"></div>
+      
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Invoice</h1>
-        <p className="text-gray-600">Generate professional invoices with advanced features</p>
+        <div className="flex items-center space-x-3">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">🚀 Enhanced Invoice Creation</h1>
+          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">v2.0 Enhanced</span>
+        </div>
+        <p className="text-gray-600">Professional billing with real-time calculations, bulk operations, and advanced features</p>
       </div>
 
       {/* Customer Selection */}
