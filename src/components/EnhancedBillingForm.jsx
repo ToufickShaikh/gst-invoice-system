@@ -88,7 +88,12 @@ const EnhancedBillingForm = () => {
   const fetchCustomers = async () => {
     try {
       const response = await customersAPI.getAll();
-      setCustomers(Array.isArray(response) ? response : response.customers || []);
+      // Handle different response structures
+      const customersArray = Array.isArray(response) 
+        ? response 
+        : (Array.isArray(response.data) ? response.data : response.customers || []);
+      setCustomers(customersArray);
+      console.log('✅ Customers loaded:', customersArray.length);
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast.error('Failed to load customers');
@@ -98,7 +103,22 @@ const EnhancedBillingForm = () => {
   const fetchItems = async () => {
     try {
       const response = await itemsAPI.getAll();
-      setAvailableItems(Array.isArray(response.data) ? response.data : response.items || []);
+      // Handle different response structures - match working Items.jsx pattern
+      const itemsArray = Array.isArray(response.data)
+        ? response.data
+        : (Array.isArray(response) ? response : []);
+      
+      // Filter out null/undefined items and format for billing
+      const formattedItems = itemsArray
+        .filter(item => item != null)
+        .map(item => ({
+          ...item,
+          sellingPrice: item.rate || 0, // Map rate to sellingPrice for backward compatibility
+          quantityInStock: item.quantityInStock ?? 0
+        }));
+      
+      setAvailableItems(formattedItems);
+      console.log('✅ Items loaded:', formattedItems.length);
     } catch (error) {
       console.error('Error fetching items:', error);
       toast.error('Failed to load items');
@@ -248,17 +268,19 @@ const EnhancedBillingForm = () => {
   };
 
   const selectExistingItem = (item) => {
+    console.log('🔄 Selecting existing item:', item);
     setCurrentItem({
       itemId: item._id,
       name: item.name,
       description: item.description || '',
       hsnCode: item.hsnCode || '',
       quantity: 1,
-      rate: item.sellingPrice || 0,
+      rate: item.sellingPrice || item.rate || 0,
       discount: 0,
-      taxRate: item.taxRate || 18,
+      taxRate: item.taxSlab || item.taxRate || 18,
       amount: 0
     });
+    toast.success(`Selected: ${item.name}`);
   };
 
   const createCustomer = async () => {
@@ -557,14 +579,17 @@ const EnhancedBillingForm = () => {
             <select
               onChange={(e) => {
                 const item = availableItems.find(i => i._id === e.target.value);
-                if (item) selectExistingItem(item);
+                if (item) {
+                  console.log('✅ Selected item:', item);
+                  selectExistingItem(item);
+                }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Choose an existing item...</option>
+              <option value="">Choose an existing item... ({availableItems.length} available)</option>
               {availableItems.map(item => (
                 <option key={item._id} value={item._id}>
-                  {item.name} - {formatCurrency(item.sellingPrice)}
+                  {item.name} - {formatCurrency(item.sellingPrice || item.rate || 0)}
                 </option>
               ))}
             </select>
