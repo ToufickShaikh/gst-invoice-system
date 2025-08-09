@@ -64,6 +64,12 @@ const EnhancedBillingForm = () => {
     amount: 0
   });
 
+  // Enhanced item management states
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [bulkItemAction, setBulkItemAction] = useState('');
+
   useEffect(() => {
     fetchCustomers();
     fetchItems();
@@ -81,8 +87,8 @@ const EnhancedBillingForm = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await customersAPI.getCustomers();
-      setCustomers(response.customers || []);
+      const response = await customersAPI.getAll();
+      setCustomers(Array.isArray(response) ? response : response.customers || []);
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast.error('Failed to load customers');
@@ -91,8 +97,8 @@ const EnhancedBillingForm = () => {
 
   const fetchItems = async () => {
     try {
-      const response = await itemsAPI.getItems();
-      setAvailableItems(response.items || []);
+      const response = await itemsAPI.getAll();
+      setAvailableItems(Array.isArray(response.data) ? response.data : response.items || []);
     } catch (error) {
       console.error('Error fetching items:', error);
       toast.error('Failed to load items');
@@ -173,11 +179,56 @@ const EnhancedBillingForm = () => {
   };
 
   const removeItemFromInvoice = (itemId) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.filter(item => item.id !== itemId)
-    }));
-    toast.success('Item removed from invoice');
+    const item = formData.items.find(item => item.id === itemId);
+    if (item) {
+      setItemToDelete(item);
+      setShowDeleteConfirm(true);
+    }
+  };
+
+  const confirmRemoveItem = () => {
+    if (itemToDelete) {
+      setFormData(prev => ({
+        ...prev,
+        items: prev.items.filter(item => item.id !== itemToDelete.id)
+      }));
+      toast.success('Item removed from invoice');
+      setShowDeleteConfirm(false);
+      setItemToDelete(null);
+    }
+  };
+
+  const handleBulkItemAction = () => {
+    if (!bulkItemAction || selectedItems.length === 0) {
+      toast.error('Please select items and action');
+      return;
+    }
+
+    if (bulkItemAction === 'delete') {
+      if (window.confirm(`Remove ${selectedItems.length} items from invoice?`)) {
+        setFormData(prev => ({
+          ...prev,
+          items: prev.items.filter(item => !selectedItems.includes(item.id))
+        }));
+        toast.success(`${selectedItems.length} items removed from invoice`);
+        setSelectedItems([]);
+        setBulkItemAction('');
+      }
+    } else if (bulkItemAction === 'duplicate') {
+      const itemsToDuplicate = formData.items.filter(item => selectedItems.includes(item.id));
+      const duplicatedItems = itemsToDuplicate.map(item => ({
+        ...item,
+        id: Date.now() + Math.random(),
+        name: `${item.name} (Copy)`
+      }));
+      setFormData(prev => ({
+        ...prev,
+        items: [...prev.items, ...duplicatedItems]
+      }));
+      toast.success(`${selectedItems.length} items duplicated`);
+      setSelectedItems([]);
+      setBulkItemAction('');
+    }
   };
 
   const updateInvoiceItem = (itemId, field, value) => {
@@ -578,10 +629,52 @@ const EnhancedBillingForm = () => {
         {/* Invoice Items List */}
         {formData.items.length > 0 && (
           <div className="bg-white rounded-lg border overflow-hidden">
+            {/* Bulk Actions */}
+            {selectedItems.length > 0 && (
+              <div className="bg-blue-50 p-4 border-b">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-blue-700">
+                    {selectedItems.length} item(s) selected
+                  </span>
+                  <div className="flex items-center space-x-3">
+                    <select
+                      value={bulkItemAction}
+                      onChange={(e) => setBulkItemAction(e.target.value)}
+                      className="px-3 py-1 border border-blue-300 rounded-md text-sm"
+                    >
+                      <option value="">Select Action</option>
+                      <option value="duplicate">Duplicate Items</option>
+                      <option value="delete">Remove Items</option>
+                    </select>
+                    <button
+                      onClick={handleBulkItemAction}
+                      className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.length === formData.items.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedItems(formData.items.map(item => item.id));
+                          } else {
+                            setSelectedItems([]);
+                          }
+                        }}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HSN</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
@@ -594,7 +687,40 @@ const EnhancedBillingForm = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {formData.items.map((item) => (
-                    <tr key={item.id}>
+                    <tr key={item.id} className={selectedItems.includes(item.id) ? 'bg-blue-50' : ''}>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.includes(item.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedItems(prev => [...prev, item.id]);
+                            } else {
+                              setSelectedItems(prev => prev.filter(id => id !== item.id));
+                            }
+                          }}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                          {item.description && (
+                            <div className="text-sm text-gray-500">{item.description}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {item.hsnCode || 'N/A'}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => updateInvoiceItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <input
                           type="text"
@@ -828,6 +954,53 @@ const EnhancedBillingForm = () => {
           Cancel
         </button>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && itemToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 mt-2">Remove Item</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to remove "{itemToDelete.name}" from this invoice?
+                </p>
+                <div className="mt-2 p-3 bg-gray-50 rounded">
+                  <div className="text-xs text-gray-600">
+                    <p>Quantity: {itemToDelete.quantity}</p>
+                    <p>Rate: {formatCurrency(itemToDelete.rate)}</p>
+                    <p>Amount: {formatCurrency(itemToDelete.amount)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="items-center px-4 py-3">
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setItemToDelete(null);
+                    }}
+                    className="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmRemoveItem}
+                    className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Print Modal */}
       {showPrintModal && currentInvoice && (
