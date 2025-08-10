@@ -18,7 +18,7 @@ const EnhancedItemManagement = () => {
   });
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
-  const [viewMode, setViewMode] = useState('table'); // table, grid, compact
+  const [viewMode, setViewMode] = useState('table');
   const [showNewItem, setShowNewItem] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [currentItem, setCurrentItem] = useState({
@@ -32,7 +32,7 @@ const EnhancedItemManagement = () => {
     purchasePrice: 0,
     sellingPrice: 0,
     markup: 0,
-    priceType: 'exclusive', // exclusive, inclusive
+    priceType: 'exclusive',
     units: 'per piece',
     quantityInStock: 0,
     minStockLevel: 5,
@@ -53,7 +53,6 @@ const EnhancedItemManagement = () => {
   const [bulkAction, setBulkAction] = useState('');
   const [showImport, setShowImport] = useState(false);
 
-  // Categories for organization
   const categories = [
     'Electronics', 'Furniture', 'Clothing', 'Books', 'Food & Beverages',
     'Home & Garden', 'Sports', 'Toys', 'Automotive', 'Health & Beauty', 'Other'
@@ -143,63 +142,40 @@ const EnhancedItemManagement = () => {
       });
 
       setItems(itemsData);
-
-      if (filters.search) {
-        filteredItems = filteredItems.filter(item =>
-          item.name?.toLowerCase().includes(filters.search.toLowerCase()) ||
-          item.hsnCode?.toLowerCase().includes(filters.search.toLowerCase()) ||
-          item.description?.toLowerCase().includes(filters.search.toLowerCase())
-        );
-      }
-
-      if (filters.category) {
-        filteredItems = filteredItems.filter(item => 
-          item.category === filters.category
-        );
-      }
-
-      if (filters.status !== 'all') {
-        filteredItems = filteredItems.filter(item => 
-          item.status === filters.status
-        );
-      }
-
-      if (filters.stockLevel !== 'all') {
-        filteredItems = filteredItems.filter(item => {
-          const stock = item.quantityInStock || 0;
-          const minStock = item.minStock || 0;
-          switch (filters.stockLevel) {
-            case 'low':
-              return stock <= minStock && stock > 0;
-            case 'out':
-              return stock === 0;
-            case 'adequate':
-              return stock > minStock;
-            default:
-              return true;
-          }
-        });
-      }
-
-      setItems(filteredItems);
     } catch (error) {
       console.error('Error fetching items:', error);
       toast.error('Failed to fetch items');
+      setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const calculateMarkup = (purchasePrice, sellingPrice) => {
+    if (!purchasePrice || purchasePrice === 0) return 0;
+    return ((sellingPrice - purchasePrice) / purchasePrice * 100).toFixed(2);
+  };
+
   const handleSaveItem = async () => {
-    if (!currentItem.name || currentItem.rate < 0) {
-      toast.error('Please provide valid item details');
+    if (!currentItem.name || !currentItem.sellingPrice) {
+      toast.error('Please fill in required fields (Name and Selling Price)');
       return;
     }
 
     try {
       const itemData = {
         ...currentItem,
-        quantityInStock: currentItem.currentStock
+        purchasePrice: parseFloat(currentItem.purchasePrice) || 0,
+        sellingPrice: parseFloat(currentItem.sellingPrice) || 0,
+        taxRate: parseFloat(currentItem.taxRate) || 18,
+        quantityInStock: parseInt(currentItem.quantityInStock) || 0,
+        minStockLevel: parseInt(currentItem.minStockLevel) || 5,
+        maxStockLevel: parseInt(currentItem.maxStockLevel) || 100,
+        reorderPoint: parseInt(currentItem.reorderPoint) || 10,
+        markup: calculateMarkup(currentItem.purchasePrice, currentItem.sellingPrice),
+        // Map to legacy fields for compatibility
+        rate: parseFloat(currentItem.sellingPrice) || 0,
+        taxSlab: parseFloat(currentItem.taxRate) || 18
       };
 
       if (editingItem) {
@@ -212,22 +188,7 @@ const EnhancedItemManagement = () => {
 
       setShowNewItem(false);
       setEditingItem(null);
-      setCurrentItem({
-        name: '',
-        description: '',
-        hsnCode: '',
-        rate: 0,
-        taxSlab: 18,
-        units: 'per piece',
-        category: '',
-        minStock: 0,
-        maxStock: 0,
-        currentStock: 0,
-        costPrice: 0,
-        sellingPrice: 0,
-        barcode: '',
-        status: 'active'
-      });
+      resetCurrentItem();
       fetchItems();
     } catch (error) {
       console.error('Error saving item:', error);
@@ -235,24 +196,16 @@ const EnhancedItemManagement = () => {
     }
   };
 
-  const handleDeleteItem = (item) => {
-    setItemToDelete(item);
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDeleteItem = async () => {
-    if (!itemToDelete) return;
-
-    try {
-      await itemsAPI.delete(itemToDelete._id);
-      toast.success('Item deleted successfully');
-      setShowDeleteConfirm(false);
-      setItemToDelete(null);
-      setDeleteReason('');
-      fetchItems();
-    } catch (error) {
-      console.error('Error deleting item:', error);
-      toast.error('Failed to delete item');
+  const handleDeleteItem = async (itemId) => {
+    if (window.confirm('Are you sure you want to delete this item?')) {
+      try {
+        await itemsAPI.delete(itemId);
+        toast.success('Item deleted successfully');
+        fetchItems();
+      } catch (error) {
+        console.error('Error deleting item:', error);
+        toast.error('Failed to delete item');
+      }
     }
   };
 
@@ -270,18 +223,14 @@ const EnhancedItemManagement = () => {
         }
       } else if (bulkAction === 'activate') {
         await Promise.all(selectedItems.map(id => 
-          itemsAPI.update(id, { status: 'active' })
+          itemsAPI.update(id, { isActive: true })
         ));
         toast.success(`${selectedItems.length} items activated`);
       } else if (bulkAction === 'deactivate') {
         await Promise.all(selectedItems.map(id => 
-          itemsAPI.update(id, { status: 'inactive' })
+          itemsAPI.update(id, { isActive: false })
         ));
         toast.success(`${selectedItems.length} items deactivated`);
-      } else if (bulkAction === 'export') {
-        // Export selected items to CSV
-        const selectedItemsData = items.filter(item => selectedItems.includes(item._id));
-        exportItemsToCSV(selectedItemsData);
       }
 
       setSelectedItems([]);
@@ -293,52 +242,78 @@ const EnhancedItemManagement = () => {
     }
   };
 
-  const exportItemsToCSV = (itemsToExport) => {
-    const csvContent = [
-      ['Name', 'HSN Code', 'Rate', 'Tax Slab', 'Units', 'Category', 'Stock', 'Status'],
-      ...itemsToExport.map(item => [
-        item.name,
-        item.hsnCode || '',
-        item.rate || 0,
-        item.taxSlab || 0,
-        item.units || 'per piece',
-        item.category || '',
-        item.quantityInStock || 0,
-        item.status || 'active'
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `items_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-    toast.success('Items exported successfully');
+  const resetCurrentItem = () => {
+    setCurrentItem({
+      name: '',
+      description: '',
+      sku: '',
+      barcode: '',
+      category: '',
+      hsnCode: '',
+      taxRate: 18,
+      purchasePrice: 0,
+      sellingPrice: 0,
+      markup: 0,
+      priceType: 'exclusive',
+      units: 'per piece',
+      quantityInStock: 0,
+      minStockLevel: 5,
+      maxStockLevel: 100,
+      reorderPoint: 10,
+      preferredVendor: '',
+      storageLocation: '',
+      isActive: true,
+      isService: false,
+      dimensions: {
+        length: '',
+        width: '',
+        height: '',
+        weight: ''
+      },
+      images: []
+    });
   };
 
   const getStockStatus = (item) => {
     const stock = item.quantityInStock || 0;
-    const minStock = item.minStock || 0;
+    const minLevel = item.minStockLevel || 5;
     
-    if (stock === 0) return { status: 'Out of Stock', color: 'bg-red-100 text-red-800' };
-    if (stock <= minStock) return { status: 'Low Stock', color: 'bg-yellow-100 text-yellow-800' };
+    if (stock <= 0) return { status: 'Out of Stock', color: 'bg-red-100 text-red-800' };
+    if (stock <= minLevel) return { status: 'Low Stock', color: 'bg-yellow-100 text-yellow-800' };
     return { status: 'In Stock', color: 'bg-green-100 text-green-800' };
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const exportToCSV = () => {
+    const headers = [
+      'Name', 'SKU', 'Category', 'HSN Code', 'Purchase Price', 'Selling Price', 
+      'Tax Rate', 'Units', 'Stock', 'Min Stock', 'Status'
+    ];
+    
+    const csvContent = [
+      headers.join(','),
+      ...items.map(item => [
+        `"${item.name || ''}"`,
+        `"${item.sku || ''}"`,
+        `"${item.category || ''}"`,
+        `"${item.hsnCode || ''}"`,
+        item.purchasePrice || item.costPrice || 0,
+        item.sellingPrice || item.rate || 0,
+        item.taxRate || item.taxSlab || 18,
+        `"${item.units || 'per piece'}"`,
+        item.quantityInStock || 0,
+        item.minStockLevel || 5,
+        item.isActive ? 'Active' : 'Inactive'
+      ].join(','))
+    ].join('\n');
 
-  const categories = [...new Set(items.map(item => item.category).filter(Boolean))];
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'items_export.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return (
@@ -353,50 +328,72 @@ const EnhancedItemManagement = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Item Management</h1>
-          <p className="text-gray-600">Manage your products and services</p>
+          <h1 className="text-3xl font-bold text-gray-900">Items Management</h1>
+          <p className="text-gray-600">Manage your inventory with Zoho Books-level features</p>
         </div>
-        <button
-          onClick={() => setShowNewItem(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          New Item
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowImport(true)}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            Import
+          </button>
+          <button
+            onClick={exportToCSV}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            Export
+          </button>
+          <button
+            onClick={() => setShowNewItem(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            New Item
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-600">Total Items</h3>
           <p className="text-2xl font-bold text-gray-900">{items.length}</p>
         </div>
-        <div className="bg-green-50 p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-green-600">Active Items</h3>
+        <div className="bg-green-50 p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-green-600">In Stock</h3>
           <p className="text-2xl font-bold text-green-900">
-            {items.filter(item => item.status === 'active').length}
+            {items.filter(item => (item.quantityInStock || 0) > 0).length}
           </p>
         </div>
-        <div className="bg-yellow-50 p-6 rounded-lg shadow">
+        <div className="bg-yellow-50 p-4 rounded-lg shadow">
           <h3 className="text-sm font-medium text-yellow-600">Low Stock</h3>
           <p className="text-2xl font-bold text-yellow-900">
             {items.filter(item => {
               const stock = item.quantityInStock || 0;
-              const minStock = item.minStock || 0;
-              return stock <= minStock && stock > 0;
+              const minLevel = item.minStockLevel || 5;
+              return stock > 0 && stock <= minLevel;
             }).length}
           </p>
         </div>
-        <div className="bg-red-50 p-6 rounded-lg shadow">
+        <div className="bg-red-50 p-4 rounded-lg shadow">
           <h3 className="text-sm font-medium text-red-600">Out of Stock</h3>
           <p className="text-2xl font-bold text-red-900">
-            {items.filter(item => (item.quantityInStock || 0) === 0).length}
+            {items.filter(item => (item.quantityInStock || 0) <= 0).length}
+          </p>
+        </div>
+        <div className="bg-blue-50 p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-blue-600">Total Value</h3>
+          <p className="text-2xl font-bold text-blue-900">
+            {formatCurrency(items.reduce((sum, item) => 
+              sum + ((item.quantityInStock || 0) * (item.sellingPrice || item.rate || 0)), 0
+            ))}
           </p>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters and Controls */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <input
@@ -414,11 +411,9 @@ const EnhancedItemManagement = () => {
               onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              <option value="">All Categories</option>
-              {categories.map(category => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
+              <option value="all">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
           </div>
@@ -435,18 +430,74 @@ const EnhancedItemManagement = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Stock Level</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Price Range</label>
             <select
-              value={filters.stockLevel}
-              onChange={(e) => setFilters(prev => ({ ...prev, stockLevel: e.target.value }))}
+              value={filters.priceRange}
+              onChange={(e) => setFilters(prev => ({ ...prev, priceRange: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              <option value="all">All Stock Levels</option>
-              <option value="adequate">Adequate Stock</option>
-              <option value="low">Low Stock</option>
-              <option value="out">Out of Stock</option>
+              <option value="all">All Prices</option>
+              <option value="under100">Under ₹100</option>
+              <option value="100to500">₹100 - ₹500</option>
+              <option value="500to1000">₹500 - ₹1000</option>
+              <option value="over1000">Over ₹1000</option>
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Stock Status</label>
+            <select
+              value={filters.stockStatus}
+              onChange={(e) => setFilters(prev => ({ ...prev, stockStatus: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="all">All Stock</option>
+              <option value="instock">In Stock</option>
+              <option value="lowstock">Low Stock</option>
+              <option value="outofstock">Out of Stock</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="name">Name</option>
+              <option value="price">Price</option>
+              <option value="stock">Stock</option>
+              <option value="category">Category</option>
+            </select>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50"
+              title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+            >
+              {sortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+            <div className="flex border border-gray-300 rounded">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1 text-sm ${viewMode === 'table' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+              >
+                Table
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-1 text-sm ${viewMode === 'grid' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+              >
+                Grid
+              </button>
+            </div>
+          </div>
+          <span className="text-sm text-gray-600">
+            {items.length} item(s) found
+          </span>
         </div>
       </div>
 
@@ -466,7 +517,6 @@ const EnhancedItemManagement = () => {
                 <option value="">Select Action</option>
                 <option value="activate">Activate</option>
                 <option value="deactivate">Deactivate</option>
-                <option value="export">Export</option>
                 <option value="delete">Delete</option>
               </select>
               <button
@@ -500,19 +550,19 @@ const EnhancedItemManagement = () => {
                 />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Item Name
+                Item Details
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                HSN Code
+                SKU/HSN
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Rate
+                Category
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Price
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Stock
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Stock Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
@@ -541,31 +591,48 @@ const EnhancedItemManagement = () => {
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4">
                     <div>
                       <div className="text-sm font-medium text-gray-900">{item.name}</div>
                       {item.description && (
-                        <div className="text-sm text-gray-500">{item.description}</div>
+                        <div className="text-sm text-gray-500 truncate max-w-xs">
+                          {item.description}
+                        </div>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {item.hsnCode || 'N/A'}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {formatCurrency(item.rate || 0)}
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{item.sku || '-'}</div>
+                    <div className="text-sm text-gray-500">{item.hsnCode || '-'}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {item.quantityInStock || 0} {item.units || 'pcs'}
+                    {item.category || '-'}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {formatCurrency(item.sellingPrice || item.rate || 0)}
+                    </div>
+                    {item.purchasePrice && (
+                      <div className="text-sm text-gray-500">
+                        Cost: {formatCurrency(item.purchasePrice)}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {item.quantityInStock || 0} {item.units || 'pcs'}
+                    </div>
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${stockStatus.color}`}>
                       {stockStatus.status}
                     </span>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>
-                      {item.status || 'active'}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      item.isActive 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {item.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
@@ -574,20 +641,9 @@ const EnhancedItemManagement = () => {
                         onClick={() => {
                           setEditingItem(item);
                           setCurrentItem({
-                            name: item.name || '',
-                            description: item.description || '',
-                            hsnCode: item.hsnCode || '',
-                            rate: item.rate || 0,
-                            taxSlab: item.taxSlab || 18,
-                            units: item.units || 'per piece',
-                            category: item.category || '',
-                            minStock: item.minStock || 0,
-                            maxStock: item.maxStock || 0,
-                            currentStock: item.quantityInStock || 0,
-                            costPrice: item.costPrice || 0,
-                            sellingPrice: item.sellingPrice || 0,
-                            barcode: item.barcode || '',
-                            status: item.status || 'active'
+                            ...item,
+                            sellingPrice: item.sellingPrice || item.rate || 0,
+                            taxRate: item.taxRate || item.taxSlab || 18
                           });
                           setShowNewItem(true);
                         }}
@@ -599,7 +655,7 @@ const EnhancedItemManagement = () => {
                         </svg>
                       </button>
                       <button
-                        onClick={() => handleDeleteItem(item)}
+                        onClick={() => handleDeleteItem(item._id)}
                         className="text-red-600 hover:text-red-900"
                         title="Delete Item"
                       >
@@ -619,7 +675,7 @@ const EnhancedItemManagement = () => {
       {/* New/Edit Item Modal */}
       {showNewItem && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">
                 {editingItem ? 'Edit Item' : 'New Item'}
@@ -628,22 +684,7 @@ const EnhancedItemManagement = () => {
                 onClick={() => {
                   setShowNewItem(false);
                   setEditingItem(null);
-                  setCurrentItem({
-                    name: '',
-                    description: '',
-                    hsnCode: '',
-                    rate: 0,
-                    taxSlab: 18,
-                    units: 'per piece',
-                    category: '',
-                    minStock: 0,
-                    maxStock: 0,
-                    currentStock: 0,
-                    costPrice: 0,
-                    sellingPrice: 0,
-                    barcode: '',
-                    status: 'active'
-                  });
+                  resetCurrentItem();
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -653,162 +694,242 @@ const EnhancedItemManagement = () => {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
-                  <input
-                    type="text"
-                    value={currentItem.name}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Enter item name"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">HSN Code</label>
-                  <input
-                    type="text"
-                    value={currentItem.hsnCode}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, hsnCode: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Enter HSN code"
-                  />
-                </div>
-              </div>
-
+            <div className="space-y-6">
+              {/* Basic Information */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={currentItem.description}
-                  onChange={(e) => setCurrentItem(prev => ({ ...prev, description: e.target.value }))}
-                  rows="2"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="Enter item description"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Rate *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={currentItem.rate}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, rate: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="0.00"
-                    required
-                  />
+                <h4 className="text-md font-medium text-gray-900 mb-3">Basic Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Item Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={currentItem.name}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+                    <input
+                      type="text"
+                      value={currentItem.sku}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, sku: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select
+                      value={currentItem.category}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, category: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">HSN Code</label>
+                    <input
+                      type="text"
+                      value={currentItem.hsnCode}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, hsnCode: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tax Slab (%)</label>
-                  <input
-                    type="number"
-                    value={currentItem.taxSlab}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, taxSlab: parseFloat(e.target.value) || 0 }))}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={currentItem.description}
+                    onChange={(e) => setCurrentItem(prev => ({ ...prev, description: e.target.value }))}
+                    rows="3"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="18"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Units</label>
-                  <select
-                    value={currentItem.units}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, units: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="per piece">Per Piece</option>
-                    <option value="kg">Kg</option>
-                    <option value="gram">Gram</option>
-                    <option value="litre">Litre</option>
-                    <option value="meter">Meter</option>
-                    <option value="box">Box</option>
-                    <option value="set">Set</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <input
-                    type="text"
-                    value={currentItem.category}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Enter category"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={currentItem.status}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Stock</label>
-                  <input
-                    type="number"
-                    value={currentItem.currentStock}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, currentStock: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Stock</label>
-                  <input
-                    type="number"
-                    value={currentItem.minStock}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, minStock: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Stock</label>
-                  <input
-                    type="number"
-                    value={currentItem.maxStock}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, maxStock: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="0"
                   />
                 </div>
               </div>
 
+              {/* Pricing */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-3">Pricing & Tax</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Purchase Price
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={currentItem.purchasePrice}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, purchasePrice: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Selling Price *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={currentItem.sellingPrice}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, sellingPrice: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={currentItem.taxRate}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, taxRate: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Price Type</label>
+                    <select
+                      value={currentItem.priceType}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, priceType: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="exclusive">Tax Exclusive</option>
+                      <option value="inclusive">Tax Inclusive</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Units</label>
+                    <select
+                      value={currentItem.units}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, units: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      {units.map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Inventory */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-3">Inventory Management</h4>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Current Stock
+                    </label>
+                    <input
+                      type="number"
+                      value={currentItem.quantityInStock}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, quantityInStock: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Min Stock Level
+                    </label>
+                    <input
+                      type="number"
+                      value={currentItem.minStockLevel}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, minStockLevel: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Max Stock Level
+                    </label>
+                    <input
+                      type="number"
+                      value={currentItem.maxStockLevel}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, maxStockLevel: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Reorder Point
+                    </label>
+                    <input
+                      type="number"
+                      value={currentItem.reorderPoint}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, reorderPoint: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Details */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-3">Additional Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Preferred Vendor
+                    </label>
+                    <input
+                      type="text"
+                      value={currentItem.preferredVendor}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, preferredVendor: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Storage Location
+                    </label>
+                    <input
+                      type="text"
+                      value={currentItem.storageLocation}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, storageLocation: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-4 flex items-center space-x-6">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={currentItem.isActive}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, isActive: e.target.checked }))}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Active</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={currentItem.isService}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, isService: e.target.checked }))}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Service Item</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
               <div className="flex items-center justify-end space-x-3 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => {
                     setShowNewItem(false);
                     setEditingItem(null);
-                    setCurrentItem({
-                      name: '',
-                      description: '',
-                      hsnCode: '',
-                      rate: 0,
-                      taxSlab: 18,
-                      units: 'per piece',
-                      category: '',
-                      minStock: 0,
-                      maxStock: 0,
-                      currentStock: 0,
-                      costPrice: 0,
-                      sellingPrice: 0,
-                      barcode: '',
-                      status: 'active'
-                    });
+                    resetCurrentItem();
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
                 >
@@ -821,57 +942,6 @@ const EnhancedItemManagement = () => {
                 >
                   {editingItem ? 'Update Item' : 'Save Item'}
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3 text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mt-2">Delete Item</h3>
-              <div className="mt-2 px-7 py-3">
-                <p className="text-sm text-gray-500">
-                  Are you sure you want to delete "{itemToDelete?.name}"? This action cannot be undone.
-                </p>
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason for deletion (optional)</label>
-                  <textarea
-                    value={deleteReason}
-                    onChange={(e) => setDeleteReason(e.target.value)}
-                    rows="2"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Enter reason for deletion..."
-                  />
-                </div>
-              </div>
-              <div className="items-center px-4 py-3">
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowDeleteConfirm(false);
-                      setItemToDelete(null);
-                      setDeleteReason('');
-                    }}
-                    className="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDeleteItem}
-                    className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
-                  >
-                    Delete
-                  </button>
-                </div>
               </div>
             </div>
           </div>
