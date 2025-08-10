@@ -1,8 +1,13 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://185.52.53.253/shaikh_carpets/api';
+// Force localhost for development
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = isDevelopment 
+  ? 'http://localhost:3000/api' 
+  : (import.meta.env.VITE_API_BASE_URL || 'http://185.52.53.253/shaikh_carpets/api');
 
 console.log('[API] Using API Base URL:', API_BASE_URL);
+console.log('[API] Development mode:', isDevelopment);
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
