@@ -338,8 +338,7 @@ const EnhancedBillingForm = () => {
     try {
       const totals = calculateTotals();
       const invoiceData = {
-        customerId: formData.customer._id,
-        customer: formData.customer,
+        customer: formData.customer._id,
         items: formData.items,
         subtotal: totals.subtotal,
         discountAmount: totals.discountAmount,
