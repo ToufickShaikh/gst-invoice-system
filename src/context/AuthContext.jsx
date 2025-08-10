@@ -79,18 +79,6 @@ export const AuthProvider = ({ children }) => {
             }
           })
         }
-      } else {
-        // Development auto-login for localhost
-        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        if (isDevelopment) {
-          console.log('🔧 Development mode: Auto-logging in with test user...')
-          try {
-            await login('testuser', 'test123')
-            console.log('✅ Development auto-login successful!')
-          } catch (error) {
-            console.log('⚠️ Development auto-login failed, but continuing...', error)
-          }
-        }
       }
       setLoading(false)
     }
