@@ -4,50 +4,145 @@ import { formatCurrency } from '../utils/dateHelpers';
 import { itemsAPI } from '../api/items';
 
 const EnhancedItemManagement = () => {
+  console.log('🚀 Loading Enhanced Item Management v2.0 - Zoho Books Level Features');
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedItems, setSelectedItems] = useState([]);
   const [filters, setFilters] = useState({
     search: '',
-    category: '',
+    category: 'all',
     status: 'all',
-    stockLevel: 'all'
+    priceRange: 'all',
+    stockStatus: 'all'
   });
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [viewMode, setViewMode] = useState('table'); // table, grid, compact
   const [showNewItem, setShowNewItem] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [currentItem, setCurrentItem] = useState({
     name: '',
     description: '',
-    hsnCode: '',
-    rate: 0,
-    taxSlab: 18,
-    units: 'per piece',
-    category: '',
-    minStock: 0,
-    maxStock: 0,
-    currentStock: 0,
-    costPrice: 0,
-    sellingPrice: 0,
+    sku: '',
     barcode: '',
-    status: 'active'
+    category: '',
+    hsnCode: '',
+    taxRate: 18,
+    purchasePrice: 0,
+    sellingPrice: 0,
+    markup: 0,
+    priceType: 'exclusive', // exclusive, inclusive
+    units: 'per piece',
+    quantityInStock: 0,
+    minStockLevel: 5,
+    maxStockLevel: 100,
+    reorderPoint: 10,
+    preferredVendor: '',
+    storageLocation: '',
+    isActive: true,
+    isService: false,
+    dimensions: {
+      length: '',
+      width: '',
+      height: '',
+      weight: ''
+    },
+    images: []
   });
   const [bulkAction, setBulkAction] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
-  const [deleteReason, setDeleteReason] = useState('');
+  const [showImport, setShowImport] = useState(false);
+
+  // Categories for organization
+  const categories = [
+    'Electronics', 'Furniture', 'Clothing', 'Books', 'Food & Beverages',
+    'Home & Garden', 'Sports', 'Toys', 'Automotive', 'Health & Beauty', 'Other'
+  ];
+
+  const units = [
+    'per piece', 'kg', 'grams', 'meters', 'liters', 'boxes', 'packets',
+    'dozens', 'sets', 'pairs', 'rolls', 'sheets', 'hours', 'days'
+  ];
 
   useEffect(() => {
     fetchItems();
-  }, [filters]);
+  }, [filters, sortBy, sortOrder]);
 
   const fetchItems = async () => {
     try {
       setLoading(true);
       const response = await itemsAPI.getAll();
-      let allItems = Array.isArray(response.data) ? response.data : response || [];
-
+      let itemsData = Array.isArray(response.data) ? response.data : response;
+      
       // Apply filters
-      let filteredItems = allItems;
+      itemsData = itemsData.filter(item => {
+        if (filters.search) {
+          const searchLower = filters.search.toLowerCase();
+          if (!item.name?.toLowerCase().includes(searchLower) &&
+              !item.sku?.toLowerCase().includes(searchLower) &&
+              !item.hsnCode?.toLowerCase().includes(searchLower)) {
+            return false;
+          }
+        }
+        
+        if (filters.category !== 'all' && item.category !== filters.category) return false;
+        if (filters.status !== 'all' && 
+            (filters.status === 'active' ? !item.isActive : item.isActive)) return false;
+        
+        if (filters.priceRange !== 'all') {
+          const price = item.sellingPrice || item.rate || 0;
+          switch (filters.priceRange) {
+            case 'under100': if (price >= 100) return false; break;
+            case '100to500': if (price < 100 || price > 500) return false; break;
+            case '500to1000': if (price < 500 || price > 1000) return false; break;
+            case 'over1000': if (price <= 1000) return false; break;
+          }
+        }
+        
+        if (filters.stockStatus !== 'all') {
+          const stock = item.quantityInStock || 0;
+          const minLevel = item.minStockLevel || 5;
+          switch (filters.stockStatus) {
+            case 'instock': if (stock <= 0) return false; break;
+            case 'lowstock': if (stock > minLevel) return false; break;
+            case 'outofstock': if (stock > 0) return false; break;
+          }
+        }
+        
+        return true;
+      });
+
+      // Apply sorting
+      itemsData.sort((a, b) => {
+        let aVal, bVal;
+        switch (sortBy) {
+          case 'price':
+            aVal = a.sellingPrice || a.rate || 0;
+            bVal = b.sellingPrice || b.rate || 0;
+            break;
+          case 'stock':
+            aVal = a.quantityInStock || 0;
+            bVal = b.quantityInStock || 0;
+            break;
+          case 'category':
+            aVal = a.category || '';
+            bVal = b.category || '';
+            break;
+          default:
+            aVal = a.name || '';
+            bVal = b.name || '';
+        }
+        
+        if (typeof aVal === 'string') {
+          aVal = aVal.toLowerCase();
+          bVal = bVal.toLowerCase();
+        }
+        
+        const result = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        return sortOrder === 'asc' ? result : -result;
+      });
+
+      setItems(itemsData);
 
       if (filters.search) {
         filteredItems = filteredItems.filter(item =>
