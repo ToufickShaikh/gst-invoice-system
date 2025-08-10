@@ -53,7 +53,7 @@ const EnhancedBillingForm = () => {
 
   // Invoice item data
   const [currentItem, setCurrentItem] = useState({
-    itemId: '',
+    item: '',
     name: '',
     description: '',
     hsnCode: '',
@@ -184,7 +184,7 @@ const EnhancedBillingForm = () => {
 
     // Reset current item
     setCurrentItem({
-      itemId: '',
+      item: '',
       name: '',
       description: '',
       hsnCode: '',
@@ -270,7 +270,7 @@ const EnhancedBillingForm = () => {
   const selectExistingItem = (item) => {
     console.log('🔄 Selecting existing item:', item);
     setCurrentItem({
-      itemId: item._id,
+      item: item._id,
       name: item.name,
       description: item.description || '',
       hsnCode: item.hsnCode || '',
