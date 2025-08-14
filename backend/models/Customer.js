@@ -12,6 +12,9 @@ const customerSchema = new mongoose.Schema({
     billingAddress: { type: String }, // General billing address
     state: { type: String, required: true }, // Added state for tax calculation
     notes: { type: String },
+    // Portal access fields
+    portalToken: { type: String },
+    portalTokenExpires: { type: Date },
 });
 
 const Customer = mongoose.model('Customer', customerSchema);

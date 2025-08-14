@@ -5,7 +5,7 @@ const { generateUpiQr } = require('./upiHelper');
 const { extractStateCode, COMPANY_STATE_CODE } = require('./taxHelpers');
 const company = require('../config/company');
 
-async function generateInvoicePDF(invoiceData) {
+async function generateInvoicePDF(invoiceData, fileName) {
     console.log(`[PDF] Starting PDF generation for invoice: ${invoiceData.invoiceNumber}`);
     let browser = null;
     try {
@@ -19,7 +19,8 @@ async function generateInvoicePDF(invoiceData) {
         const outputDir = path.resolve(__dirname, '../invoices');
         await fs.mkdir(outputDir, { recursive: true });
         const safeNumber = (invoiceData.invoiceNumber || `INV-${Date.now()}`);
-        const pdfPath = path.join(outputDir, `invoice-${safeNumber}.pdf`);
+        const pdfFileName = fileName && fileName.toString().trim().length > 0 ? fileName : `invoice-${safeNumber}.pdf`;
+        const pdfPath = path.join(outputDir, pdfFileName);
 
         browser = await puppeteer.launch({
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -131,183 +132,88 @@ async function replacePlaceholders(html, invoiceData) {
             taxSummary[hsnKey].sgstAmount = (taxSummary[hsnKey].sgstAmount || 0) + gstAmount / 2;
         }
 
-        // Rows for template-new.html (Amount column = taxable)
         itemsHtml += `
             <tr>
-                <td class="center">${index + 1}</td>
-                <td class="left">${escapeHtml(itemName)}</td>
-                <td class="center">${escapeHtml(hsnCode)}</td>
-                <td class="center">${quantity}</td>
-                <td class="center">${escapeHtml(units)}</td>
-                <td class="right">₹${rate.toFixed(2)}</td>
-                <td class="right">₹${taxable.toFixed(2)}</td>
-                <td class="center">${taxSlab}%</td>
-                <td class="right">₹${totalWithGst.toFixed(2)}</td>
-            </tr>`;
+                <td style="text-align: center;">${index + 1}</td>
+                <td style="text-align: left;">${escapeHtml(itemName)} (${escapeHtml(units)})</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(rate))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(gross))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(discountAmt))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxable))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(gstAmount))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(totalWithGst))}</td>
+            </tr>
+        `;
     });
 
-    html = html.replace(/{{itemsTable}}/g, itemsHtml);
-    html = html.replace(/{{totalQuantity}}/g, String(totalQuantity));
+    const totalTaxableAmount = Object.values(taxSummary).reduce((sum, item) => sum + (item.taxableAmount || 0), 0);
+    const totalIgstAmount = Object.values(taxSummary).reduce((sum, item) => sum + (item.igstAmount || 0), 0);
+    const totalCgstAmount = Object.values(taxSummary).reduce((sum, item) => sum + (item.cgstAmount || 0), 0);
+    const totalSgstAmount = Object.values(taxSummary).reduce((sum, item) => sum + (item.sgstAmount || 0), 0);
 
-    // Totals
-    const shippingCharges = Number(invoiceData.shippingCharges || 0);
-    const roundOff = Number(invoiceData.roundOff || 0);
-    const receivedAmount = Number(invoiceData.paidAmount || 0);
+    // Round off to avoid floating point issues
+    const roundOff = Math.round((totalGST + Number.EPSILON) * 100) / 100;
 
-    let subTotalCalc = Number(invoiceData.subTotal);
-    if (!subTotalCalc && Object.keys(taxSummary).length) {
-        subTotalCalc = Object.values(taxSummary).reduce((s, t) => s + t.taxableAmount, 0);
-    }
-    let totalGSTCalc = Number(invoiceData.totalTax);
-    if (!totalGSTCalc && Object.keys(taxSummary).length) {
-        totalGSTCalc = Object.values(taxSummary).reduce((s, t) => s + t.totalTax, 0);
-    }
-    let totalAmountCalc = Number(invoiceData.totalAmount || invoiceData.grandTotal);
-    if (!totalAmountCalc) totalAmountCalc = subTotalCalc + totalGSTCalc + shippingCharges + roundOff;
-    const balanceAmount = Number(invoiceData.balance != null ? invoiceData.balance : (totalAmountCalc - receivedAmount));
+    html = html.replace(/{{items}}/g, itemsHtml);
+    html = html.replace(/{{totalQuantity}}/g, escapeHtml(String(totalQuantity)));
+    html = html.replace(/{{totalDiscount}}/g, escapeHtml(formatCurrency(totalDiscount)));
+    html = html.replace(/{{totalGST}}/g, escapeHtml(formatCurrency(roundOff)));
+    html = html.replace(/{{totalAmount}}/g, escapeHtml(formatCurrency(invoiceData.totalAmount || 0)));
+    html = html.replace(/{{netAmount}}/g, escapeHtml(formatCurrency(invoiceData.netAmount || 0)));
 
-    html = html.replace(/{{subTotal}}/g, (subTotalCalc || 0).toFixed(2));
-    html = html.replace(/{{totalGST}}/g, (totalGSTCalc || 0).toFixed(2));
-    html = html.replace(/{{totalDiscount}}/g, (totalDiscount || 0).toFixed(2));
-    html = html.replace(/{{shippingCharges}}/g, shippingCharges.toFixed(2));
-    html = html.replace(/{{roundOff}}/g, roundOff.toFixed(2));
-    html = html.replace(/{{totalAmount}}/g, (totalAmountCalc || 0).toFixed(2));
-    html = html.replace(/{{receivedAmount}}/g, receivedAmount.toFixed(2));
-    html = html.replace(/{{balanceAmount}}/g, balanceAmount.toFixed(2));
-
-    // Tax Summary table
+    // Tax summary table
     let taxSummaryHtml = '';
-    let taxSummaryTotals = { taxableAmount: 0, cgstAmount: 0, sgstAmount: 0, igstAmount: 0, totalTax: 0 };
-    Object.values(taxSummary).forEach(tax => {
-        taxSummaryTotals.taxableAmount += tax.taxableAmount;
-        taxSummaryTotals.totalTax += tax.totalTax;
-        if (tax.isInterState) {
-            taxSummaryTotals.igstAmount += tax.igstAmount;
-            taxSummaryHtml += `
-                <tr>
-                    <td class="left">${escapeHtml(tax.hsnCode)}</td>
-                    <td class="right">₹${tax.taxableAmount.toFixed(2)}</td>
-                    <td class="center">${tax.igstRate}%</td>
-                    <td class="right">₹${tax.igstAmount.toFixed(2)}</td>
-                    <td class="center">-</td>
-                    <td class="right">-</td>
-                    <td class="center">-</td>
-                    <td class="right">-</td>
-                    <td class="right">₹${tax.totalTax.toFixed(2)}</td>
-                </tr>`;
-        } else {
-            taxSummaryTotals.cgstAmount += tax.cgstAmount;
-            taxSummaryTotals.sgstAmount += tax.sgstAmount;
-            taxSummaryHtml += `
-                <tr>
-                    <td class="left">${escapeHtml(tax.hsnCode)}</td>
-                    <td class="right">₹${tax.taxableAmount.toFixed(2)}</td>
-                    <td class="center">-</td>
-                    <td class="right">-</td>
-                    <td class="center">${tax.cgstRate}%</td>
-                    <td class="right">₹${tax.cgstAmount.toFixed(2)}</td>
-                    <td class="center">${tax.sgstRate}%</td>
-                    <td class="right">₹${tax.sgstAmount.toFixed(2)}</td>
-                    <td class="right">₹${tax.totalTax.toFixed(2)}</td>
-                </tr>`;
-        }
+    Object.values(taxSummary).forEach((taxItem) => {
+        taxSummaryHtml += `
+            <tr>
+                <td style="text-align: left;">${escapeHtml(taxItem.hsnCode)}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.taxableAmount))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.igstAmount || 0))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.cgstAmount || 0))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.sgstAmount || 0))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.totalTax))}</td>
+            </tr>
+        `;
     });
 
-    html = html.replace(/{{taxSummaryTable}}/g, taxSummaryHtml);
-    html = html.replace(/{{taxSummaryTotal\.taxableAmount}}/g, taxSummaryTotals.taxableAmount.toFixed(2));
-    html = html.replace(/{{taxSummaryTotal\.igstAmount}}/g, taxSummaryTotals.igstAmount ? taxSummaryTotals.igstAmount.toFixed(2) : '0.00');
-    html = html.replace(/{{taxSummaryTotal\.cgstAmount}}/g, taxSummaryTotals.cgstAmount ? taxSummaryTotals.cgstAmount.toFixed(2) : '0.00');
-    html = html.replace(/{{taxSummaryTotal\.sgstAmount}}/g, taxSummaryTotals.sgstAmount ? taxSummaryTotals.sgstAmount.toFixed(2) : '0.00');
-    html = html.replace(/{{taxSummaryTotal\.totalTax}}/g, taxSummaryTotals.totalTax.toFixed(2));
+    html = html.replace(/{{taxSummary}}/g, taxSummaryHtml);
 
-    // Amount in words
-    const amountInWords = convertToWords(totalAmountCalc || 0);
-    html = html.replace(/{{amountInWords}}/g, escapeHtml(amountInWords));
+    // Payment details
+    const paymentDetails = invoiceData.paymentDetails || {};
+    const upiQrCode = paymentDetails.upiId ? await generateUpiQr(paymentDetails.upiId, invoiceData.invoiceNumber) : '';
+    const paymentMode = paymentDetails.mode || 'Not specified';
+    const transactionId = paymentDetails.transactionId || paymentDetails.txnId || 'N/A';
+    const paymentDate = paymentDetails.date ? new Date(paymentDetails.date).toLocaleDateString('en-GB') : 'N/A';
+    const amountPaid = paymentDetails.amount ? Number(paymentDetails.amount).toFixed(2) : 0.00;
 
-    // Bank details
-    html = html.replace(/{{bankName}}/g, escapeHtml(company.bank.name || ''));
-    html = html.replace(/{{bankAccount}}/g, escapeHtml(company.bank.account || ''));
-    html = html.replace(/{{bankIFSC}}/g, escapeHtml(company.bank.ifsc || ''));
-    html = html.replace(/{{bankHolder}}/g, escapeHtml(company.bank.holder || ''));
-
-    // UPI QR image
-    let upiQrDataUrl = '';
-    try {
-        if (company.upi.qrImageUrl) {
-            upiQrDataUrl = company.upi.qrImageUrl;
-        } else if (company.upi.id) {
-            const amountForQr = balanceAmount > 0 ? balanceAmount.toFixed(2) : undefined;
-            const { qrCodeImage } = await generateUpiQr(company.upi.id, amountForQr);
-            upiQrDataUrl = qrCodeImage;
-        }
-    } catch (e) {
-        console.error('[PDF] UPI QR generation failed:', e.message);
-    }
-    html = html.replace(/{{upiQrImage}}/g, upiQrDataUrl);
-
-    // Signature
-    html = html.replace(/{{signatureImage}}/g, escapeHtml(company.signatureImageUrl || ''));
-
-    // Terms & Conditions
-    const termsList = Array.isArray(company.terms) ? company.terms : [];
-    const termsHtml = termsList.map(t => `<li>${escapeHtml(t)}</li>`).join('');
-    html = html.replace(/{{termsList}}/g, termsHtml);
+    html = html.replace(/{{upiQrCode}}/g, upiQrCode);
+    html = html.replace(/{{paymentMode}}/g, escapeHtml(paymentMode));
+    html = html.replace(/{{transactionId}}/g, escapeHtml(transactionId));
+    html = html.replace(/{{paymentDate}}/g, escapeHtml(paymentDate));
+    html = html.replace(/{{amountPaid}}/g, escapeHtml(formatCurrency(amountPaid)));
 
     return html;
 }
 
-function escapeHtml(str) {
-    return String(str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return unsafe;
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
-function convertToWords(num) {
-    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-
-    if (!num || isNaN(num)) return 'Zero Rupees Only';
-
-    let words = '';
-
-    function toWords(n) {
-        let str = '';
-        if (n > 99) {
-            str += ones[Math.floor(n / 100)] + ' Hundred ';
-            n %= 100;
-        }
-        if (n > 19) {
-            str += tens[Math.floor(n / 10)] + ' ' + ones[n % 10];
-        } else if (n > 9) {
-            str += teens[n - 10];
-        } else {
-            str += ones[n];
-        }
-        return str.trim();
-    }
-
-    let amount = Math.floor(num);
-    if (amount >= 10000000) {
-        words += toWords(Math.floor(amount / 10000000)) + ' Crore ';
-        amount %= 10000000;
-    }
-    if (amount >= 100000) {
-        words += toWords(Math.floor(amount / 100000)) + ' Lakh ';
-        amount %= 100000;
-    }
-    if (amount >= 1000) {
-        words += toWords(Math.floor(amount / 1000)) + ' Thousand ';
-        amount %= 1000;
-    }
-    if (amount > 0) {
-        words += toWords(amount);
-    }
-
-    return words.trim() + ' Rupees Only';
+function formatCurrency(amount) {
+    if (amount == null) return '0.00';
+    amount = Number(amount);
+    return amount.toLocaleString('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).replace('₹', '').trim();
 }
 
 module.exports = { generateInvoicePDF };

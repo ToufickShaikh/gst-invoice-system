@@ -256,33 +256,55 @@ const EnhancedQuoteManagement = () => {
 
   const handleConvertToInvoice = async (quote) => {
     try {
-      // Create invoice from quote
-      const invoiceData = {
-        customer: quote.customer._id,
-        items: quote.items.map(item => ({
-          name: item.name,
+      const customerId = quote?.customer?._id || quote?.customer;
+      // Build items with robust fallback to ensure item IDs exist
+      const mapped = (quote?.items || []).map((item) => {
+        const itemId = item.item?._id || (typeof item.item === 'string' ? item.item : undefined) || (items.find(it => it.name === (item.name || item.item?.name))?._id);
+        return {
+          item: itemId,
+          name: item.name || item.item?.name,
           description: item.description,
           hsnCode: item.hsnCode,
-          quantity: item.quantity,
-          rate: item.rate,
-          discount: item.discount || 0,
-          taxRate: item.taxRate || 18,
-          units: item.units || 'per piece'
-        })),
+          quantity: Number(item.quantity || 0),
+          rate: Number(item.rate || 0),
+          discount: Number(item.discount || 0),
+          taxRate: Number(item.taxRate ?? item.taxSlab ?? 0),
+          units: item.units || 'per piece',
+        };
+      });
+      const itemsPayload = mapped.filter((it) => it.item && it.quantity > 0 && it.rate >= 0);
+
+      if (!customerId) {
+        toast.error('Quote is missing a valid customer');
+        return;
+      }
+      if (itemsPayload.length === 0) {
+        toast.error('Quote has no valid items with catalog reference');
+        return;
+      }
+
+      const invoiceData = {
+        customer: customerId,
+        items: itemsPayload,
         notes: `Converted from Quote. ${quote.notes || ''}`.trim(),
-        billingType: 'invoice'
+        billingType: 'invoice',
+        paymentMethod: 'Pending',
+        paidAmount: 0,
       };
 
       await billingAPI.createInvoice(invoiceData);
-      
-      // Update quote status to Accepted
-      await billingAPI.updateQuote(quote._id, { status: 'Accepted' });
-      
+      // Backend requires full payload for quote update
+      await billingAPI.updateQuote(quote._id, {
+        customer: customerId,
+        items: itemsPayload,
+        notes: quote.notes || '',
+        status: 'Accepted',
+      });
       toast.success('Quote converted to invoice successfully');
       fetchData();
     } catch (error) {
       console.error('Error converting quote:', error);
-      toast.error('Failed to convert quote to invoice');
+      toast.error(error?.response?.data?.message || 'Failed to convert quote to invoice');
     }
   };
 

@@ -84,6 +84,9 @@ const EnhancedBillingForm = () => {
   const [itemSearch, setItemSearch] = useState('');
   const [showItemDropdown, setShowItemDropdown] = useState(false);
 
+  // Export details state
+  const [exportInfo, setExportInfo] = useState({ isExport: false, exportType: '', withTax: false, shippingBillNo: '', shippingBillDate: '', portCode: '' });
+
   useEffect(() => {
     fetchCustomers();
     fetchItems();
@@ -439,55 +442,54 @@ const EnhancedBillingForm = () => {
     }
   };
 
-  const saveInvoice = async (status = 'draft') => {
-    if (!formData.customer) {
-      toast.error('Please select a customer');
-      return;
-    }
-
-    if (formData.items.length === 0) {
-      toast.error('Please add at least one item');
-      return;
-    }
-
-    setLoading(true);
+  const handleCreateInvoice = async (mode = 'pending') => {
     try {
+      setLoading(true);
+      if (!formData.customer) {
+        toast.error('Please select a customer');
+        return;
+      }
+
+      if (formData.items.length === 0) {
+        toast.error('Please add at least one item');
+        return;
+      }
+
       const totals = calculateTotals();
-      const aggregateDiscount = (Number(totals.lineDiscount || 0) + Number(totals.invoiceDiscount || 0));
-      const aggregateTax = (Number(totals.cgst || 0) + Number(totals.sgst || 0) + Number(totals.igst || 0));
-
-      const isPaid = recordPaymentNow && Number(paidAmount) >= Number(totals.total || 0);
-      const isPartial = recordPaymentNow && Number(paidAmount) > 0 && Number(paidAmount) < Number(totals.total || 0);
-      const statusToSave = status === 'draft' ? 'draft' : (isPaid ? 'paid' : 'pending');
-
-      const invoiceData = {
-        customer: formData.customer._id,
-        items: formData.items,
-        // Summary fields (for UI/debug; backend recalculates actuals)
-        subtotal: totals.subtotal,
-        discountAmount: aggregateDiscount,
-        taxAmount: aggregateTax,
-        shippingCharges: formData.shippingCharges,
-        total: totals.total,
-        // Notes & terms
-        notes: formData.notes,
-        termsAndConditions: formData.termsAndConditions,
-        paymentTerms: formData.paymentTerms,
-        dueDate: formData.dueDate,
-        status: statusToSave,
-        date: new Date().toISOString(),
-        // Payment capture
-        paidAmount: recordPaymentNow ? Number(paidAmount) : 0,
+      const payload = {
+        customer: formData.customer?._id || formData.customer,
+        items: formData.items.map(it => ({
+          item: it.item?._id || it.item || undefined,
+          name: it.name,
+          description: it.description,
+          hsnCode: it.hsnCode,
+          quantity: Number(it.quantity||0),
+          rate: Number(it.rate||0),
+          discount: Number(it.discount||0),
+          taxRate: Number(it.taxRate ?? it.taxSlab ?? 0),
+        })),
+        discount: formData.discountType === 'amount' ? Number(formData.discountValue||0) : 0,
+        shippingCharges: Number(formData.shippingCharges||0),
+        paidAmount: recordPaymentNow ? Number(paidAmount||0) : 0,
         paymentMethod: recordPaymentNow ? paymentMethod : '',
+        billingType: 'invoice',
+        exportInfo: exportInfo.isExport ? {
+          isExport: true,
+          exportType: exportInfo.exportType,
+          withTax: !!exportInfo.withTax,
+          shippingBillNo: exportInfo.shippingBillNo || '',
+          shippingBillDate: exportInfo.shippingBillDate || undefined,
+          portCode: exportInfo.portCode || '',
+        } : undefined,
       };
 
-      const response = await billingAPI.createInvoice(invoiceData);
-      setCurrentInvoice(response.invoice || response);
+      const created = await billingAPI.createInvoice(payload);
+      setCurrentInvoice(created.invoice || created);
 
       // Record cash in drawer only if payment is Cash and paidAmount > 0
       try {
         if (recordPaymentNow && paymentMethod === 'Cash' && Number(paidAmount) > 0) {
-          const inv = response.invoice || response;
+          const inv = created.invoice || created;
           const invoiceId = inv?._id;
           if (invoiceId) {
             await cashDrawerAPI.recordSale({ invoiceId, amount: Number(paidAmount), denominations: cashDenoms });
@@ -497,9 +499,9 @@ const EnhancedBillingForm = () => {
         console.warn('Cash drawer update failed (non-blocking):', e);
       }
       
-      toast.success(`Invoice ${status === 'draft' ? 'saved as draft' : 'created'} successfully!`);
+      toast.success(`Invoice ${mode === 'draft' ? 'saved as draft' : 'created'} successfully!`);
       
-      if (status !== 'draft') {
+      if (mode !== 'draft') {
         setShowPrintModal(true);
       }
     } catch (error) {
@@ -508,6 +510,11 @@ const EnhancedBillingForm = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveInvoice = (mode) => {
+    // mode: 'draft' | 'pending'
+    return handleCreateInvoice(mode);
   };
 
   const totals = calculateTotals();

@@ -8,6 +8,7 @@ import InputField from '../components/InputField' // Import InputField
 import { customersAPI } from '../api/customers'
 import AddCustomerModal from '../components/AddCustomerModal'
 import { billingAPI } from '../api/billing'
+import { portalAPI } from '../api/portal'
 
 const Customers = () => {
   const navigate = useNavigate()
@@ -247,6 +248,19 @@ const Customers = () => {
       toast.error(e?.response?.data?.message || 'Failed to prepare statement');
     }
   }
+  const copyCustomerPortalLink = async () => {
+    try {
+      if (!drawerCustomer?._id) return;
+      const res = await portalAPI.createCustomerPortalLink(drawerCustomer._id);
+      const url = res?.url;
+      if (!url) throw new Error('No URL returned');
+      await navigator.clipboard.writeText(url);
+      toast.success('Customer portal link copied');
+    } catch (e) {
+      console.error(e);
+      toast.error(e?.response?.data?.message || 'Failed to create portal link');
+    }
+  }
 
   return (
     <Layout>
@@ -341,7 +355,7 @@ const Customers = () => {
 
               <div className="p-4 space-y-6 overflow-auto h-[calc(100%-56px)]">
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button onClick={createInvoiceForCustomer}>
                     Create Invoice
                   </Button>
@@ -350,6 +364,9 @@ const Customers = () => {
                   </Button>
                   <Button variant="outline" onClick={emailStatementToCustomer}>
                     Email Statement
+                  </Button>
+                  <Button variant="ghost" onClick={copyCustomerPortalLink}>
+                    Copy Portal Link
                   </Button>
                 </div>
 

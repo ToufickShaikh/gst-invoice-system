@@ -8,6 +8,7 @@ const { generateUpiQr } = require('../utils/upiHelper');
 const fs = require('fs');
 const path = require('path');
 const company = require('../config/company');
+const crypto = require('crypto');
 
 // Helper function for consistent error responses
 const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
@@ -109,7 +110,7 @@ const getInvoiceById = async (req, res) => {
 // @access  Private
 const createInvoice = async (req, res) => {
     console.log('--- Starting Invoice Creation ---');
-    const { customer, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '' } = req.body;
+    const { customer, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '', exportInfo } = req.body;
 
     // Input validation
     if (!customer || !items || items.length === 0) {
@@ -178,6 +179,7 @@ const createInvoice = async (req, res) => {
             paymentMethod,
             billingType,
             totalAmount: grandTotal,
+            exportInfo: exportInfo || undefined,
         });
 
         await invoice.save();
@@ -193,21 +195,8 @@ const createInvoice = async (req, res) => {
             }
         }
 
-        // Optionally, generate PDF and return its path
-        let pdfPath = null;
-        try {
-            const populated = await Invoice.findById(invoice._id)
-                .populate('customer')
-                .populate('items.item');
-            pdfPath = await pdfGenerator.generateInvoicePDF(populated || invoice);
-            invoice.pdfPath = pdfPath;
-            await invoice.save();
-        } catch (e) {
-            console.error('PDF generation failed during creation:', e);
-            // Do not block invoice creation if PDF fails
-        }
-
-        res.status(201).json(invoice);
+        // Do NOT generate/store PDF here; PDFs are generated on-demand via public endpoint
+        return res.status(201).json(invoice);
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to create invoice', error);
     }
@@ -218,7 +207,7 @@ const createInvoice = async (req, res) => {
 // @access  Private
 const updateInvoice = async (req, res) => {
     const { id } = req.params;
-    const { customer, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '' } = req.body;
+    const { customer, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '', exportInfo } = req.body;
 
     // Input validation
     if (!customer || !items || items.length === 0) {
@@ -295,6 +284,7 @@ const updateInvoice = async (req, res) => {
             paymentMethod,
             billingType,
             totalAmount: grandTotal,
+            exportInfo: exportInfo || originalInvoice.exportInfo,
         }, { new: true, runValidators: true })
             .populate('customer')
             .populate('items.item');
@@ -314,20 +304,8 @@ const updateInvoice = async (req, res) => {
             }
         }
 
-        // After successful update, regenerate the PDF
-        let pdfPath = null;
-        try {
-            const populated = await Invoice.findById(updatedInvoice._id)
-                .populate('customer')
-                .populate('items.item');
-            pdfPath = await pdfGenerator.generateInvoicePDF(populated || updatedInvoice);
-            updatedInvoice.pdfPath = pdfPath;
-            await updatedInvoice.save();
-        } catch (e) {
-            console.error(`[WARN] PDF regeneration failed for invoice ${id}:`, e);
-        }
-
-        res.json(updatedInvoice);
+        // Do NOT regenerate/store PDF here; PDFs are generated on-demand via public endpoint
+        return res.json(updatedInvoice);
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to update invoice', error);
     }
@@ -553,7 +531,9 @@ const generatePublicPdf = async (req, res) => {
         }
 
         const tempFileName = `public-invoice-${invoiceId}-${Date.now()}.pdf`;
-        const pdfPath = await pdfGenerator.generateInvoicePDF(invoice, tempFileName);
+        const webPath = await pdfGenerator.generateInvoicePDF(invoice, tempFileName);
+        const fileName = path.basename(webPath);
+        const fullPath = path.resolve(__dirname, '../invoices', fileName);
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`);
@@ -561,23 +541,24 @@ const generatePublicPdf = async (req, res) => {
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
 
-        res.sendFile(pdfPath, (err) => {
+        res.sendFile(fullPath, (err) => {
             if (err) {
                 console.error('Error sending PDF file:', err);
                 if (!res.headersSent) {
                     sendErrorResponse(res, 500, 'Error sending PDF file', err);
                 }
             }
-
+            // Delete the temp PDF after 30 seconds
             setTimeout(() => {
                 try {
                     if (fs.existsSync(fullPath)) {
                         fs.unlinkSync(fullPath);
+                        console.log(`[INFO] Deleted temporary PDF: ${fullPath}`);
                     }
                 } catch (deleteError) {
                     console.error('Error deleting temporary PDF:', deleteError);
                 }
-            }, 60000); // 1 minute = 60,000 milliseconds
+            }, 30000);
         });
 
     } catch (error) {
@@ -736,6 +717,102 @@ const emailCustomerStatement = async (req, res) => {
     }
 };
 
+// Create or refresh a portal link for an invoice (protected)
+const createInvoicePortalLink = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const invoice = await Invoice.findById(id);
+    if (!invoice) return sendErrorResponse(res, 404, 'Invoice not found');
+    invoice.portalToken = crypto.randomBytes(16).toString('hex');
+    // default expiry 30 days
+    invoice.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await invoice.save();
+    const url = `${process.env.PUBLIC_BASE_URL || req.protocol + '://' + req.get('host')}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
+    res.json({ url, token: invoice.portalToken, expiresAt: invoice.portalTokenExpires });
+  } catch (error) {
+    sendErrorResponse(res, 500, 'Failed to create portal link', error);
+  }
+};
+
+// Create or refresh a portal link for a customer (protected)
+const createCustomerPortalLink = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const customer = await Customer.findById(customerId);
+    if (!customer) return sendErrorResponse(res, 404, 'Customer not found');
+    customer.portalToken = crypto.randomBytes(16).toString('hex');
+    customer.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await customer.save();
+    const url = `${process.env.PUBLIC_BASE_URL || req.protocol + '://' + req.get('host')}/portal/customer/${customer._id}/${customer.portalToken}/statement`;
+    res.json({ url, token: customer.portalToken, expiresAt: customer.portalTokenExpires });
+  } catch (error) {
+    sendErrorResponse(res, 500, 'Failed to create customer portal link', error);
+  }
+};
+
+// Public: Get invoice details with optional payment QR (by token)
+const getPublicInvoice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { token } = req.query;
+    const invoice = await Invoice.findById(id).populate('customer').populate('items.item');
+    if (!invoice) return sendErrorResponse(res, 404, 'Invoice not found');
+    if (!invoice.portalToken || token !== invoice.portalToken) return sendErrorResponse(res, 401, 'Invalid token');
+    if (invoice.portalTokenExpires && new Date(invoice.portalTokenExpires) < new Date()) return sendErrorResponse(res, 401, 'Portal link expired');
+
+    const totalForBalance = (invoice.grandTotal != null ? invoice.grandTotal : invoice.totalAmount) || 0;
+    const paidForBalance = Number(invoice.paidAmount || 0);
+    const balance = Number(invoice.balance ?? (totalForBalance - paidForBalance));
+
+    const upiId = company?.upi?.id || process.env.UPI_ID || '';
+    let qrCodeImage = '';
+    try {
+      if (upiId) {
+        const amountForQr = balance > 0 ? balance.toFixed(2) : undefined;
+        const qr = await generateUpiQr(upiId, amountForQr);
+        qrCodeImage = qr.qrCodeImage;
+      }
+    } catch (e) { /* ignore QR errors */ }
+
+    res.json({
+      invoice,
+      company,
+      payment: { balance, upiId, qrCodeImage },
+      pdfUrl: `/api/billing/public/pdf/${invoice._id}`
+    });
+  } catch (error) {
+    sendErrorResponse(res, 500, 'Failed to fetch public invoice', error);
+  }
+};
+
+// Public: Get customer statement by token and date range
+const getPublicCustomerStatement = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { token, from, to } = req.query;
+    const customer = await Customer.findById(customerId);
+    if (!customer) return sendErrorResponse(res, 404, 'Customer not found');
+    if (!customer.portalToken || token !== customer.portalToken) return sendErrorResponse(res, 401, 'Invalid token');
+    if (customer.portalTokenExpires && new Date(customer.portalTokenExpires) < new Date()) return sendErrorResponse(res, 401, 'Portal link expired');
+
+    const start = from ? new Date(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = to ? new Date(to) : new Date();
+
+    const invoices = await Invoice.find({ customer: customer._id, invoiceDate: { $gte: start, $lte: end } }).sort({ invoiceDate: 1 });
+
+    const summary = invoices.reduce((acc, inv) => {
+      const total = Number(inv.grandTotal || inv.totalAmount || 0);
+      const paid = Number(inv.paidAmount || 0);
+      const bal = Number(inv.balance ?? (total - paid));
+      acc.total += total; acc.paid += paid; acc.balance += bal; return acc;
+    }, { total: 0, paid: 0, balance: 0 });
+
+    res.json({ customer, company, period: { from: start, to: end }, invoices, summary });
+  } catch (error) {
+    sendErrorResponse(res, 500, 'Failed to fetch public statement', error);
+  }
+};
+
 module.exports = {
     createInvoice,
     updateInvoice,
@@ -748,4 +825,8 @@ module.exports = {
     generatePublicPdf,
     recordCustomerPayment,
     emailCustomerStatement,
+    createInvoicePortalLink,
+    createCustomerPortalLink,
+    getPublicInvoice,
+    getPublicCustomerStatement,
 };
