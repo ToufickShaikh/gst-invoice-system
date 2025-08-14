@@ -36,18 +36,36 @@ const getCustomers = async (req, res) => {
 // @route   POST /api/customers
 // @access  Private
 const createCustomer = async (req, res) => {
-    const { customerType, name, firmName, firmAddress, contact, email, gstNo, panNo, billingAddress, state, notes } = req.body;
+    // Normalize input: accept either gstNo or gstin and derive customerType
+    const {
+        customerType: _ignoredProvidedType,
+        name,
+        firmName,
+        firmAddress,
+        contact,
+        email,
+        gstNo: rawGstNo,
+        gstin: rawGstin,
+        panNo,
+        billingAddress,
+        state,
+        notes
+    } = req.body;
 
-    // Basic input validation based on customer type
-    if (!customerType || !contact || !state) {
-        return sendErrorResponse(res, 400, 'Customer type, contact, and state are required');
+    const normalizedGstNo = (rawGstNo || rawGstin || '').trim();
+    // Always derive from GST presence
+    const derivedCustomerType = normalizedGstNo ? 'B2B' : 'B2C';
+
+    // Basic input validation based on derived customer type
+    if (!contact || !state) {
+        return sendErrorResponse(res, 400, 'Contact and state are required');
     }
 
-    if (customerType === 'B2B') {
-        if (!firmName || !gstNo) {
+    if (derivedCustomerType === 'B2B') {
+        if (!firmName || !normalizedGstNo) {
             return sendErrorResponse(res, 400, 'Firm name and GST number are required for B2B customers');
         }
-    } else if (customerType === 'B2C') {
+    } else if (derivedCustomerType === 'B2C') {
         if (!name) {
             return sendErrorResponse(res, 400, 'Customer name is required for B2C customers');
         }
@@ -56,16 +74,16 @@ const createCustomer = async (req, res) => {
     }
 
     try {
-        console.log('[CUSTOMER] Create request received:', req.body);
+        console.log('[CUSTOMER] Create request received:', { ...req.body, gstNo: normalizedGstNo, customerType: derivedCustomerType });
 
         const customer = new Customer({
-            customerType,
+            customerType: derivedCustomerType,
             name,
             firmName,
             firmAddress,
             contact,
             email,
-            gstNo,
+            gstNo: normalizedGstNo,
             panNo,
             billingAddress,
             state,
@@ -94,9 +112,23 @@ const createCustomer = async (req, res) => {
 const updateCustomer = async (req, res) => {
     try {
         console.log('[CUSTOMER] Update request for ID:', req.params.id);
-        console.log('[CUSTOMER] Update data:', req.body);
+        console.log('[CUSTOMER] Raw update data:', req.body);
 
-        const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        // Normalize gst value and derive customerType from GST presence
+        const normalizedGstNo = (req.body.gstNo || req.body.gstin || '').trim();
+        const newCustomerType = normalizedGstNo ? 'B2B' : 'B2C';
+
+        const updateData = {
+            ...req.body,
+            gstNo: normalizedGstNo,
+            customerType: newCustomerType,
+        };
+
+        const customer = await Customer.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true, runValidators: true }
+        );
 
         if (!customer) {
             return sendErrorResponse(res, 404, 'Customer not found');

@@ -21,7 +21,7 @@ const PORT = process.env.PORT || 3000;
 // Start the Express server
 const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Backend server is running on port ${PORT}`);
-    console.log(`✅ CORS enabled for: https://shaikhgst.netlify.app`);
+    console.log(`✅ CORS enabled for: http://localhost:5173, http://localhost:3000, http://localhost:${PORT}`);
     console.log(`✅ Health check available at: http://localhost:${PORT}/api/health`);
 });
 

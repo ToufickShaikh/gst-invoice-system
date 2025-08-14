@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const { generateUpiQr } = require('../utils/upiHelper');
 const fs = require('fs');
 const path = require('path');
+const company = require('../config/company');
 
 // Helper function for consistent error responses
 const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
@@ -30,9 +31,9 @@ async function generateInvoiceNumber(customerType) {
 
         if (lastInvoice) {
             // Extract the number part from the invoice number (e.g., "B2B-05" -> 5)
-            const match = lastInvoice.invoiceNumber.match(new RegExp(`^${customerType}-(\d+)$`));
+            const match = lastInvoice.invoiceNumber.match(new RegExp(`^${customerType}-(\\d+)$`));
             if (match) {
-                nextNumber = parseInt(match[1]) + 1;
+                nextNumber = parseInt(match[1], 10) + 1;
             }
         }
 
@@ -122,10 +123,20 @@ const createInvoice = async (req, res) => {
             return sendErrorResponse(res, 400, 'Customer not found');
         }
 
-        // Validate items and check stock availability
-        for (const invoiceItem of items) {
-            if (!invoiceItem.item || !invoiceItem.quantity || invoiceItem.rate === undefined) {
-                return sendErrorResponse(res, 400, 'Each item must have an item ID, quantity, and rate');
+        // Normalize items to backend shape
+        const normalizedItems = items.map((it) => ({
+            ...it,
+            rate: it.rate ?? it.price ?? 0,
+            taxSlab: it.taxSlab ?? it.taxRate ?? 0,
+            name: it.name || it.item?.name || '',
+            hsnCode: it.hsnCode || it.item?.hsnCode || '',
+            quantity: Number(it.quantity) || 0,
+        }));
+
+        // Validate items (basic validation only, allow manual lines without item id)
+        for (const invoiceItem of normalizedItems) {
+            if (!invoiceItem.quantity || invoiceItem.rate === undefined) {
+                return sendErrorResponse(res, 400, 'Each item must have a quantity and rate');
             }
             if (invoiceItem.quantity <= 0) {
                 return sendErrorResponse(res, 400, 'Quantity must be greater than zero');
@@ -133,18 +144,16 @@ const createInvoice = async (req, res) => {
             if (invoiceItem.rate < 0) {
                 return sendErrorResponse(res, 400, 'Rate cannot be negative');
             }
-
-            const item = await Item.findById(invoiceItem.item);
-            if (!item) {
-                return sendErrorResponse(res, 404, `Item with ID ${invoiceItem.item} not found`);
-            }
-            if (item.quantityInStock < invoiceItem.quantity) {
-                return sendErrorResponse(res, 400, `Insufficient stock for ${item.name}. Available: ${item.quantityInStock}, Requested: ${invoiceItem.quantity}`);
+            if (invoiceItem.item) {
+                const item = await Item.findById(invoiceItem.item);
+                if (!item) {
+                    return sendErrorResponse(res, 404, `Item with ID ${invoiceItem.item} not found`);
+                }
             }
         }
 
         // Recalculate totals on the backend to ensure data integrity
-        const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(items, customerDetails.state);
+        const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(normalizedItems, customerDetails.state);
         const balance = grandTotal - paidAmount;
         const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
 
@@ -155,7 +164,7 @@ const createInvoice = async (req, res) => {
         const invoice = new Invoice({
             invoiceNumber,
             customer,
-            items,
+            items: normalizedItems,
             subTotal,
             cgst: taxAmount.cgst,
             sgst: taxAmount.sgst,
@@ -173,17 +182,24 @@ const createInvoice = async (req, res) => {
 
         await invoice.save();
 
-        // Decrement stock quantities after successful save
-        for (const invoiceItem of items) {
-            await Item.findByIdAndUpdate(invoiceItem.item, {
+        // Decrement stock quantities after successful save (can go negative) for linked catalog items only
+        for (const invoiceItem of normalizedItems) {
+            if (!invoiceItem.item) continue; // skip manual lines
+            const updated = await Item.findByIdAndUpdate(invoiceItem.item, {
                 $inc: { quantityInStock: -invoiceItem.quantity },
-            });
+            }, { new: true });
+            if (updated && updated.quantityInStock < 0) {
+                console.warn(`[INVOICE] Item ${updated.name} stock is negative after billing (${updated.quantityInStock}). Will be recovered by Purchases.`);
+            }
         }
 
         // Optionally, generate PDF and return its path
         let pdfPath = null;
         try {
-            pdfPath = await pdfGenerator.generateInvoicePDF(invoice);
+            const populated = await Invoice.findById(invoice._id)
+                .populate('customer')
+                .populate('items.item');
+            pdfPath = await pdfGenerator.generateInvoicePDF(populated || invoice);
             invoice.pdfPath = pdfPath;
             await invoice.save();
         } catch (e) {
@@ -215,8 +231,9 @@ const updateInvoice = async (req, res) => {
             return sendErrorResponse(res, 404, 'Original invoice not found for update');
         }
 
-        // Revert stock for original items
+        // Revert stock for original items (only catalog items)
         for (const originalItem of originalInvoice.items) {
+            if (!originalItem.item) continue;
             await Item.findByIdAndUpdate(originalItem.item, {
                 $inc: { quantityInStock: originalItem.quantity },
             });
@@ -228,10 +245,20 @@ const updateInvoice = async (req, res) => {
             return sendErrorResponse(res, 400, 'Customer for invoice not found');
         }
 
-        // Validate items and check stock availability for new items
-        for (const updatedItem of items) {
-            if (!updatedItem.item || !updatedItem.quantity || updatedItem.rate === undefined) {
-                return sendErrorResponse(res, 400, 'Each item must have an item ID, quantity, and rate');
+        // Normalize items
+        const normalizedItems = items.map((it) => ({
+            ...it,
+            rate: it.rate ?? it.price ?? 0,
+            taxSlab: it.taxSlab ?? it.taxRate ?? 0,
+            name: it.name || it.item?.name || '',
+            hsnCode: it.hsnCode || it.item?.hsnCode || '',
+            quantity: Number(it.quantity) || 0,
+        }));
+
+        // Validate items (allow manual lines)
+        for (const updatedItem of normalizedItems) {
+            if (!updatedItem.quantity || updatedItem.rate === undefined) {
+                return sendErrorResponse(res, 400, 'Each item must have a quantity and rate');
             }
             if (updatedItem.quantity <= 0) {
                 return sendErrorResponse(res, 400, 'Quantity must be greater than zero');
@@ -239,32 +266,22 @@ const updateInvoice = async (req, res) => {
             if (updatedItem.rate < 0) {
                 return sendErrorResponse(res, 400, 'Rate cannot be negative');
             }
-
-            const item = await Item.findById(updatedItem.item);
-            if (!item) {
-                return sendErrorResponse(res, 404, `Item with ID ${updatedItem.item} not found`);
-            }
-            if (item.quantityInStock < updatedItem.quantity) {
-                // Revert changes made so far before sending error
-                for (const revertItem of items) {
-                    if (revertItem.item.toString() !== updatedItem.item.toString()) {
-                        await Item.findByIdAndUpdate(revertItem.item, {
-                            $inc: { quantityInStock: revertItem.quantity },
-                        });
-                    }
+            if (updatedItem.item) {
+                const item = await Item.findById(updatedItem.item);
+                if (!item) {
+                    return sendErrorResponse(res, 404, `Item with ID ${updatedItem.item} not found`);
                 }
-                return sendErrorResponse(res, 400, `Insufficient stock for ${item.name}. Available: ${item.quantityInStock}, Requested: ${updatedItem.quantity}`);
             }
         }
 
         // Recalculate totals based on updated items
-        const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(items, customerDetails.state);
+        const { subTotal, taxAmount, totalAmount: grandTotal } = calculateTotals(normalizedItems, customerDetails.state);
         const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
         const balance = grandTotal - paidAmount;
 
         const updatedInvoice = await Invoice.findByIdAndUpdate(id, {
             customer,
-            items,
+            items: normalizedItems,
             subTotal,
             cgst: taxAmount.cgst,
             sgst: taxAmount.sgst,
@@ -286,17 +303,24 @@ const updateInvoice = async (req, res) => {
             return sendErrorResponse(res, 404, 'Invoice not found');
         }
 
-        // Decrement stock for updated items
-        for (const updatedItem of items) {
-            await Item.findByIdAndUpdate(updatedItem.item, {
+        // Decrement stock for updated items (only catalog items)
+        for (const updatedItem of normalizedItems) {
+            if (!updatedItem.item) continue;
+            const updated = await Item.findByIdAndUpdate(updatedItem.item, {
                 $inc: { quantityInStock: -updatedItem.quantity },
-            });
+            }, { new: true });
+            if (updated && updated.quantityInStock < 0) {
+                console.warn(`[INVOICE] Item ${updated.name} stock is negative after invoice update (${updated.quantityInStock}). Will be recovered by Purchases.`);
+            }
         }
 
         // After successful update, regenerate the PDF
         let pdfPath = null;
         try {
-            pdfPath = await pdfGenerator.generateInvoicePDF(updatedInvoice);
+            const populated = await Invoice.findById(updatedInvoice._id)
+                .populate('customer')
+                .populate('items.item');
+            pdfPath = await pdfGenerator.generateInvoicePDF(populated || updatedInvoice);
             updatedInvoice.pdfPath = pdfPath;
             await updatedInvoice.save();
         } catch (e) {
@@ -501,14 +525,12 @@ const generatePaymentQr = async (req, res) => {
             balance = newBalance;
         }
 
-        if (balance <= 0) {
-            return sendErrorResponse(res, 400, 'Invoice is already fully paid');
-        }
+        const upiId = company.upi.id; // centralized from config/company.js
+        // If balance is > 0, include amount; else generate QR without amount
+        const amountForQr = balance > 0 ? balance.toFixed(2) : undefined;
+        const { qrCodeImage } = await generateUpiQr(upiId, amountForQr);
 
-        const upiId = process.env.UPI_ID || 'shaikhtool@ibl';
-        const { qrCodeImage } = await generateUpiQr(upiId, balance.toFixed(2));
-
-        res.json({ qrCodeImage });
+        res.json({ qrCodeImage, amount: amountForQr || null });
 
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to generate QR code', error);
@@ -563,6 +585,157 @@ const generatePublicPdf = async (req, res) => {
     }
 };
 
+// @desc    Record a payment for a customer and allocate across outstanding invoices (oldest first)
+// @route   POST /api/billing/customers/:customerId/payments
+// @access  Private
+const recordCustomerPayment = async (req, res) => {
+    try {
+        const { customerId } = req.params;
+        let { amount, method = 'Cash', date = new Date(), notes = '' } = req.body || {};
+
+        amount = Number(amount);
+        if (!customerId) return sendErrorResponse(res, 400, 'Customer ID is required');
+        if (!amount || amount <= 0) return sendErrorResponse(res, 400, 'Valid payment amount is required');
+
+        const customer = await Customer.findById(customerId);
+        if (!customer) return sendErrorResponse(res, 404, 'Customer not found');
+
+        // Fetch outstanding invoices for this customer
+        const invoices = await Invoice.find({ customer: customerId })
+            .sort({ invoiceDate: 1 })
+            .select('_id invoiceNumber grandTotal paidAmount balance');
+
+        let remaining = amount;
+        const allocations = [];
+
+        for (const inv of invoices) {
+            const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+            const paidAmount = Number(inv.paidAmount || 0);
+            let balance = Number(inv.balance != null ? inv.balance : (grandTotal - paidAmount));
+
+            if (balance <= 0) continue;
+            if (remaining <= 0) break;
+
+            const alloc = Math.min(balance, remaining);
+            inv.paidAmount = paidAmount + alloc;
+            inv.balance = Math.max(0, grandTotal - inv.paidAmount);
+            await inv.save();
+
+            allocations.push({
+                invoiceId: inv._id,
+                invoiceNumber: inv.invoiceNumber,
+                allocated: alloc,
+                remainingBalance: inv.balance,
+            });
+
+            remaining -= alloc;
+        }
+
+        res.json({
+            success: true,
+            customerId,
+            customerName: customer.firmName || customer.name,
+            totalPaid: amount,
+            unallocated: remaining,
+            method,
+            date,
+            notes,
+            allocations,
+        });
+    } catch (error) {
+        sendErrorResponse(res, 500, 'Failed to record payment', error);
+    }
+};
+
+// @desc    Generate and email a customer statement (returns statement data; email sending optional/configurable)
+// @route   POST /api/billing/customers/:customerId/email-statement
+// @access  Private
+const emailCustomerStatement = async (req, res) => {
+    try {
+        const { customerId } = req.params;
+        const { startDate, endDate } = req.body || {};
+
+        const customer = await Customer.findById(customerId);
+        if (!customer) return sendErrorResponse(res, 404, 'Customer not found');
+
+        const dateQuery = {};
+        if (startDate) dateQuery.$gte = new Date(startDate);
+        if (endDate) {
+            const end = new Date(endDate);
+            end.setUTCHours(23, 59, 59, 999);
+            dateQuery.$lte = end;
+        }
+
+        const match = { customer: customerId };
+        if (Object.keys(dateQuery).length) match.invoiceDate = dateQuery;
+
+        const invoices = await Invoice.find(match).sort({ invoiceDate: 1 });
+
+        const totals = invoices.reduce((acc, inv) => {
+            const total = Number(inv.grandTotal || inv.totalAmount || 0);
+            const paid = Number(inv.paidAmount || 0);
+            const bal = Number(inv.balance != null ? inv.balance : (total - paid));
+            acc.total += total;
+            acc.paid += paid;
+            acc.balance += Math.max(0, bal);
+            return acc;
+        }, { total: 0, paid: 0, balance: 0 });
+
+        // Build a simple HTML statement preview
+        const rows = invoices.map(inv => {
+            const total = Number(inv.grandTotal || inv.totalAmount || 0).toFixed(2);
+            const paid = Number(inv.paidAmount || 0).toFixed(2);
+            const bal = Number(inv.balance != null ? inv.balance : (inv.grandTotal - (inv.paidAmount || 0))).toFixed(2);
+            const dateStr = inv.invoiceDate ? new Date(inv.invoiceDate).toISOString().slice(0,10) : '';
+            return `<tr><td style="padding:6px;border:1px solid #eee;">${inv.invoiceNumber || inv._id}</td><td style="padding:6px;border:1px solid #eee;">${dateStr}</td><td style="padding:6px;border:1px solid #eee;">₹${total}</td><td style="padding:6px;border:1px solid #eee;">₹${paid}</td><td style="padding:6px;border:1px solid #eee;">₹${bal}</td></tr>`;
+        }).join('');
+
+        const html = `
+            <div style="font-family:Arial,sans-serif;">
+              <h2>Account Statement</h2>
+              <p><strong>Customer:</strong> ${customer.firmName || customer.name || ''}</p>
+              ${startDate || endDate ? `<p><strong>Period:</strong> ${startDate || 'Start'} to ${endDate || 'Today'}</p>` : ''}
+              <table style="border-collapse:collapse;min-width:520px;">
+                <thead>
+                  <tr>
+                    <th style="text-align:left;padding:6px;border:1px solid #eee;">Invoice</th>
+                    <th style="text-align:left;padding:6px;border:1px solid #eee;">Date</th>
+                    <th style="text-align:right;padding:6px;border:1px solid #eee;">Total</th>
+                    <th style="text-align:right;padding:6px;border:1px solid #eee;">Paid</th>
+                    <th style="text-align:right;padding:6px;border:1px solid #eee;">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>${rows || '<tr><td colspan="5" style="padding:8px;color:#888;">No invoices found.</td></tr>'}</tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="2" style="padding:6px;border:1px solid #eee;text-align:right;"><strong>Totals:</strong></td>
+                    <td style="padding:6px;border:1px solid #eee;text-align:right;"><strong>₹${totals.total.toFixed(2)}</strong></td>
+                    <td style="padding:6px;border:1px solid #eee;text-align:right;"><strong>₹${totals.paid.toFixed(2)}</strong></td>
+                    <td style="padding:6px;border:1px solid #eee;text-align:right;"><strong>₹${totals.balance.toFixed(2)}</strong></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+        `;
+
+        const toEmail = customer.email || company.email;
+        const subject = `Account Statement - ${customer.firmName || customer.name || ''}`;
+
+        // If email infrastructure exists, send it here. For now, return payload.
+        res.json({
+            success: true,
+            to: toEmail,
+            subject,
+            html,
+            totals,
+            invoiceCount: invoices.length,
+            note: 'Email sending can be wired with SMTP in a follow-up. This endpoint returns the composed statement for now.'
+        });
+    } catch (error) {
+        sendErrorResponse(res, 500, 'Failed to generate/email statement', error);
+    }
+};
+
 module.exports = {
     createInvoice,
     updateInvoice,
@@ -573,4 +746,6 @@ module.exports = {
     getInvoiceById,
     deleteInvoice,
     generatePublicPdf,
+    recordCustomerPayment,
+    emailCustomerStatement,
 };

@@ -43,7 +43,7 @@ exports.createSalesOrder = async (req, res) => {
       return sendErrorResponse(res, 404, 'Customer not found');
     }
 
-    // Check stock availability and decrement
+    // Basic item validation (no stock block)
     for (const orderItem of items) {
       if (!orderItem.item || !orderItem.quantity || orderItem.rate === undefined) {
         return sendErrorResponse(res, 400, 'Each item must have an item ID, quantity, and rate');
@@ -59,9 +59,6 @@ exports.createSalesOrder = async (req, res) => {
       if (!item) {
         return sendErrorResponse(res, 404, `Item with ID ${orderItem.item} not found`);
       }
-      if (item.quantityInStock < orderItem.quantity) {
-        return sendErrorResponse(res, 400, `Insufficient stock for ${item.name}. Available: ${item.quantityInStock}, Requested: ${orderItem.quantity}`);
-      }
     }
 
     const salesOrder = new SalesOrder({
@@ -72,11 +69,14 @@ exports.createSalesOrder = async (req, res) => {
 
     await salesOrder.save();
 
-    // Decrement stock quantities after successful save
+    // Decrement stock quantities after successful save (can go negative)
     for (const orderItem of items) {
-      await Item.findByIdAndUpdate(orderItem.item, {
+      const updated = await Item.findByIdAndUpdate(orderItem.item, {
         $inc: { quantityInStock: -orderItem.quantity },
-      });
+      }, { new: true });
+      if (updated && updated.quantityInStock < 0) {
+        console.warn(`[SALES-ORDER] Item ${updated.name} stock is negative after sales order (${updated.quantityInStock}). Will be recovered by Purchases.`);
+      }
     }
 
     res.status(201).json(salesOrder);
@@ -147,7 +147,6 @@ exports.updateSalesOrder = async (req, res) => {
       return sendErrorResponse(res, 404, 'Customer not found');
     }
 
-    // Check stock availability for new items and revert old stock
     // Revert stock changes from the original sales order
     for (const originalItem of salesOrder.items) {
       await Item.findByIdAndUpdate(originalItem.item, {
@@ -155,7 +154,7 @@ exports.updateSalesOrder = async (req, res) => {
       });
     }
 
-    // Check stock availability for new items and decrement
+    // Basic item validation (no stock block)
     for (const orderItem of items) {
       if (!orderItem.item || !orderItem.quantity || orderItem.rate === undefined) {
         return sendErrorResponse(res, 400, 'Each item must have an item ID, quantity, and rate');
@@ -166,27 +165,10 @@ exports.updateSalesOrder = async (req, res) => {
       if (orderItem.rate < 0) {
         return sendErrorResponse(res, 400, 'Rate cannot be negative');
       }
-
       const item = await Item.findById(orderItem.item);
       if (!item) {
         return sendErrorResponse(res, 404, `Item with ID ${orderItem.item} not found`);
       }
-      if (item.quantityInStock < orderItem.quantity) {
-        // Revert changes made so far before sending error
-        for (const revertItem of items) {
-            if (revertItem.item.toString() !== orderItem.item.toString()) {
-                await Item.findByIdAndUpdate(revertItem.item, {
-                    $inc: { quantityInStock: revertItem.quantity },
-                });
-            }
-        }
-        return sendErrorResponse(res, 400, `Insufficient stock for ${item.name}. Available: ${item.quantityInStock}, Requested: ${orderItem.quantity}`);
-      }
-    }
-
-    // If status changes to Cancelled, revert stock (already handled above by reverting all and then re-applying)
-    if (salesOrder.status !== 'Cancelled' && status === 'Cancelled') {
-        // Stock already reverted, no need to do it again
     }
 
     salesOrder.customer = customer;
@@ -196,11 +178,14 @@ exports.updateSalesOrder = async (req, res) => {
 
     await salesOrder.save();
 
-    // Decrement stock quantities for new items after successful save
+    // Decrement stock quantities for new items after successful save (can go negative)
     for (const orderItem of items) {
-        await Item.findByIdAndUpdate(orderItem.item, {
+        const updated = await Item.findByIdAndUpdate(orderItem.item, {
             $inc: { quantityInStock: -orderItem.quantity },
-        });
+        }, { new: true });
+        if (updated && updated.quantityInStock < 0) {
+            console.warn(`[SALES-ORDER] Item ${updated.name} stock is negative after sales order update (${updated.quantityInStock}). Will be recovered by Purchases.`);
+        }
     }
 
     res.json(salesOrder);

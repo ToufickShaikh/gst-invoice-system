@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import Modal from './Modal';
@@ -32,15 +31,17 @@ const AddCustomerModal = ({
     setFormData((prev) => ({ ...prev, customerType }));
   }, [customerType]);
 
+  const hasGST = (formData.gstNo || '').trim().length > 0;
+
   const handleChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
 
-    if (field === 'gstNo' && customerType === 'B2B') {
-      if (value.length >= 15) {
-        validateAndVerifyGSTIN(value);
+    if (field === 'gstNo') {
+      if (value && value.trim().length >= 15) {
+        validateAndVerifyGSTIN(value.trim());
       } else {
         setGstinValid(null);
         setGstinDetails(null);
@@ -86,7 +87,10 @@ const AddCustomerModal = ({
   };
 
   const handleSubmit = async () => {
-    if (customerType === 'B2B') {
+    // Derive type from GST presence
+    const derivedType = hasGST ? 'B2B' : 'B2C';
+
+    if (hasGST) {
       if (!formData.gstNo.trim()) {
         toast.error('GST Number is required for B2B customers');
         return;
@@ -107,9 +111,18 @@ const AddCustomerModal = ({
       return;
     }
 
+    if (!formData.state) {
+      toast.error('State is required');
+      return;
+    }
+
     setAddingCustomer(true);
     try {
-      const response = await customersAPI.create(formData);
+      const payload = {
+        ...formData,
+        customerType: derivedType,
+      };
+      const response = await customersAPI.create(payload);
       const createdCustomer = response.data || response;
       onCustomerAdded(createdCustomer);
       toast.success('Customer added successfully!');
@@ -129,31 +142,29 @@ const AddCustomerModal = ({
       contentLabel="Add Customer"
       className="max-w-lg mx-auto p-6 rounded-lg shadow-lg bg-white"
     >
-      <h2 className="text-xl font-semibold mb-4">
-        {customerType === 'B2B' ? 'Add B2B Customer' : 'Add B2C Customer'}
-      </h2>
+      <h2 className="text-xl font-semibold mb-4">Add Customer</h2>
 
       <div className="space-y-4">
-        {customerType === 'B2B' && (
+        <InputField
+          label="GST Number (leave empty for B2C)"
+          value={formData.gstNo}
+          onChange={(e) => handleChange('gstNo', e.target.value)}
+          placeholder="Enter GST number (optional)"
+        />
+        {gstinValidating && <p>Validating...</p>}
+        {gstinDetails && (
+          <div className="bg-green-100 p-2 rounded">
+            <p>
+              <strong>Firm Name:</strong> {gstinDetails.legalName}
+            </p>
+            <p>
+              <strong>Address:</strong> {gstinDetails.principalPlaceOfBusiness}
+            </p>
+          </div>
+        )}
+
+        {hasGST ? (
           <>
-            <InputField
-              label="GST Number"
-              value={formData.gstNo}
-              onChange={(e) => handleChange('gstNo', e.target.value)}
-              placeholder="Enter GST number first"
-              required
-            />
-            {gstinValidating && <p>Validating...</p>}
-            {gstinDetails && (
-              <div className="bg-green-100 p-2 rounded">
-                <p>
-                  <strong>Firm Name:</strong> {gstinDetails.legalName}
-                </p>
-                <p>
-                  <strong>Address:</strong> {gstinDetails.principalPlaceOfBusiness}
-                </p>
-              </div>
-            )}
             <InputField
               label="Firm Name"
               value={formData.firmName}
@@ -169,8 +180,7 @@ const AddCustomerModal = ({
               required
             />
           </>
-        )}
-        {customerType === 'B2C' && (
+        ) : (
           <InputField
             label="Customer Name"
             value={formData.name}
@@ -179,6 +189,7 @@ const AddCustomerModal = ({
             required
           />
         )}
+
         <InputField
           label="Contact Number"
           value={formData.contact}
@@ -258,23 +269,16 @@ const AddCustomerModal = ({
             <option value="33-Tamil Nadu">33 - Tamil Nadu</option>
             <option value="34-Puducherry">34 - Puducherry</option>
             <option value="35-Andaman and Nicobar Islands">35 - Andaman and Nicobar Islands</option>
-            <option value="36-Telangana">36 - Telangana</option>
-            <option value="37-Ladakh">37 - Ladakh</option>
           </select>
         </div>
       </div>
 
-      <div className="flex justify-end gap-4 mt-6">
-        <Button onClick={onClose} variant="outline" size="sm">
+      <div className="flex justify-end space-x-2 mt-6">
+        <Button variant="secondary" onClick={onClose} disabled={addingCustomer}>
           Cancel
         </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="primary"
-          size="sm"
-          loading={addingCustomer}
-        >
-          Add Customer
+        <Button variant="primary" onClick={handleSubmit} disabled={addingCustomer}>
+          {addingCustomer ? 'Adding...' : 'Add Customer'}
         </Button>
       </div>
     </Modal>

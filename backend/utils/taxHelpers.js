@@ -7,9 +7,11 @@ const GST_RATES = {
     28: 28,
 };
 
-// Company's state code - Tamil Nadu (33)
-const COMPANY_STATE_CODE = '33';
-const COMPANY_STATE_NAME = 'Tamil Nadu';
+const company = require('../config/company');
+
+// Company's state code and name derived from config (default Tamil Nadu 33)
+const COMPANY_STATE_CODE = (company.state && String(company.state).split('-')[0].trim()) || '33';
+const COMPANY_STATE_NAME = (company.state && String(company.state).split('-')[1]) || 'Tamil Nadu';
 
 /**
  * Extract state code from formatted state string (e.g., "33-Tamil Nadu" -> "33")
@@ -54,7 +56,7 @@ const calculateTotals = (items, customerState) => {
     let totalIgst = 0;
 
     console.log('[TAX CALC] Calculating taxes...');
-    console.log('[TAX CALC] Company State Code:', COMPANY_STATE_CODE, '(Tamil Nadu)');
+    console.log('[TAX CALC] Company State Code:', COMPANY_STATE_CODE, `(${COMPANY_STATE_NAME})`);
     console.log('[TAX CALC] Customer State:', customerState);
 
     // Extract customer state code

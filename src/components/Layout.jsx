@@ -123,12 +123,25 @@ const Layout = ({ children }) => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h2a2 2 0 002-2V8a2 2 0 00-2-2h-2M17 20V6M17 20H7m10 0v-2a2 2 0 00-2-2H9a2 2 0 00-2 2v2M7 20H5a2 2 0 01-2-2V8a2 2 0 012-2h2m0 0V4a2 2 0 012-2h4a2 2 0 012 2v2M7 6h10" />
         </svg>
       )
+    },
+    {
+      path: '/cash-drawer',
+      label: 'Cash Drawer',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zm4 10h6" />
+        </svg>
+      )
     }
   ]
 
   const isActiveRoute = (path) => {
     return location.pathname === path
   }
+
+  // Pick a compact set of items for the mobile bottom nav
+  const bottomNavPaths = new Set(['/dashboard', '/billing', '/invoices', '/customers', '/cash-drawer'])
+  const mobileNavItems = navItems.filter(n => bottomNavPaths.has(n.path))
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -257,7 +270,7 @@ const Layout = ({ children }) => {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto pb-20 lg:pb-0">
           {children}
         </main>
       </div>
@@ -268,6 +281,27 @@ const Layout = ({ children }) => {
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         ></div>
+      )}
+
+      {/* Bottom navigation for mobile */}
+      {isMobile && (
+        <nav className="nav-mobile safe-area">
+          <div className="flex">
+            {mobileNavItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`nav-mobile-item ${isActiveRoute(item.path) ? 'text-primary-700' : ''}`}
+              >
+                <div className={`flex flex-col items-center ${isActiveRoute(item.path) ? 'font-semibold' : ''}`}>
+                  {/* Reuse small icons */}
+                  <div className="mb-0.5">{item.icon}</div>
+                  <span>{item.label.replace('Create Invoice','Billing').replace('All Invoices','Invoices')}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </nav>
       )}
     </div>
   )

@@ -464,7 +464,7 @@ const InvoiceSuccess = () => {
                   <div className="mt-3 flex flex-wrap gap-2 justify-center">
                     <Button
                       onClick={() => {
-                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://185.52.53.253/shaikh_carpets';
+                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5001';
                         const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
 
                         if (navigator.share) {
@@ -496,7 +496,7 @@ const InvoiceSuccess = () => {
 
                     <Button
                       onClick={() => {
-                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://185.52.53.253/shaikh_carpets';
+                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5001';
                         const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
 
                         const emailSubject = encodeURIComponent(`Invoice ${invoiceNumber || invoiceId}`);
@@ -519,7 +519,7 @@ Best regards`);
                       size="sm"
                       leftIcon={
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12H8m8 0a4 4 0 11-8 0 4 4 0 018 0zm0 0V8m0 4v4" />
                         </svg>
                       }
                     >

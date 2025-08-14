@@ -1,5 +1,6 @@
 // GST Verification and Auto-fill Utility
 const https = require('https');
+const company = require('../config/company');
 
 /**
  * Make HTTPS request (Node.js compatible fetch alternative)
@@ -92,8 +93,8 @@ const GST_STATE_CODES = {
     '38': 'Ladakh'
 };
 
-// Company's state code (Tamil Nadu = 33)
-const COMPANY_STATE_CODE = '33';
+// Company's state code derived from config (default Tamil Nadu = 33)
+const COMPANY_STATE_CODE = (company.state && String(company.state).split('-')[0].trim()) || '33';
 
 /**
  * Validate GSTIN format

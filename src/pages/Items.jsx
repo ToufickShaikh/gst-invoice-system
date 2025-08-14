@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import Layout from '../components/Layout'
@@ -43,57 +43,110 @@ const Items = () => {
   const columns = [
     { key: 'name', label: 'Item Name' },
     { key: 'hsnCode', label: 'HSN Code' },
-    { key: 'priceType', label: 'Price Type' },
+    {
+      key: 'priceType',
+      label: 'Price Type',
+      render: (value) => (
+        <span className={`px-2 py-1 rounded text-xs font-medium ${value === 'Inclusive' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+          {value || 'Exclusive'}
+        </span>
+      )
+    },
     { key: 'formattedRate', label: 'Rate' },
     { key: 'units', label: 'Units' },
-    { key: 'taxSlabDisplay', label: 'Tax Slab' },
-    { 
-      key: 'stockDisplay', 
+    {
+      key: 'taxSlabDisplay',
+      label: 'Tax Slab',
+      render: (value, item) => (
+        <span className={`px-2 py-1 rounded text-xs font-medium ${Number(item.taxSlab || 0) === 0 ? 'bg-gray-100 text-gray-700' : 'bg-green-100 text-green-700'}`}>
+          {value}
+        </span>
+      )
+    },
+    {
+      key: 'stockDisplay',
       label: 'Stock',
       render: (value, item) => {
         // Defensive check to handle undefined items
         if (!item) return <span>-</span>;
-        
         const stock = item.stock ?? 0;
         return (
           <div className={`font-semibold ${
-            stock <= 0 ? 'text-red-600' : 
-            stock <= 10 ? 'text-orange-600' : 
+            stock <= 0 ? 'text-red-600' :
+            stock <= lowStockThreshold ? 'text-orange-600' :
             'text-green-600'
           }`}>
             {stock}
             {stock <= 0 && (
-              <span className="ml-1 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
-                Out of Stock
-              </span>
+              <span className="ml-1 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Out of Stock</span>
             )}
-            {stock > 0 && stock <= 10 && (
-              <span className="ml-1 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                Low Stock
-              </span>
+            {stock > 0 && stock <= lowStockThreshold && (
+              <span className="ml-1 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">Low Stock</span>
             )}
           </div>
         );
       }
-    }
+    },
+    { key: 'actions', label: 'Actions' }
   ]
+
+  // Advanced filters like Zoho
+  const [filters, setFilters] = useState({
+    query: '',
+    priceType: 'ALL',
+    tax: 'ALL',
+    stock: 'ALL', // ALL | IN | LOW | OUT
+    units: 'ALL',
+  })
+  const [lowStockThreshold, setLowStockThreshold] = useState(10)
+
+  const unitOptions = useMemo(() => {
+    const s = new Set(items.filter(Boolean).map(i => i.units).filter(Boolean))
+    return ['ALL', ...Array.from(s)]
+  }, [items])
+
+  const stats = useMemo(() => {
+    const total = items.filter(Boolean).length
+    const out = items.filter(i => (i?.stock ?? 0) <= 0).length
+    const low = items.filter(i => (i?.stock ?? 0) > 0 && (i?.stock ?? 0) <= lowStockThreshold).length
+    const inStock = Math.max(0, total - out)
+    return { total, inStock, low, out }
+  }, [items, lowStockThreshold])
+
+  const filteredItems = useMemo(() => {
+    const q = filters.query.trim().toLowerCase()
+    return items.filter((it) => {
+      if (!it) return false
+      if (filters.priceType !== 'ALL' && (it.priceType || 'Exclusive') !== filters.priceType) return false
+      if (filters.tax !== 'ALL' && String(it.taxSlab || 0) !== filters.tax) return false
+      if (filters.units !== 'ALL' && (it.units || '') !== filters.units) return false
+      const stock = Number(it.stock ?? 0)
+      if (filters.stock === 'OUT' && !(stock <= 0)) return false
+      if (filters.stock === 'LOW' && !(stock > 0 && stock <= lowStockThreshold)) return false
+      if (filters.stock === 'IN' && !(stock > 0)) return false
+      if (!q) return true
+      const fields = [it.name, it.hsnCode, it.units, it.priceType, String(it.rate), String(it.taxSlab)]
+        .map(x => (x ?? '').toString().toLowerCase())
+      return fields.some(f => f.includes(q))
+    })
+  }, [items, filters, lowStockThreshold])
 
   const fetchItems = async () => {
     setLoading(true)
     try {
       const response = await itemsAPI.getAll()
-      // Defensive: always use array and handle undefined items
-      const itemsArr = Array.isArray(response.data)
-        ? response.data
-        : (Array.isArray(response) ? response : [])
+      // Normalize to array regardless of shape
+      const itemsArr = Array.isArray(response)
+        ? response
+        : (Array.isArray(response?.data) ? response.data : [])
       
       const formattedItems = itemsArr
-        .filter(item => item != null) // Filter out null/undefined items
+        .filter(item => item != null)
         .map(item => ({
           ...item,
           formattedRate: formatCurrency(item.rate || 0),
           taxSlabDisplay: `${item.taxSlab || 0}%`,
-          stock: item.quantityInStock ?? 0  // Use quantityInStock from backend
+          stock: item.quantityInStock ?? 0
         }))
       setItems(formattedItems)
     } catch (error) {
@@ -108,6 +161,28 @@ const Items = () => {
   useEffect(() => {
     fetchItems()
   }, [])
+
+  // Export CSV of current view
+  const exportCsv = () => {
+    const headers = ['name','hsnCode','rate','priceType','taxSlab','units','stock']
+    const rows = filteredItems.map(i => [
+      i.name,
+      i.hsnCode,
+      i.rate,
+      i.priceType || 'Exclusive',
+      i.taxSlab || 0,
+      i.units || '',
+      i.stock ?? 0
+    ])
+    const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'items_export.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -367,6 +442,12 @@ const Items = () => {
       let duplicateCount = 0
       const errors = []
 
+      // Fetch existing items once and build lookup sets for faster duplicate checks
+      const existing = await itemsAPI.getAll()
+      const existingArr = Array.isArray(existing) ? existing : (Array.isArray(existing?.data) ? existing.data : [])
+      const existingNames = new Set(existingArr.filter(Boolean).map(i => (i.name || '').toLowerCase()))
+      const existingHsns = new Set(existingArr.filter(Boolean).map(i => i.hsnCode))
+
       for (const item of csvData) {
         try {
           const itemData = {
@@ -376,27 +457,23 @@ const Items = () => {
             priceType: item.priceType || 'Exclusive',
             taxSlab: item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 18,
             units: item.units || 'per piece',
-            quantityInStock: 0  // Always start with 0 stock, to be managed through purchase system
+            quantityInStock: 0
           }
           
-          // Debug logging for 0% tax items
           if (parseFloat(item.taxSlab) === 0) {
             console.log('Processing 0% tax item:', item.name, 'Original taxSlab:', item.taxSlab, 'Parsed taxSlab:', itemData.taxSlab)
           }
           
-          // Validate required fields
           if (!itemData.name || !itemData.hsnCode || itemData.rate <= 0) {
             console.log('Validation failed for item:', itemData)
             errors.push(`Skipped "${item.name || 'unnamed'}": Missing required fields (name: ${!!itemData.name}, hsnCode: ${!!itemData.hsnCode}, rate: ${itemData.rate})`)
             continue
           }
 
-          // Check for existing item by name or HSN code
-          const existingItems = await itemsAPI.getAll()
-          const isDuplicate = existingItems.data.some(existing => 
-            existing.name.toLowerCase() === itemData.name.toLowerCase() || 
-            existing.hsnCode === itemData.hsnCode
-          )
+          // Duplicate check via prebuilt sets
+          const nameKey = itemData.name.toLowerCase()
+          const hsnKey = itemData.hsnCode
+          const isDuplicate = existingNames.has(nameKey) || existingHsns.has(hsnKey)
 
           if (isDuplicate) {
             duplicateCount++
@@ -404,13 +481,16 @@ const Items = () => {
             continue
           }
           
-          // Debug: Log data being sent to API for 0% tax items
           if (itemData.taxSlab === 0) {
             console.log('Sending 0% tax item to API:', itemData)
           }
           
           await itemsAPI.create(itemData)
           successCount++
+
+          // Update sets to avoid duplicates within same import
+          existingNames.add(nameKey)
+          existingHsns.add(hsnKey)
         } catch (error) {
           if (error.message && error.message.includes('already exists')) {
             duplicateCount++
@@ -448,7 +528,7 @@ const Items = () => {
     try {
       console.log('Testing delete API...')
       const response = await itemsAPI.getAll()
-      const allItems = Array.isArray(response.data) ? response.data : Array.isArray(response) ? response : []
+      const allItems = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : [])
       
       if (allItems.length === 0) {
         console.log('No items to test delete with')
@@ -486,9 +566,8 @@ const Items = () => {
       const response = await itemsAPI.getAll()
       console.log('API Response:', response)
       
-      // Handle different response structures
-      const allItems = Array.isArray(response.data) ? response.data : 
-                      Array.isArray(response) ? response : []
+      const allItems = Array.isArray(response) ? response : 
+                      (Array.isArray(response?.data) ? response.data : [])
       
       console.log('All items:', allItems.length, allItems)
       
@@ -630,42 +709,110 @@ const Items = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        {/* Stock Alerts */}
-        {items.filter(item => item != null).some(item => (item.stock ?? 0) <= 10) && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <h3 className="text-yellow-800 font-medium">Stock Alerts</h3>
-            </div>
-            <div className="mt-2 text-sm text-yellow-700">
-              {items.filter(item => item != null && (item.stock ?? 0) <= 0).length > 0 && (
-                <p>{items.filter(item => item != null && (item.stock ?? 0) <= 0).length} items are out of stock</p>
-              )}
-              {items.filter(item => item != null && (item.stock ?? 0) > 0 && (item.stock ?? 0) <= 10).length > 0 && (
-                <p>{items.filter(item => item != null && (item.stock ?? 0) > 0 && (item.stock ?? 0) <= 10).length} items have low stock</p>
-              )}
-            </div>
+      <div className="space-y-6 pb-20 lg:pb-0">
+        {/* Stats Summary */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-4 rounded-lg border bg-white">
+            <div className="text-xs text-gray-500">Total Items</div>
+            <div className="text-2xl font-semibold">{stats.total}</div>
           </div>
-        )}
+          <div className="p-4 rounded-lg border bg-white">
+            <div className="text-xs text-gray-500">In Stock</div>
+            <div className="text-2xl font-semibold text-green-600">{stats.inStock}</div>
+          </div>
+          <div className="p-4 rounded-lg border bg-white">
+            <div className="text-xs text-gray-500">Low Stock ≤ {lowStockThreshold}</div>
+            <div className="text-2xl font-semibold text-orange-600">{stats.low}</div>
+          </div>
+          <div className="p-4 rounded-lg border bg-white">
+            <div className="text-xs text-gray-500">Out of Stock</div>
+            <div className="text-2xl font-semibold text-red-600">{stats.out}</div>
+          </div>
+        </div>
 
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Item Management</h1>
-          <div className="flex gap-3">
-            <Button onClick={() => setIsModalOpen(true)}>
-              Add Item
-            </Button>
-            <Button onClick={() => setIsBulkModalOpen(true)} variant="secondary">
-              Bulk Add Items
-            </Button>
-            <Button onClick={() => setIsCsvModalOpen(true)} variant="secondary">
-              Import CSV
-            </Button>
-            <Button onClick={findAndDeleteDuplicates} variant="outline" className="text-red-600 border-red-300 hover:bg-red-50">
-              Clean Duplicates
-            </Button>
+          <div className="flex gap-3 flex-wrap">
+            <Button onClick={() => setIsModalOpen(true)}>Add Item</Button>
+            <Button onClick={() => setIsBulkModalOpen(true)} variant="secondary">Bulk Add Items</Button>
+            <Button onClick={() => setIsCsvModalOpen(true)} variant="secondary">Import CSV</Button>
+            <Button onClick={exportCsv} variant="outline">Export CSV</Button>
+            <Button onClick={findAndDeleteDuplicates} variant="outline" className="text-red-600 border-red-300 hover:bg-red-50">Clean Duplicates</Button>
+          </div>
+        </div>
+
+        {/* Advanced Filters */}
+        <div className="bg-white rounded-lg border p-3 md:p-4">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+            <div className="md:col-span-2">
+              <label className="text-xs text-gray-600">Search</label>
+              <input
+                value={filters.query}
+                onChange={(e) => setFilters(prev => ({ ...prev, query: e.target.value }))}
+                placeholder="Search by name, HSN, rate, tax..."
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600">Price Type</label>
+              <select
+                value={filters.priceType}
+                onChange={(e) => setFilters(prev => ({ ...prev, priceType: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="ALL">All</option>
+                <option value="Exclusive">Exclusive</option>
+                <option value="Inclusive">Inclusive</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-600">Tax Slab</label>
+              <select
+                value={filters.tax}
+                onChange={(e) => setFilters(prev => ({ ...prev, tax: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="ALL">All</option>
+                <option value="0">0%</option>
+                <option value="5">5%</option>
+                <option value="12">12%</option>
+                <option value="18">18%</option>
+                <option value="28">28%</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-600">Units</label>
+              <select
+                value={filters.units}
+                onChange={(e) => setFilters(prev => ({ ...prev, units: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                {unitOptions.map(u => (<option key={u} value={u}>{u}</option>))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-600">Stock Status</label>
+              <select
+                value={filters.stock}
+                onChange={(e) => setFilters(prev => ({ ...prev, stock: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="ALL">All</option>
+                <option value="IN">In Stock</option>
+                <option value="LOW">Low Stock</option>
+                <option value="OUT">Out of Stock</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-600">Low Stock Threshold</label>
+              <input
+                type="number"
+                min={1}
+                value={lowStockThreshold}
+                onChange={(e) => setLowStockThreshold(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
           </div>
         </div>
 
@@ -676,9 +823,12 @@ const Items = () => {
           ) : (
             <Table
               columns={columns}
-              data={items}
+              data={filteredItems}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              sortable={true}
+              pagination={true}
+              pageSize={10}
             />
           )}
         </div>

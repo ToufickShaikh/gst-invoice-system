@@ -4,6 +4,8 @@ import { formatCurrency } from '../utils/dateHelpers';
 import { billingAPI } from '../api/billing';
 import { customersAPI } from '../api/customers';
 import { itemsAPI } from '../api/items';
+import { useCompany } from '../context/CompanyContext.jsx';
+import Layout from './Layout'
 
 const EnhancedQuoteManagement = () => {
   const [quotes, setQuotes] = useState([]);
@@ -40,6 +42,7 @@ const EnhancedQuoteManagement = () => {
     units: 'per piece'
   });
   const [bulkAction, setBulkAction] = useState('');
+  const { company } = useCompany();
 
   useEffect(() => {
     fetchData();
@@ -298,510 +301,477 @@ const EnhancedQuoteManagement = () => {
     }
   };
 
+  const getQuoteNumber = (quote) => `QUO-${String(quote?._id || '').slice(-6).toUpperCase()}`;
+
+  const generateQuoteHTML = (quote) => {
+    if (!quote) return '';
+    const comp = company || {};
+    const customer = quote.customer || {};
+
+    const compStateCode = (comp.state || '').split('-')[0] || '';
+    const custStateCode = (customer.state || '').split('-')[0] || '';
+    const isInterState = compStateCode && custStateCode && compStateCode !== custStateCode;
+
+    const rows = (quote.items || []).map((it, i) => {
+      const name = it.name || it.item?.name || `Item ${i + 1}`;
+      const qty = Number(it.quantity || 0);
+      const rate = Number(it.rate || 0);
+      const disc = Number(it.discount || 0);
+      const taxRate = Number(it.taxRate || 0);
+      const taxable = (rate * qty) * (1 - disc / 100);
+      const taxAmt = taxable * (taxRate / 100);
+      const total = taxable + taxAmt;
+      return { name, qty, rate, disc, taxRate, taxable, taxAmt, total };
+    });
+
+    const totals = rows.reduce((acc, r) => ({
+      taxable: acc.taxable + r.taxable,
+      tax: acc.tax + r.taxAmt,
+      total: acc.total + r.total,
+    }), { taxable: 0, tax: 0, total: 0 });
+
+    const quoteNo = getQuoteNumber(quote);
+    const quoteDate = quote.quoteDate ? new Date(quote.quoteDate).toLocaleDateString('en-IN') : '';
+    const termsList = Array.isArray(comp.terms) ? comp.terms : [];
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Quote ${quoteNo}</title>
+        <style>
+          body { font-family: Arial, sans-serif; color:#000; }
+          .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+          .header { border: 2px solid #000; margin-bottom: 12px; }
+          .header-top { background: #f8f9fa; padding: 12px; text-align: center; border-bottom: 1px solid #000; }
+          .brand { display:flex; align-items:center; justify-content:center; gap:12px; }
+          .logo { height:48px; width:auto; object-fit:contain; }
+          .company-name { font-size: 22px; font-weight: bold; letter-spacing: 1px; }
+          .title { background: #000; color:#fff; text-align:center; padding:8px; font-weight:bold; letter-spacing:2px; }
+          .meta, .party { border: 1px solid #000; margin-top:10px; }
+          .meta-row { display:flex; border-bottom:1px solid #000; }
+          .meta-row:last-child { border-bottom:none; }
+          .cell { flex:1; padding:8px 10px; border-right:1px solid #000; }
+          .cell:last-child { border-right:none; }
+          .label { color:#666; font-size:12px; }
+          table { width:100%; border-collapse:collapse; margin-top:12px; }
+          th, td { border:1px solid #000; padding:6px 8px; font-size:12px; }
+          th { background:#f0f0f0; }
+          .right { text-align:right; }
+          .center { text-align:center; }
+          .footer { display:flex; gap:12px; margin-top:14px; }
+          .footer .box { flex:1; border:1px solid #000; padding:10px; }
+          .small { font-size:12px; color:#333; }
+          .no-print { text-align:center; margin-top: 16px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="header-top">
+              <div class="brand">
+                ${comp.logoUrl ? `<img class="logo" src="${comp.logoUrl}" alt="Logo"/>` : ''}
+                <div>
+                  <div class="company-name">${comp.name || ''}</div>
+                  <div>${comp.address || ''}<br/>Phone: ${comp.phone || ''} ${comp.email ? `| Email: ${comp.email}` : ''}${comp.gstin ? ` | GSTIN: ${comp.gstin}` : ''}</div>
+                </div>
+              </div>
+            </div>
+            <div class="title">QUOTATION</div>
+          </div>
+
+          <div class="meta">
+            <div class="meta-row">
+              <div class="cell"><div class="label">Quote #</div>${quoteNo}</div>
+              <div class="cell"><div class="label">Quote Date</div>${quoteDate}</div>
+              <div class="cell"><div class="label">Status</div>${quote.status || 'Draft'}</div>
+            </div>
+            <div class="meta-row">
+              <div class="cell"><div class="label">Customer</div>${customer.name || customer.firmName || ''}</div>
+              <div class="cell"><div class="label">Place of Supply</div>${customer.state || ''}</div>
+              <div class="cell"><div class="label">Supply Type</div>${isInterState ? 'Interstate' : 'Intrastate'}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width:5%">#</th>
+                <th style="width:35%">Item</th>
+                <th style="width:10%">Qty</th>
+                <th style="width:15%">Rate</th>
+                <th style="width:10%">Disc%</th>
+                <th style="width:10%">Tax%</th>
+                <th style="width:15%">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((r, i) => `
+                <tr>
+                  <td class="center">${i + 1}</td>
+                  <td>${r.name}</td>
+                  <td class="center">${r.qty}</td>
+                  <td class="right">${formatCurrency(r.rate)}</td>
+                  <td class="center">${r.disc}</td>
+                  <td class="center">${r.taxRate}</td>
+                  <td class="right">${formatCurrency(r.total)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5"></td>
+                <td class="right"><b>Taxable</b></td>
+                <td class="right">${formatCurrency(totals.taxable)}</td>
+              </tr>
+              <tr>
+                <td colspan="5"></td>
+                <td class="right"><b>Tax</b></td>
+                <td class="right">${formatCurrency(totals.tax)}</td>
+              </tr>
+              <tr>
+                <td colspan="5"></td>
+                <td class="right"><b>Total</b></td>
+                <td class="right"><b>${formatCurrency(totals.total)}</b></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          ${quote.notes ? `<div style="margin-top:10px; padding:10px; border:1px solid #000;"><b>Notes:</b><br/>${quote.notes}</div>` : ''}
+
+          <div class="footer">
+            <div class="box">
+              <div class="small"><b>Bank Name:</b> ${comp.bank?.name || ''}</div>
+              <div class="small"><b>Account No:</b> ${comp.bank?.account || ''}</div>
+              <div class="small"><b>IFSC:</b> ${comp.bank?.ifsc || ''}</div>
+              <div class="small"><b>Account Holder:</b> ${comp.bank?.holder || ''}</div>
+            </div>
+            <div class="box">
+              <div class="small"><b>Terms & Conditions</b></div>
+              <ol>
+                ${termsList.map(t => `<li class="small">${t}</li>`).join('')}
+              </ol>
+            </div>
+          </div>
+
+          <div class="no-print">
+            <button onclick="window.print()">Print</button>
+            <button onclick="window.close()">Close</button>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
+  const handlePrintQuote = (quote) => {
+    try {
+      const html = generateQuoteHTML(quote);
+      const w = window.open('', '_blank');
+      if (!w) {
+        toast.error('Pop-up blocked. Please allow pop-ups to print.');
+        return;
+      }
+      w.document.write(html);
+      w.document.close();
+      // Optional: auto-trigger print
+      try { w.focus(); w.print(); } catch (_) {}
+    } catch (e) {
+      console.error('Print error:', e);
+      toast.error('Failed to open print preview');
+    }
+  };
+
+  const loadingSpinner = (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      <Layout>
+        {loadingSpinner}
+      </Layout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Quotes Management</h1>
-          <p className="text-gray-600">Create, manage and track your quotes</p>
+    <Layout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Quotes Management</h1>
+            <p className="text-gray-600">Create, manage and track your quotes</p>
+          </div>
+          <button
+            onClick={() => setShowNewQuote(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            New Quote
+          </button>
         </div>
-        <button
-          onClick={() => setShowNewQuote(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          New Quote
-        </button>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-gray-600">Total Quotes</h3>
+            <p className="text-2xl font-bold text-gray-900">{quotes.length}</p>
+          </div>
+          <div className="bg-green-50 p-6 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-green-600">Accepted</h3>
+            <p className="text-2xl font-bold text-green-900">
+              {quotes.filter(q => q.status === 'Accepted').length}
+            </p>
+          </div>
+          <div className="bg-blue-50 p-6 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-blue-600">Sent</h3>
+            <p className="text-2xl font-bold text-blue-900">
+              {quotes.filter(q => q.status === 'Sent').length}
+            </p>
+          </div>
+          <div className="bg-yellow-50 p-6 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-yellow-600">Total Value</h3>
+            <p className="text-2xl font-bold text-yellow-900">
+              {formatCurrency(quotes.reduce((sum, quote) => sum + calculateQuoteTotal(quote.items || []), 0))}
+            </p>
+          </div>
+        </div>
+
+        {/* Filters */}
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-600">Total Quotes</h3>
-          <p className="text-2xl font-bold text-gray-900">{quotes.length}</p>
-        </div>
-        <div className="bg-green-50 p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-green-600">Accepted</h3>
-          <p className="text-2xl font-bold text-green-900">
-            {quotes.filter(q => q.status === 'Accepted').length}
-          </p>
-        </div>
-        <div className="bg-blue-50 p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-blue-600">Sent</h3>
-          <p className="text-2xl font-bold text-blue-900">
-            {quotes.filter(q => q.status === 'Sent').length}
-          </p>
-        </div>
-        <div className="bg-yellow-50 p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-yellow-600">Total Value</h3>
-          <p className="text-2xl font-bold text-yellow-900">
-            {formatCurrency(quotes.reduce((sum, quote) => sum + calculateQuoteTotal(quote.items || []), 0))}
-          </p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="accepted">Accepted</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-            <select
-              value={filters.customer}
-              onChange={(e) => setFilters(prev => ({ ...prev, customer: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">All Customers</option>
-              {customers.map(customer => (
-                <option key={customer._id} value={customer._id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-            <input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-            <input
-              type="text"
-              placeholder="Search quotes..."
-              value={filters.search}
-              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Bulk Actions */}
-      {selectedQuotes.length > 0 && (
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-blue-700">
-              {selectedQuotes.length} quote(s) selected
-            </span>
-            <div className="flex items-center space-x-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
-                value={bulkAction}
-                onChange={(e) => setBulkAction(e.target.value)}
-                className="px-3 py-1 border border-blue-300 rounded-md text-sm"
+                value={filters.status}
+                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
-                <option value="">Select Action</option>
-                <option value="sent">Mark as Sent</option>
-                <option value="draft">Mark as Draft</option>
-                <option value="delete">Delete</option>
+                <option value="all">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Rejected</option>
               </select>
-              <button
-                onClick={handleBulkAction}
-                className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+              <select
+                value={filters.customer}
+                onChange={(e) => setFilters(prev => ({ ...prev, customer: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
-                Apply
-              </button>
+                <option value="">All Customers</option>
+                {customers.map(customer => (
+                  <option key={customer._id} value={customer._id}>
+                    {customer.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+              <input
+                type="text"
+                placeholder="Search quotes..."
+                value={filters.search}
+                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
             </div>
           </div>
         </div>
-      )}
 
-      {/* Quotes Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={selectedQuotes.length === quotes.length}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedQuotes(quotes.map(q => q._id));
-                    } else {
-                      setSelectedQuotes([]);
-                    }
-                  }}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Quote #
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Customer
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Amount
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {quotes.map((quote) => (
-              <tr key={quote._id} className="hover:bg-gray-50">
-                <td className="px-4 py-4 whitespace-nowrap">
+        {/* Bulk Actions */}
+        {selectedQuotes.length > 0 && (
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-blue-700">
+                {selectedQuotes.length} quote(s) selected
+              </span>
+              <div className="flex items-center space-x-3">
+                <select
+                  value={bulkAction}
+                  onChange={(e) => setBulkAction(e.target.value)}
+                  className="px-3 py-1 border border-blue-300 rounded-md text-sm"
+                >
+                  <option value="">Select Action</option>
+                  <option value="sent">Mark as Sent</option>
+                  <option value="draft">Mark as Draft</option>
+                  <option value="delete">Delete</option>
+                </select>
+                <button
+                  onClick={handleBulkAction}
+                  className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quotes Table */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3">
                   <input
                     type="checkbox"
-                    checked={selectedQuotes.includes(quote._id)}
+                    checked={selectedQuotes.length === quotes.length}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedQuotes(prev => [...prev, quote._id]);
+                        setSelectedQuotes(quotes.map(q => q._id));
                       } else {
-                        setSelectedQuotes(prev => prev.filter(id => id !== quote._id));
+                        setSelectedQuotes([]);
                       }
                     }}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  QUO-{quote._id.slice(-6).toUpperCase()}
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {quote.customer?.name || 'N/A'}
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {new Date(quote.quoteDate).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(quote.status)}`}>
-                    {quote.status}
-                  </span>
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {formatCurrency(calculateQuoteTotal(quote.items || []))}
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => {
-                        setEditingQuote(quote);
-                        setCurrentQuote({
-                          customer: quote.customer?._id || '',
-                          items: quote.items || [],
-                          notes: quote.notes || '',
-                          status: quote.status || 'Draft',
-                          validTill: quote.validTill || '',
-                          terms: quote.terms || 'Quote is valid for 30 days from the date of issue.'
-                        });
-                        setShowNewQuote(true);
-                      }}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="Edit Quote"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleConvertToInvoice(quote)}
-                      className="text-green-600 hover:text-green-900"
-                      title="Convert to Invoice"
-                      disabled={quote.status === 'Accepted'}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleDeleteQuote(quote._id)}
-                      className="text-red-600 hover:text-red-900"
-                      title="Delete Quote"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                </td>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Quote #
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Customer
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Amount
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {quotes.map((quote) => (
+                <tr key={quote._id} className="hover:bg-gray-50">
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={selectedQuotes.includes(quote._id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedQuotes(prev => [...prev, quote._id]);
+                        } else {
+                          setSelectedQuotes(prev => prev.filter(id => id !== quote._id));
+                        }
+                      }}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {getQuoteNumber(quote)}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {quote.customer?.name || 'N/A'}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {new Date(quote.quoteDate).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(quote.status)}`}>
+                      {quote.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {formatCurrency(calculateQuoteTotal(quote.items || []))}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditingQuote(quote);
+                          setCurrentQuote({
+                            customer: quote.customer?._id || '',
+                            items: quote.items || [],
+                            notes: quote.notes || '',
+                            status: quote.status || 'Draft',
+                            validTill: quote.validTill || '',
+                            terms: quote.terms || 'Quote is valid for 30 days from the date of issue.'
+                          });
+                          setShowNewQuote(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Edit Quote"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleConvertToInvoice(quote)}
+                        className="text-green-600 hover:text-green-900"
+                        title="Convert to Invoice"
+                        disabled={quote.status === 'Accepted'}
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteQuote(quote._id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete Quote"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handlePrintQuote(quote)}
+                        className="text-gray-700 hover:text-gray-900"
+                        title="Print Quote"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9V2h12v7M6 18h12v4H6v-4zm0-5h12a2 2 0 002-2V9a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-      {/* New/Edit Quote Modal */}
-      {showNewQuote && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                {editingQuote ? 'Edit Quote' : 'New Quote'}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowNewQuote(false);
-                  setEditingQuote(null);
-                  setCurrentQuote({
-                    customer: '',
-                    items: [],
-                    notes: '',
-                    status: 'Draft',
-                    validTill: '',
-                    terms: 'Quote is valid for 30 days from the date of issue.'
-                  });
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              {/* Quote Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-                  <select
-                    value={currentQuote.customer}
-                    onChange={(e) => setCurrentQuote(prev => ({ ...prev, customer: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Select Customer</option>
-                    {customers.map(customer => (
-                      <option key={customer._id} value={customer._id}>
-                        {customer.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={currentQuote.status}
-                    onChange={(e) => setCurrentQuote(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="Draft">Draft</option>
-                    <option value="Sent">Sent</option>
-                    <option value="Accepted">Accepted</option>
-                    <option value="Rejected">Rejected</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Add Item Section */}
-              <div className="border-t pt-4">
-                <h4 className="font-medium text-gray-900 mb-3">Add Item</h4>
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-                  <select
-                    value={currentItem.item}
-                    onChange={(e) => {
-                      const selectedItem = items.find(item => item._id === e.target.value);
-                      if (selectedItem) {
-                        setCurrentItem(prev => ({
-                          ...prev,
-                          item: selectedItem._id,
-                          name: selectedItem.name,
-                          hsnCode: selectedItem.hsnCode || '',
-                          rate: selectedItem.rate || 0,
-                          taxRate: selectedItem.taxSlab || 18,
-                          units: selectedItem.units || 'per piece'
-                        }));
-                      } else {
-                        setCurrentItem(prev => ({ ...prev, item: e.target.value }));
-                      }
-                    }}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="">Select Item</option>
-                    {items.map(item => (
-                      <option key={item._id} value={item._id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Item Name"
-                    value={currentItem.name}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, name: e.target.value }))}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Quantity"
-                    value={currentItem.quantity}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Rate"
-                    value={currentItem.rate}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, rate: parseFloat(e.target.value) || 0 }))}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Discount %"
-                    value={currentItem.discount}
-                    onChange={(e) => setCurrentItem(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={addItemToQuote}
-                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              {currentQuote.items.length > 0 && (
-                <div className="border-t pt-4">
-                  <h4 className="font-medium text-gray-900 mb-3">Quote Items</h4>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Discount</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tax</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {currentQuote.items.map((item) => (
-                          <tr key={item.id}>
-                            <td className="px-3 py-2 text-sm text-gray-900">{item.name}</td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) => updateQuoteItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                                className="w-16 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                value={item.rate}
-                                onChange={(e) => updateQuoteItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                                className="w-20 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                value={item.discount}
-                                onChange={(e) => updateQuoteItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
-                                className="w-16 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                value={item.taxRate}
-                                onChange={(e) => updateQuoteItem(item.id, 'taxRate', parseFloat(e.target.value) || 0)}
-                                className="w-16 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-sm text-gray-900">
-                              {formatCurrency(item.quantity * item.rate)}
-                            </td>
-                            <td className="px-3 py-2">
-                              <button
-                                onClick={() => removeItemFromQuote(item.id)}
-                                className="text-red-600 hover:text-red-900"
-                                title="Remove Item"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="mt-4 text-right">
-                    <p className="text-lg font-bold">
-                      Total: {formatCurrency(calculateQuoteTotal(currentQuote.items))}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Notes and Terms */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                  <textarea
-                    value={currentQuote.notes}
-                    onChange={(e) => setCurrentQuote(prev => ({ ...prev, notes: e.target.value }))}
-                    rows="3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Additional notes..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Terms & Conditions</label>
-                  <textarea
-                    value={currentQuote.terms}
-                    onChange={(e) => setCurrentQuote(prev => ({ ...prev, terms: e.target.value }))}
-                    rows="3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Terms and conditions..."
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+        {/* New/Edit Quote Modal */}
+        {showNewQuote && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  {editingQuote ? 'Edit Quote' : 'New Quote'}
+                </h3>
                 <button
-                  type="button"
                   onClick={() => {
                     setShowNewQuote(false);
                     setEditingQuote(null);
@@ -814,23 +784,255 @@ const EnhancedQuoteManagement = () => {
                       terms: 'Quote is valid for 30 days from the date of issue.'
                     });
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+                  className="text-gray-400 hover:text-gray-600"
                 >
-                  Cancel
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSaveQuote}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-                >
-                  {editingQuote ? 'Update Quote' : 'Save Quote'}
-                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Quote Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+                    <select
+                      value={currentQuote.customer}
+                      onChange={(e) => setCurrentQuote(prev => ({ ...prev, customer: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Select Customer</option>
+                      {customers.map(customer => (
+                        <option key={customer._id} value={customer._id}>
+                          {customer.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={currentQuote.status}
+                      onChange={(e) => setCurrentQuote(prev => ({ ...prev, status: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="Draft">Draft</option>
+                      <option value="Sent">Sent</option>
+                      <option value="Accepted">Accepted</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Add Item Section */}
+                <div className="border-t pt-4">
+                  <h4 className="font-medium text-gray-900 mb-3">Add Item</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <select
+                      value={currentItem.item}
+                      onChange={(e) => {
+                        const selectedItem = items.find(item => item._id === e.target.value);
+                        if (selectedItem) {
+                          setCurrentItem(prev => ({
+                            ...prev,
+                            item: selectedItem._id,
+                            name: selectedItem.name,
+                            hsnCode: selectedItem.hsnCode || '',
+                            rate: selectedItem.rate || 0,
+                            taxRate: selectedItem.taxSlab || 18,
+                            units: selectedItem.units || 'per piece'
+                          }));
+                        } else {
+                          setCurrentItem(prev => ({ ...prev, item: e.target.value }));
+                        }
+                      }}
+                      className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Select Item</option>
+                      {items.map(item => (
+                        <option key={item._id} value={item._id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Item Name"
+                      value={currentItem.name}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, name: e.target.value }))}
+                      className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Quantity"
+                      value={currentItem.quantity}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
+                      className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Rate"
+                      value={currentItem.rate}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, rate: parseFloat(e.target.value) || 0 }))}
+                      className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Discount %"
+                      value={currentItem.discount}
+                      onChange={(e) => setCurrentItem(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
+                      className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={addItemToQuote}
+                      className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Items Table */}
+                {currentQuote.items.length > 0 && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium text-gray-900 mb-3">Quote Items</h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Discount</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tax</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {currentQuote.items.map((item) => (
+                            <tr key={item.id}>
+                              <td className="px-3 py-2 text-sm text-gray-900">{item.name}</td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) => updateQuoteItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                                  className="w-16 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  value={item.rate}
+                                  onChange={(e) => updateQuoteItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
+                                  className="w-20 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  value={item.discount}
+                                  onChange={(e) => updateQuoteItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                                  className="w-16 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  value={item.taxRate}
+                                  onChange={(e) => updateQuoteItem(item.id, 'taxRate', parseFloat(e.target.value) || 0)}
+                                  className="w-16 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-900">
+                                {formatCurrency(item.quantity * item.rate)}
+                              </td>
+                              <td className="px-3 py-2">
+                                <button
+                                  onClick={() => removeItemFromQuote(item.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                  title="Remove Item"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-4 text-right">
+                      <p className="text-lg font-bold">
+                        Total: {formatCurrency(calculateQuoteTotal(currentQuote.items))}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes and Terms */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea
+                      value={currentQuote.notes}
+                      onChange={(e) => setCurrentQuote(prev => ({ ...prev, notes: e.target.value }))}
+                      rows="3"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="Additional notes..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Terms & Conditions</label>
+                    <textarea
+                      value={currentQuote.terms}
+                      onChange={(e) => setCurrentQuote(prev => ({ ...prev, terms: e.target.value }))}
+                      rows="3"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="Terms and conditions..."
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNewQuote(false);
+                      setEditingQuote(null);
+                      setCurrentQuote({
+                        customer: '',
+                        items: [],
+                        notes: '',
+                        status: 'Draft',
+                        validTill: '',
+                        terms: 'Quote is valid for 30 days from the date of issue.'
+                      });
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveQuote}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                  >
+                    {editingQuote ? 'Update Quote' : 'Save Quote'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </Layout>
   );
 };
 

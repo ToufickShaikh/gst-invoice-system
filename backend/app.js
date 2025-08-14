@@ -13,21 +13,23 @@ const purchaseRoutes = require('./routes/purchaseRoutes');
 const salesOrderRoutes = require('./routes/salesOrderRoutes');
 const quoteRoutes = require('./routes/quoteRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
+const companyRoutes = require('./routes/companyRoutes');
+const cashDrawerRoutes = require('./routes/cashDrawerRoutes');
 
 const app = express(); // Create Express app instance
 
 // Middleware setup
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5001'
+];
 app.use(cors({
-    origin: [
-        'https://shaikhgst.netlify.app',
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'http://185.52.53.253'
-    ],
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control', 'Pragma', 'Expires']
-})); // Enable CORS for Netlify, local dev, etc.
+})); // Enable CORS for local dev only
 
 // Handle preflight requests explicitly
 
@@ -92,6 +94,8 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/suppliers', supplierRoutes); // Supplier management routes
+app.use('/api/company', companyRoutes); // Public company details
+app.use('/api/cash-drawer', cashDrawerRoutes); // Cash drawer routes
 
 // Serve generated invoices as static files with proper headers
 app.use('/invoices', express.static('invoices'));
