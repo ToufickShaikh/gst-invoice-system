@@ -140,6 +140,19 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
       <td class="right">${formatCurrency(it.amount)}</td>
     </tr>`).join('');
 
+    // New: compute footer details (bank, QR, signature, terms)
+    const balanceDue = Math.max(0, Number(norm.total || 0) - Number(norm.paidAmount || 0));
+    const bank = company?.bank || {};
+    const hasBank = !!(bank.name || bank.account || bank.ifsc || bank.holder);
+    const signatureUrl = company?.signatureImageUrl || '';
+    const hasSignature = !!(signatureUrl || company?.name);
+    const showFooter = hasBank || hasSignature || (paymentQr && balanceDue > 0);
+    const termsHtml = company?.terms
+      ? (Array.isArray(company.terms)
+          ? `<ul style="margin:2mm 0 0 5mm;">${company.terms.map(t => `<li>${t}</li>`).join('')}</ul>`
+          : `<div>${company.terms}</div>`)
+      : '';
+
     return `<!DOCTYPE html>
     <html><head><meta charset="utf-8" />
     <style>
@@ -231,12 +244,42 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
             ${printOptions.showShipping ? `<div class="amount-row"><span>Shipping:</span><span>${formatCurrency(norm.shippingCharges || 0)}</span></div>` : ''}
             <div class="amount-row total"><span>Grand Total:</span><span>${formatCurrency(norm.total)}</span></div>
             <div class="amount-row"><span>Received:</span><span>${formatCurrency(norm.paidAmount || 0)}</span></div>
-            <div class="amount-row"><span>Balance:</span><span>${formatCurrency((norm.total - (norm.paidAmount || 0)) || 0)}</span></div>
+            <div class="amount-row"><span>Balance:</span><span>${formatCurrency(balanceDue)}</span></div>
           </div>
         </div>
       </div>
 
-      ${(company?.terms || '') ? `<div style="margin-top:6mm;" class="box"><b>Terms:</b><div>${company.terms}</div></div>` : ''}
+      ${showFooter ? `
+      <div class="grid" style="margin-top:6mm; align-items:flex-start;">
+        <div class="col">
+          <div class="box">
+            <div style="font-weight:bold;margin-bottom:3mm;">Bank Details</div>
+            ${hasBank ? `
+            <div style="font-size:11px;">
+              ${bank.name ? `<div><b>Bank Name:</b> ${bank.name}</div>` : ''}
+              ${bank.account ? `<div><b>Account No:</b> ${bank.account}</div>` : ''}
+              ${bank.ifsc ? `<div><b>IFSC Code:</b> ${bank.ifsc}</div>` : ''}
+              ${bank.holder ? `<div><b>Account Holder:</b> ${bank.holder}</div>` : ''}
+            </div>` : `<div style="font-size:11px;">No bank details configured.</div>`}
+            ${(paymentQr && balanceDue > 0) ? `
+              <div style="text-align:center; margin-top:4mm;">
+                <div style="font-weight:bold; font-size:11px; margin-bottom:2mm;">Scan to Pay</div>
+                <img src="${paymentQr}" alt="UPI QR" style="width:60px; height:60px; border:1px solid #000;"/>
+                ${company?.upi?.id ? `<div style="font-size:10px; margin-top:2mm;">UPI: ${company.upi.id}</div>` : ''}
+              </div>` : ''}
+          </div>
+        </div>
+        <div class="col">
+          <div class="box" style="text-align:center;">
+            <div style="font-weight:bold;margin-bottom:3mm;">Authorized Signatory</div>
+            <div style="margin-bottom:2mm;">For ${company?.name || ''}</div>
+            ${signatureUrl ? `<img src="${signatureUrl}" alt="Signature" style="width:80px;height:30px;border:1px solid #000; margin-bottom:2mm;"/>` : '<div style="height:30px; border-bottom:1px solid #000; width:80px; margin: 0 auto 2mm;"></div>'}
+            <div style="font-size:11px; font-weight:bold;">Authorized Signatory</div>
+          </div>
+        </div>
+      </div>` : ''}
+
+      ${termsHtml ? `<div style="margin-top:6mm;" class="box"><b>Terms:</b>${termsHtml}</div>` : ''}
     </div></body></html>`;
   };
 

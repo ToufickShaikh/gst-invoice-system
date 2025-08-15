@@ -38,6 +38,9 @@ const EnhancedBillingForm = () => {
   // Cash denominations for cash drawer recording
   const [cashDenoms, setCashDenoms] = useState({ d500:0,d100:0,d50:0,d20:0,d10:0,d5:0,d2:0,d1:0 });
   const [drawerStatus, setDrawerStatus] = useState(null);
+  // Change computation states
+  const [changeSuggestions, setChangeSuggestions] = useState([]);
+  const [selectedChangeDenoms, setSelectedChangeDenoms] = useState(null);
 
   // Customer form data - single form, derive type from GSTIN presence
   const [newCustomer, setNewCustomer] = useState({
@@ -94,6 +97,10 @@ const EnhancedBillingForm = () => {
       ...prev,
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     }));
+    // Load cash drawer status
+    (async () => {
+      try { const s = await cashDrawerAPI.getStatus(); setDrawerStatus(s); } catch (e) { console.warn('Drawer status load failed:', e?.message||e); }
+    })();
   }, []);
 
   // Preselect customer when coming from Customers page
@@ -266,6 +273,103 @@ const EnhancedBillingForm = () => {
       total: roundedTotal,
     };
   };
+
+  // ===== Cash change-making helpers =====
+  // Denominations used in India (no 2000 notes in backend)
+  const denomOrder = [500, 100, 50, 20, 10, 5, 2, 1];
+
+  function sumDenoms(d = {}) {
+    return denomOrder.reduce((sum, v) => sum + v * (d[`d${v}`] || 0), 0);
+  }
+
+  function addDenoms(a = {}, b = {}) {
+    const out = {};
+    denomOrder.forEach(v => {
+      out[`d${v}`] = (a[`d${v}`] || 0) + (b[`d${v}`] || 0);
+    });
+    return out;
+  }
+
+  function makeGreedyChange(amount, available = {}) {
+    let remaining = amount;
+    const result = {};
+    for (const v of denomOrder) {
+      const have = available[`d${v}`] || 0;
+      const canUse = Math.min(have, Math.floor(remaining / v));
+      if (canUse > 0) {
+        result[`d${v}`] = canUse;
+        remaining -= canUse * v;
+      }
+    }
+    return { result, remaining };
+  }
+
+  function makePreferredChange(amount, available = {}) {
+    // Prefer 20 and 10 first, then fallback greedy
+    const preferredOrder = [20, 10, 500, 100, 50, 5, 2, 1];
+    let remaining = amount;
+    const result = {};
+    for (const v of preferredOrder) {
+      const have = available[`d${v}`] || 0;
+      const canUse = Math.min(have, Math.floor(remaining / v));
+      if (canUse > 0) {
+        result[`d${v}`] = canUse;
+        remaining -= canUse * v;
+      }
+    }
+    return { result, remaining };
+  }
+
+  function makeSingleDenom(amount, available = {}) {
+    // Try to return change with a single denomination if possible
+    for (const v of denomOrder) {
+      if (amount % v === 0) {
+        const need = amount / v;
+        if ((available[`d${v}`] || 0) >= need) {
+          return { [`d${v}`]: need };
+        }
+      }
+    }
+    return null;
+  }
+
+  // Build change suggestions when recording cash payment
+  useEffect(() => {
+    if (!(recordPaymentNow && paymentMethod === 'Cash')) {
+      setChangeSuggestions([]);
+      setSelectedChangeDenoms(null);
+      return;
+    }
+
+    // Compute change due locally to avoid TDZ with changeDue const defined later
+    const t = calculateTotals();
+    const cd = recordPaymentNow && paymentMethod === 'Cash'
+      ? Math.max(0, Math.round((Number(paidAmount || 0) - Number(t.total || 0))))
+      : 0;
+
+    if (cd <= 0) {
+      setChangeSuggestions([]);
+      setSelectedChangeDenoms(null);
+      return;
+    }
+
+    const available = addDenoms(drawerStatus?.denominations || {}, cashDenoms);
+    const suggestions = [];
+
+    const greedy = makeGreedyChange(cd, available);
+    if (greedy.remaining === 0) suggestions.push({ label: 'Optimal', denoms: greedy.result });
+
+    const pref = makePreferredChange(cd, available);
+    if (pref.remaining === 0 && JSON.stringify(pref.result) !== JSON.stringify(greedy.result)) {
+      suggestions.push({ label: 'Prefer 20/10', denoms: pref.result });
+    }
+
+    const single = makeSingleDenom(cd, available);
+    if (single) suggestions.push({ label: 'Single denom', denoms: single });
+
+    setChangeSuggestions(suggestions);
+    setSelectedChangeDenoms(suggestions[0]?.denoms || null);
+  }, [recordPaymentNow, paymentMethod, paidAmount, formData.items, formData.discountType, formData.discountValue, formData.shippingCharges, drawerStatus, cashDenoms]);
 
   const addItemToInvoice = () => {
     if (!currentItem.name || currentItem.quantity <= 0 || currentItem.rate <= 0) {
@@ -445,15 +549,8 @@ const EnhancedBillingForm = () => {
   const handleCreateInvoice = async (mode = 'pending') => {
     try {
       setLoading(true);
-      if (!formData.customer) {
-        toast.error('Please select a customer');
-        return;
-      }
-
-      if (formData.items.length === 0) {
-        toast.error('Please add at least one item');
-        return;
-      }
+      if (!formData.customer) { toast.error('Please select a customer'); return; }
+      if (formData.items.length === 0) { toast.error('Please add at least one item'); return; }
 
       const totals = calculateTotals();
       const payload = {
@@ -489,10 +586,28 @@ const EnhancedBillingForm = () => {
       // Record cash in drawer only if payment is Cash and paidAmount > 0
       try {
         if (recordPaymentNow && paymentMethod === 'Cash' && Number(paidAmount) > 0) {
-          const inv = created.invoice || created;
-          const invoiceId = inv?._id;
+          const inv = created.invoice || created; const invoiceId = inv?._id;
           if (invoiceId) {
             await cashDrawerAPI.recordSale({ invoiceId, amount: Number(paidAmount), denominations: cashDenoms });
+            // Compute change and optionally remove from drawer
+            const totalDue = Number(totals.total || 0);
+            const change = Math.max(0, Math.round(Number(paidAmount) - totalDue));
+            if (change > 0) {
+              // Use selected suggestion if valid; else greedy
+              const available = addDenoms(drawerStatus?.denominations || {}, cashDenoms);
+              let chosen = selectedChangeDenoms;
+              if (!chosen || sumDenoms(chosen) !== change) {
+                const g = makeGreedyChange(change, available);
+                if (g.remaining === 0) chosen = g.result;
+              }
+              if (chosen && sumDenoms(chosen) === change) {
+                await cashDrawerAPI.adjust({ type: 'adjust-remove', denominations: chosen, reason: `Change returned for invoice ${inv.invoiceNumber || inv._id}` });
+              } else {
+                console.warn('Unable to compute exact change removal; skipped adjust-remove.');
+              }
+            }
+            // Refresh drawer status
+            try { const s = await cashDrawerAPI.getStatus(); setDrawerStatus(s); } catch {}
           }
         }
       } catch (e) {
@@ -521,6 +636,7 @@ const EnhancedBillingForm = () => {
   const taxTotal = (Number(totals.cgst || 0) + Number(totals.sgst || 0) + Number(totals.igst || 0));
   const effectivePaid = recordPaymentNow ? Number(paidAmount || 0) : 0;
   const balanceDue = Math.max(0, Number(totals.total || 0) - effectivePaid);
+  const changeDue = recordPaymentNow && paymentMethod === 'Cash' ? Math.max(0, Math.round(effectivePaid - Number(totals.total || 0))) : 0;
 
   return (
     <div className="space-y-8 pb-20 lg:pb-0 max-w-6xl mx-auto p-6 bg-white">
@@ -1043,6 +1159,7 @@ const EnhancedBillingForm = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Charges & Settings</h3>
           
           <div className="space-y-4">
+            {/* Discount */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Discount</label>
               <div className="flex gap-2">
@@ -1064,6 +1181,7 @@ const EnhancedBillingForm = () => {
               </div>
             </div>
 
+            {/* Shipping */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Charges</label>
               <input
@@ -1075,6 +1193,7 @@ const EnhancedBillingForm = () => {
               />
             </div>
 
+            {/* Payment Terms */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Payment Terms (Days)</label>
               <input
@@ -1086,6 +1205,7 @@ const EnhancedBillingForm = () => {
               />
             </div>
 
+            {/* Due Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
               <input
@@ -1158,6 +1278,40 @@ const EnhancedBillingForm = () => {
                       </div>
                     ))}
                   </div>
+
+                  {/* Change suggestions */}
+                  <div className="mt-3 p-3 border rounded bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium text-gray-800">Change to return:</div>
+                      <div className={`text-sm font-bold ${changeDue>0 ? 'text-red-700':'text-gray-700'}`}>{formatCurrency(changeDue)}</div>
+                    </div>
+                    {changeDue > 0 && (
+                      <div className="mt-2">
+                        <div className="text-xs text-gray-600 mb-1">Suggestions</div>
+                        <div className="flex flex-wrap gap-2">
+                          {changeSuggestions.length === 0 && (
+                            <span className="text-xs text-gray-500">No exact combination available with current drawer</span>
+                          )}
+                          {changeSuggestions.map((opt, idx) => {
+                            const text = denomOrder
+                              .filter(v => (opt.denoms[`d${v}`]||0) > 0)
+                              .map(v => `₹${v}×${opt.denoms[`d${v}`]}`)
+                              .join(' + ');
+                            const isSelected = selectedChangeDenoms && JSON.stringify(selectedChangeDenoms) === JSON.stringify(opt.denoms);
+                            return (
+                              <button key={idx} type="button" onClick={()=> setSelectedChangeDenoms(opt.denoms)}
+                                className={`px-2 py-1 rounded text-xs border ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-800 border-gray-300 hover:bg-blue-50'}`}
+                                title={opt.label}
+                              >{text || opt.label}</button>
+                            );
+                          })}
+                          {selectedChangeDenoms && (
+                            <button type="button" onClick={()=> setSelectedChangeDenoms(null)} className="px-2 py-1 rounded text-xs border bg-white text-gray-600">Clear</button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -1190,7 +1344,7 @@ const EnhancedBillingForm = () => {
             {recordPaymentNow && (
               <>
                 <div className="flex justify-between"><span className="text-blue-800">Paid Now:</span><span className="font-medium text-green-700">{formatCurrency(effectivePaid)}</span></div>
-                <div className="flex justify-between"><span className="text-blue-800">Balance Due:</span><span className={`font-semibold ${balanceDue > 0 ? 'text-red-700' : 'text-green-700'}`}>{formatCurrency(balanceDue)}</span></div>
+                <div className={`flex justify-between`}><span className="text-blue-800">Balance Due:</span><span className={`font-semibold ${balanceDue > 0 ? 'text-red-700' : 'text-green-700'}`}>{formatCurrency(balanceDue)}</span></div>
               </>
             )}
           </div>
