@@ -3,12 +3,14 @@ const path = require('path');
 const puppeteer = require('puppeteer');
 const { generateUpiQr } = require('./upiHelper');
 const { extractStateCode, COMPANY_STATE_CODE } = require('./taxHelpers');
+const company = require('../config/company');
 
-async function generateInvoicePDF(invoiceData) {
+async function generateInvoicePDF(invoiceData, fileName) {
     console.log(`[PDF] Starting PDF generation for invoice: ${invoiceData.invoiceNumber}`);
     let browser = null;
     try {
-        const templatePath = path.resolve(__dirname, '../templates/invoiceTemplate.html');
+        // Use the new Zoho-like template
+        const templatePath = path.resolve(__dirname, '../templates/invoiceTemplate-new.html');
         let html = await fs.readFile(templatePath, 'utf-8');
 
         // Replace placeholders
@@ -16,7 +18,9 @@ async function generateInvoicePDF(invoiceData) {
 
         const outputDir = path.resolve(__dirname, '../invoices');
         await fs.mkdir(outputDir, { recursive: true });
-        const pdfPath = path.join(outputDir, `invoice-${invoiceData.invoiceNumber}.pdf`);
+        const safeNumber = (invoiceData.invoiceNumber || `INV-${Date.now()}`);
+        const pdfFileName = fileName && fileName.toString().trim().length > 0 ? fileName : `invoice-${safeNumber}.pdf`;
+        const pdfPath = path.join(outputDir, pdfFileName);
 
         browser = await puppeteer.launch({
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -28,16 +32,11 @@ async function generateInvoicePDF(invoiceData) {
             path: pdfPath,
             format: 'A4',
             printBackground: true,
-            margin: {
-                top: '8mm',
-                right: '8mm',
-                bottom: '8mm',
-                left: '8mm'
-            }
+            margin: { top: '8mm', right: '8mm', bottom: '8mm', left: '8mm' }
         });
 
         console.log(`[PDF] PDF generated successfully: ${pdfPath}`);
-        return `/invoices/invoice-${invoiceData.invoiceNumber}.pdf`;
+        return `/invoices/${path.basename(pdfPath)}`;
     } catch (error) {
         console.error(`[PDF] Failed to generate PDF for invoice ${invoiceData.invoiceNumber}:`, error);
         throw new Error(`PDF generation failed: ${error.message}`);
@@ -50,217 +49,171 @@ async function generateInvoicePDF(invoiceData) {
 
 async function replacePlaceholders(html, invoiceData) {
     // Company details
-    html = html.replace(/{{companyName}}/g, 'Shaikh Carpets And Mats');
-    html = html.replace(/{{companyAddress}}/g, '11 Trevelyan Basin Street,Sowcarpet,Chennai-600079');
-    html = html.replace(/{{companyPhone}}/g, '9840844026/8939487096');
-    html = html.replace(/{{companyEmail}}/g, 'shaikhcarpetsandmats@gmail.com');
-    html = html.replace(/{{companyGSTIN}}/g, '33BVRPS2849Q2ZG');
-    html = html.replace(/{{companyState}}/g, '33-Tamil Nadu');
-    html = html.replace(/{{companyLogo}}/g, 'https://bri.ct.ws/include/logo.png');
+    html = html.replace(/{{companyName}}/g, escapeHtml(company.name));
+    html = html.replace(/{{companyAddress}}/g, escapeHtml(company.address));
+    html = html.replace(/{{companyPhone}}/g, escapeHtml(company.phone));
+    html = html.replace(/{{companyEmail}}/g, escapeHtml(company.email));
+    html = html.replace(/{{companyGSTIN}}/g, escapeHtml(company.gstin));
+    html = html.replace(/{{companyState}}/g, escapeHtml(company.state));
+    html = html.replace(/{{companyLogo}}/g, escapeHtml(company.logoUrl || ''));
 
     // Customer details
-    const customer = invoiceData.customer;
-    html = html.replace(/{{customerName}}/g, customer?.firmName || customer?.name || '');
-    html = html.replace(/{{customerAddress}}/g, customer?.firmAddress || '');
-    html = html.replace(/{{customerPhone}}/g, customer?.contact || '');
-    html = html.replace(/{{customerEmail}}/g, customer?.email || '');
-    html = html.replace(/{{customerGSTIN}}/g, customer?.gstNo || '');
-    html = html.replace(/{{customerState}}/g, customer?.state || '33-Tamil Nadu');
+    const customer = invoiceData.customer && typeof invoiceData.customer === 'object' ? invoiceData.customer : (invoiceData._doc?.customer || {});
+    const customerName = customer?.firmName || customer?.name || '';
+    const customerAddress = customer?.firmAddress || customer?.billingAddress || '';
+    const customerPhone = customer?.contact || customer?.phone || '';
+    const customerEmail = customer?.email || '';
+    const customerGSTIN = customer?.gstNo || customer?.gstin || '';
+    const customerState = customer?.state || '33-Tamil Nadu';
 
-    // Invoice details
-    html = html.replace(/{{invoiceNumber}}/g, invoiceData.invoiceNumber || '');
-    html = html.replace(/{{invoiceDate}}/g, new Date(invoiceData.invoiceDate || Date.now()).toLocaleDateString('en-GB'));
-    html = html.replace(/{{dueDate}}/g, new Date(invoiceData.dueDate || Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB'));
-    html = html.replace(/{{placeOfSupply}}/g, customer?.state || '33-Tamil Nadu');
-    html = html.replace(/{{paymentStatus}}/g, invoiceData.paymentStatus || 'Pending');
+    html = html.replace(/{{customerName}}/g, escapeHtml(customerName));
+    html = html.replace(/{{customerAddress}}/g, escapeHtml(customerAddress));
+    html = html.replace(/{{customerPhone}}/g, escapeHtml(customerPhone));
+    html = html.replace(/{{customerEmail}}/g, escapeHtml(customerEmail));
+    html = html.replace(/{{customerGSTIN}}/g, escapeHtml(customerGSTIN));
+    html = html.replace(/{{customerState}}/g, escapeHtml(customerState));
 
-    const customerStateCode = extractStateCode(customer?.state);
+    // Invoice meta
+    const invoiceNumber = invoiceData.invoiceNumber || invoiceData._id || '';
+    const invoiceDate = new Date(invoiceData.invoiceDate || Date.now()).toLocaleDateString('en-GB');
+    const dueDate = new Date(invoiceData.dueDate || Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB');
+    const placeOfSupply = customerState;
+
+    html = html.replace(/{{invoiceNumber}}/g, escapeHtml(String(invoiceNumber)));
+    html = html.replace(/{{invoiceDate}}/g, escapeHtml(invoiceDate));
+    html = html.replace(/{{dueDate}}/g, escapeHtml(dueDate));
+    html = html.replace(/{{placeOfSupply}}/g, escapeHtml(placeOfSupply));
+
+    const customerStateCode = extractStateCode(customerState);
     const isInterState = customerStateCode && customerStateCode !== COMPANY_STATE_CODE;
+    const paymentStatus = invoiceData.paymentStatus || ((Number(invoiceData.balance) || 0) <= 0 ? 'Paid' : (Number(invoiceData.paidAmount || 0) > 0 ? 'Partial' : 'Pending'));
+    html = html.replace(/{{paymentStatus}}/g, escapeHtml(paymentStatus));
+    html = html.replace(/{{supplyType}}/g, isInterState ? 'Interstate' : 'Intrastate');
 
+    // Items and tax summary
     let totalQuantity = 0;
     let totalGST = 0;
+    let totalDiscount = 0;
     let itemsHtml = '';
     const taxSummary = {};
+    const items = Array.isArray(invoiceData.items) ? invoiceData.items : [];
 
-    if (invoiceData.items && invoiceData.items.length > 0) {
-        invoiceData.items.forEach((item, index) => {
-            const itemName = item.name || item.item?.name || '';
-            const hsnCode = item.hsnCode || item.item?.hsnCode || '';
-            const rate = item.rate || item.item?.rate || 0;
-            const quantity = item.quantity || 0;
-            const taxSlab = item.taxSlab || item.item?.taxSlab || 18;
-            const units = item.units || item.item?.units || 'per piece';
+    items.forEach((item, index) => {
+        const src = item.item && typeof item.item === 'object' ? item.item : item;
+        const itemName = item.name || src?.name || '';
+        const hsnCode = item.hsnCode || src?.hsnCode || '';
+        const rate = Number(item.rate ?? src?.rate ?? src?.sellingPrice ?? 0) || 0;
+        const quantity = Number(item.quantity || 0) || 0;
+        const taxSlab = Number(item.taxSlab ?? src?.taxSlab ?? item.taxRate ?? 0) || 0;
+        const units = item.units || src?.units || 'pcs';
+        const discountPct = Number(item.discount || 0) || 0;
 
-            const itemTotal = rate * quantity;
-            const gstAmount = (itemTotal * taxSlab) / 100;
-            const totalWithGst = itemTotal + gstAmount;
+        const gross = rate * quantity;
+        const discountAmt = (gross * discountPct) / 100;
+        const taxable = gross - discountAmt;
+        const gstAmount = (taxable * taxSlab) / 100;
+        const totalWithGst = taxable + gstAmount;
 
-            totalQuantity += quantity;
-            totalGST += gstAmount;
+        totalQuantity += quantity;
+        totalGST += gstAmount;
+        totalDiscount += discountAmt;
 
-            if (!taxSummary[hsnCode]) {
-                if (isInterState) {
-                    taxSummary[hsnCode] = { hsnCode, taxableAmount: 0, igstRate: taxSlab, igstAmount: 0, totalTax: 0, isInterState: true };
-                } else {
-                    taxSummary[hsnCode] = { hsnCode, taxableAmount: 0, cgstRate: taxSlab / 2, sgstRate: taxSlab / 2, cgstAmount: 0, sgstAmount: 0, totalTax: 0, isInterState: false };
-                }
-            }
-
-            taxSummary[hsnCode].taxableAmount += itemTotal;
-            taxSummary[hsnCode].totalTax += gstAmount;
-
-            if (isInterState) {
-                taxSummary[hsnCode].igstAmount += gstAmount;
-            } else {
-                taxSummary[hsnCode].cgstAmount += gstAmount / 2;
-                taxSummary[hsnCode].sgstAmount += gstAmount / 2;
-            }
-
-            itemsHtml += `
-            <tr>
-                <td class="text-center">${index + 1}</td>
-                <td class="text-left">${itemName}</td>
-                <td class="text-center">${hsnCode}</td>
-                <td class="text-center">${quantity}</td>
-                <td class="text-center">${units}</td>
-                <td class="text-right">₹${rate.toFixed(2)}</td>
-                <td class="text-center">${taxSlab}%</td>
-                <td class="text-right">₹${totalWithGst.toFixed(2)}</td>
-            </tr>`;
-        });
-    }
-
-    html = html.replace(/{{itemsTable}}/g, itemsHtml);
-    html = html.replace(/{{totalQuantity}}/g, totalQuantity);
-    html = html.replace(/{{totalGST}}/g, totalGST.toFixed(2));
-    html = html.replace(/{{totalAmount}}/g, (invoiceData.totalAmount || invoiceData.grandTotal || 0).toFixed(2));
-    html = html.replace(/{{subTotal}}/g, (invoiceData.subTotal || 0).toFixed(2));
-
-    let taxSummaryHtml = '';
-    let taxSummaryTotals = { taxableAmount: 0, cgstAmount: 0, sgstAmount: 0, igstAmount: 0, totalTax: 0 };
-
-    Object.values(taxSummary).forEach(tax => {
-        taxSummaryTotals.taxableAmount += tax.taxableAmount;
-        taxSummaryTotals.totalTax += tax.totalTax;
-
-        if (tax.isInterState) {
-            taxSummaryTotals.igstAmount += tax.igstAmount;
-            taxSummaryHtml += `
-            <tr>
-                <td class="text-left">${tax.hsnCode}</td>
-                <td class="text-right">₹${tax.taxableAmount.toFixed(2)}</td>
-                <td class="text-center">${tax.igstRate}%</td>
-                <td class="text-right">₹${tax.igstAmount.toFixed(2)}</td>
-                <td class="text-center">-</td>
-                <td class="text-right">-</td>
-                <td class="text-center">-</td>
-                <td class="text-right">-</td>
-                <td class="text-right">₹${tax.totalTax.toFixed(2)}</td>
-            </tr>`;
-        } else {
-            taxSummaryTotals.cgstAmount += tax.cgstAmount;
-            taxSummaryTotals.sgstAmount += tax.sgstAmount;
-            taxSummaryHtml += `
-            <tr>
-                <td class="text-left">${tax.hsnCode}</td>
-                <td class="text-right">₹${tax.taxableAmount.toFixed(2)}</td>
-                <td class="text-center">-</td>
-                <td class="text-right">-</td>
-                <td class="text-center">${tax.cgstRate}%</td>
-                <td class="text-right">₹${tax.cgstAmount.toFixed(2)}</td>
-                <td class="text-center">${tax.sgstRate}%</td>
-                <td class="text-right">₹${tax.sgstAmount.toFixed(2)}</td>
-                <td class="text-right">₹${tax.totalTax.toFixed(2)}</td>
-            </tr>`;
+        const hsnKey = hsnCode || 'NA';
+        if (!taxSummary[hsnKey]) {
+            taxSummary[hsnKey] = isInterState
+                ? { hsnCode: hsnKey, taxableAmount: 0, igstRate: taxSlab, igstAmount: 0, totalTax: 0, isInterState: true }
+                : { hsnCode: hsnKey, taxableAmount: 0, cgstRate: taxSlab / 2, sgstRate: taxSlab / 2, cgstAmount: 0, sgstAmount: 0, totalTax: 0, isInterState: false };
         }
+        taxSummary[hsnKey].taxableAmount += taxable;
+        taxSummary[hsnKey].totalTax += gstAmount;
+        if (isInterState) taxSummary[hsnKey].igstAmount = (taxSummary[hsnKey].igstAmount || 0) + gstAmount;
+        else {
+            taxSummary[hsnKey].cgstAmount = (taxSummary[hsnKey].cgstAmount || 0) + gstAmount / 2;
+            taxSummary[hsnKey].sgstAmount = (taxSummary[hsnKey].sgstAmount || 0) + gstAmount / 2;
+        }
+
+        itemsHtml += `
+            <tr>
+                <td style="text-align: center;">${index + 1}</td>
+                <td style="text-align: left;">${escapeHtml(itemName)} (${escapeHtml(units)})</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(rate))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(gross))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(discountAmt))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxable))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(gstAmount))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(totalWithGst))}</td>
+            </tr>
+        `;
     });
 
-    html = html.replace(/{{taxSummaryTable}}/g, taxSummaryHtml);
-    html = html.replace(/{{taxSummaryTotal\.taxableAmount}}/g, taxSummaryTotals.taxableAmount.toFixed(2));
+    const totalTaxableAmount = Object.values(taxSummary).reduce((sum, item) => sum + (item.taxableAmount || 0), 0);
+    const totalIgstAmount = Object.values(taxSummary).reduce((sum, item) => sum + (item.igstAmount || 0), 0);
+    const totalCgstAmount = Object.values(taxSummary).reduce((sum, item) => sum + (item.cgstAmount || 0), 0);
+    const totalSgstAmount = Object.values(taxSummary).reduce((sum, item) => sum + (item.sgstAmount || 0), 0);
 
-    if (isInterState) {
-        html = html.replace(/{{taxSummaryTotal\.cgstAmount}}/g, '-');
-        html = html.replace(/{{taxSummaryTotal\.sgstAmount}}/g, '-');
-        html = html.replace(/{{taxSummaryTotal\.igstAmount}}/g, taxSummaryTotals.igstAmount.toFixed(2));
-    } else {
-        html = html.replace(/{{taxSummaryTotal\.cgstAmount}}/g, taxSummaryTotals.cgstAmount.toFixed(2));
-        html = html.replace(/{{taxSummaryTotal\.sgstAmount}}/g, taxSummaryTotals.sgstAmount.toFixed(2));
-        html = html.replace(/{{taxSummaryTotal\.igstAmount}}/g, '-');
-    }
+    // Round off to avoid floating point issues
+    const roundOff = Math.round((totalGST + Number.EPSILON) * 100) / 100;
 
-    html = html.replace(/{{taxSummaryTotal\.totalTax}}/g, taxSummaryTotals.totalTax.toFixed(2));
+    html = html.replace(/{{items}}/g, itemsHtml);
+    html = html.replace(/{{totalQuantity}}/g, escapeHtml(String(totalQuantity)));
+    html = html.replace(/{{totalDiscount}}/g, escapeHtml(formatCurrency(totalDiscount)));
+    html = html.replace(/{{totalGST}}/g, escapeHtml(formatCurrency(roundOff)));
+    html = html.replace(/{{totalAmount}}/g, escapeHtml(formatCurrency(invoiceData.totalAmount || 0)));
+    html = html.replace(/{{netAmount}}/g, escapeHtml(formatCurrency(invoiceData.netAmount || 0)));
 
-    const amountInWords = convertToWords(invoiceData.totalAmount || invoiceData.grandTotal || 0);
-    html = html.replace(/{{amountInWords}}/g, amountInWords);
+    // Tax summary table
+    let taxSummaryHtml = '';
+    Object.values(taxSummary).forEach((taxItem) => {
+        taxSummaryHtml += `
+            <tr>
+                <td style="text-align: left;">${escapeHtml(taxItem.hsnCode)}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.taxableAmount))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.igstAmount || 0))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.cgstAmount || 0))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.sgstAmount || 0))}</td>
+                <td style="text-align: right;">${escapeHtml(formatCurrency(taxItem.totalTax))}</td>
+            </tr>
+        `;
+    });
 
-    html = html.replace(/{{receivedAmount}}/g, (invoiceData.paidAmount || 0).toFixed(2));
-    html = html.replace(/{{balanceAmount}}/g, (invoiceData.balance || (invoiceData.totalAmount || invoiceData.grandTotal || 0) - (invoiceData.paidAmount || 0)).toFixed(2));
+    html = html.replace(/{{taxSummary}}/g, taxSummaryHtml);
 
-    const balanceAmount = invoiceData.balance || (invoiceData.totalAmount || invoiceData.grandTotal || 0) - (invoiceData.paidAmount || 0);
-    let upiQrDataUrl = '';
-    if (process.env.UPI_ID) {
-        try {
-            const upiId = process.env.UPI_ID;
-            const { qrCodeImage } = await generateUpiQr(upiId, balanceAmount > 0 ? balanceAmount.toFixed(2) : null);
-            upiQrDataUrl = qrCodeImage;
-        } catch (error) {
-            console.error(`[PDF] Failed to generate UPI QR code:`, error);
-        }
-    }
+    // Payment details
+    const paymentDetails = invoiceData.paymentDetails || {};
+    const upiQrCode = paymentDetails.upiId ? await generateUpiQr(paymentDetails.upiId, invoiceData.invoiceNumber) : '';
+    const paymentMode = paymentDetails.mode || 'Not specified';
+    const transactionId = paymentDetails.transactionId || paymentDetails.txnId || 'N/A';
+    const paymentDate = paymentDetails.date ? new Date(paymentDetails.date).toLocaleDateString('en-GB') : 'N/A';
+    const amountPaid = paymentDetails.amount ? Number(paymentDetails.amount).toFixed(2) : 0.00;
 
-    html = html.replace(/{{bankName}}/g, 'INDIAN OVERSEAS BANK, B RDWAY');
-    html = html.replace(/{{bankAccount}}/g, '130702000003731');
-    html = html.replace(/{{bankIFSC}}/g, 'IOBA0001307');
-    html = html.replace(/{{bankHolder}}/g, 'Shaikh Carpets And Mats');
-    html = html.replace(/{{upiQrImage}}/g, upiQrDataUrl);
-    html = html.replace(/{{signatureImage}}/g, 'https://bri.ct.ws/include/sign.png');
+    html = html.replace(/{{upiQrCode}}/g, upiQrCode);
+    html = html.replace(/{{paymentMode}}/g, escapeHtml(paymentMode));
+    html = html.replace(/{{transactionId}}/g, escapeHtml(transactionId));
+    html = html.replace(/{{paymentDate}}/g, escapeHtml(paymentDate));
+    html = html.replace(/{{amountPaid}}/g, escapeHtml(formatCurrency(amountPaid)));
 
     return html;
 }
 
-function convertToWords(num) {
-    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return unsafe;
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
-    if (num === 0) return 'Zero Rupees Only';
-
-    let words = '';
-
-    function toWords(n) {
-        let str = '';
-        if (n > 99) {
-            str += ones[Math.floor(n / 100)] + ' Hundred ';
-            n %= 100;
-        }
-        if (n > 19) {
-            str += tens[Math.floor(n / 10)] + ' ' + ones[n % 10];
-        } else if (n > 9) {
-            str += teens[n - 10];
-        } else {
-            str += ones[n];
-        }
-        return str.trim();
-    }
-
-    let amount = Math.floor(num);
-    if (amount >= 10000000) {
-        words += toWords(Math.floor(amount / 10000000)) + ' Crore ';
-        amount %= 10000000;
-    }
-    if (amount >= 100000) {
-        words += toWords(Math.floor(amount / 100000)) + ' Lakh ';
-        amount %= 100000;
-    }
-    if (amount >= 1000) {
-        words += toWords(Math.floor(amount / 1000)) + ' Thousand ';
-        amount %= 1000;
-    }
-    if (amount > 0) {
-        words += toWords(amount);
-    }
-
-    return words.trim() + ' Rupees Only';
+function formatCurrency(amount) {
+    if (amount == null) return '0.00';
+    amount = Number(amount);
+    return amount.toLocaleString('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).replace('₹', '').trim();
 }
 
 module.exports = { generateInvoicePDF };

@@ -63,18 +63,31 @@ export const billingAPI = {
   // --- Quote operations ---
   getAllQuotes: async () => {
     const res = await axiosInstance.get(`/quotes`);
+    return Array.isArray(res.data) ? res.data : res.data?.data || [];
+  },
+  createQuote: async (payload) => {
+    const res = await axiosInstance.post(`/quotes`, payload);
     return res.data;
   },
-  createQuote: async (quoteData) => {
-    const res = await axiosInstance.post(`/quotes`, quoteData);
-    return res.data;
-  },
-  updateQuote: async (id, quoteData) => {
-    const res = await axiosInstance.put(`/quotes/${id}`, quoteData);
+  updateQuote: async (id, payload) => {
+    const res = await axiosInstance.put(`/quotes/${id}`, payload);
     return res.data;
   },
   deleteQuote: async (id) => {
     const res = await axiosInstance.delete(`/quotes/${id}`);
+    return res.data;
+  },
+  convertQuoteToSalesOrder: async (id) => {
+    const res = await axiosInstance.post(`/quotes/${id}/convert-to-sales-order`);
+    return res.data;
+  },
+  // --- Payments & Statements ---
+  recordCustomerPayment: async (customerId, payload) => {
+    const res = await axiosInstance.post(`/billing/customers/${customerId}/payments`, payload);
+    return res.data;
+  },
+  emailCustomerStatement: async (customerId, payload) => {
+    const res = await axiosInstance.post(`/billing/customers/${customerId}/email-statement`, payload);
     return res.data;
   },
 };

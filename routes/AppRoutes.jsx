@@ -11,11 +11,14 @@ import Invoices from '../src/pages/Invoices'
 import Login from '../src/pages/Login'
 import EditInvoice from '../src/pages/EditInvoice'
 import Purchases from '../src/pages/Purchases'
-import SalesOrders from '../src/pages/SalesOrders'
-import NewSalesOrder from '../src/pages/NewSalesOrder'
-import Quotes from '../src/pages/Quotes'
+import EnhancedQuoteManagement from '../src/components/EnhancedQuoteManagement'
 import NewQuote from '../src/pages/NewQuote'
 import Suppliers from '../src/pages/Suppliers'
+import CashDrawer from '../src/pages/CashDrawer'
+import EnhancedSalesOrderManagement from '../src/components/EnhancedSalesOrderManagement'
+import PortalInvoice from '../src/pages/PortalInvoice'
+import PortalStatement from '../src/pages/PortalStatement'
+import GstFilings from '../src/pages/GstFilings'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -39,6 +42,9 @@ const AppRoutes = () => {
 
   return (
     <Routes>
+      {/* Public portal routes */}
+      <Route path="/portal/invoice/:id/:token" element={<PortalInvoice />} />
+      <Route path="/portal/customer/:customerId/:token/statement" element={<PortalStatement />} />
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
       <Route path="/dashboard" element={<PrivateRoute><AdvancedDashboard /></PrivateRoute>} />
       <Route path="/dashboard-simple" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
@@ -49,11 +55,12 @@ const AppRoutes = () => {
       <Route path="/invoices" element={<PrivateRoute><Invoices /></PrivateRoute>} />
       <Route path="/edit-invoice/:id" element={<PrivateRoute><EditInvoice /></PrivateRoute>} />
       <Route path="/purchases" element={<PrivateRoute><Purchases /></PrivateRoute>} />
-      <Route path="/sales-orders" element={<PrivateRoute><SalesOrders /></PrivateRoute>} />
-      <Route path="/sales-orders/new" element={<PrivateRoute><NewSalesOrder /></PrivateRoute>} />
-      <Route path="/quotes" element={<PrivateRoute><Quotes /></PrivateRoute>} />
+      <Route path="/sales-orders" element={<PrivateRoute><EnhancedSalesOrderManagement /></PrivateRoute>} />
+      <Route path="/quotes" element={<PrivateRoute><EnhancedQuoteManagement /></PrivateRoute>} />
       <Route path="/quotes/new" element={<PrivateRoute><NewQuote /></PrivateRoute>} />
       <Route path="/suppliers" element={<PrivateRoute><Suppliers /></PrivateRoute>} />
+      <Route path="/cash-drawer" element={<PrivateRoute><CashDrawer /></PrivateRoute>} />
+      <Route path="/gst-filings" element={<PrivateRoute><GstFilings /></PrivateRoute>} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   )

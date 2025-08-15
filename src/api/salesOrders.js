@@ -16,5 +16,9 @@ export const salesOrdersAPI = {
   delete: async (id) => {
     const res = await axiosInstance.delete(`/sales-orders/${id}`);
     return res;
+  },
+  convertToInvoice: async (id) => {
+    const res = await axiosInstance.post(`/sales-orders/${id}/convert-to-invoice`);
+    return res;
   }
 };

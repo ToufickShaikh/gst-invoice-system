@@ -134,13 +134,9 @@ const updateStock = async (req, res) => {
             return sendErrorResponse(res, 404, 'Item not found');
         }
 
+        // Allow negative stock (backorder). Just warn in logs instead of reverting.
         if (item.quantityInStock < 0) {
-            // Revert the update if it would result in negative stock
-            await Item.findByIdAndUpdate(
-                req.params.id,
-                { $inc: { quantityInStock: -quantityChange } }
-            );
-            return sendErrorResponse(res, 400, 'Insufficient stock. Cannot reduce stock below zero.');
+            console.warn(`[ITEM] Stock for ${item.name} is negative (${item.quantityInStock}). This will be recovered by Purchases.`);
         }
 
         const operation = quantityChange > 0 ? 'increased' : 'decreased';

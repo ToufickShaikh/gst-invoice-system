@@ -16,7 +16,7 @@ const BackendDiagnostic = () => {
 
         try {
             // Test 1: Check API Base URL
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
             addResult('API Base URL', true, `Using: ${baseUrl}`);
 
             // Test 2: Health Check

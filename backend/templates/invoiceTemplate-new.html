@@ -40,6 +40,19 @@
             text-align: center;
         }
 
+        .header-brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .company-logo {
+            height: 48px;
+            width: auto;
+            object-fit: contain;
+        }
+
         .company-name {
             font-size: 24px;
             font-weight: bold;
@@ -417,12 +430,12 @@
         <!-- Header Section -->
         <div class="header">
             <div class="header-top">
-                <div class="company-name">{{companyName}}</div>
-                <div class="company-tagline">Carpets & Mats Manufacturing</div>
-                <div class="company-details">
-                    {{companyAddress}}<br>
-                    Phone: {{companyPhone}} | Email: {{companyEmail}}<br>
-                    GSTIN: {{companyGSTIN}} | State: {{companyState}}
+                <div class="header-brand">
+                    <img src="{{companyLogo}}" class="company-logo" alt="Company Logo" />
+                    <div>
+                        <div class="company-name">{{companyName}}</div>
+                        <div class="company-details">{{companyAddress}}<br />Phone: {{companyPhone}}{{companyEmail ? ` | Email: ${{{companyEmail}}}` : ''}}{{companyGSTIN ? ` | GSTIN: ${{{companyGSTIN}}}` : ''}}</div>
+                    </div>
                 </div>
             </div>
             <div class="invoice-title">TAX INVOICE</div>
@@ -502,11 +515,11 @@
                 </div>
                 <div class="meta-cell">
                     <div class="meta-label">Due Date</div>
-                    {{invoiceDate}}
+                    {{dueDate}}
                 </div>
                 <div class="meta-cell">
-                    <div class="meta-label">Reference</div>
-                    {{invoiceNumber}}
+                    <div class="meta-label">Payment Status</div>
+                    {{paymentStatus}}
                 </div>
             </div>
         </div>
@@ -594,11 +607,15 @@
                     </div>
                     <div class="amount-row">
                         <span>Discount:</span>
-                        <span>Rs. 0.00</span>
+                        <span>Rs. {{totalDiscount}}</span>
                     </div>
                     <div class="amount-row">
                         <span>Shipping:</span>
-                        <span>Rs. 0.00</span>
+                        <span>Rs. {{shippingCharges}}</span>
+                    </div>
+                    <div class="amount-row">
+                        <span>Round Off:</span>
+                        <span>Rs. {{roundOff}}</span>
                     </div>
                     <div class="amount-row total">
                         <span>Grand Total:</span>
@@ -619,7 +636,7 @@
         <!-- Amount in Words -->
         <div class="amount-words">
             <div class="amount-words-label">Amount in Words:</div>
-            <div class="amount-words-text">{{amountInWords}} Only</div>
+            <div class="amount-words-text">{{amountInWords}}</div>
         </div>
 
         <!-- Footer Section -->
@@ -643,29 +660,11 @@
             </div>
         </div>
 
-        <!-- Signature Section -->
-        <div class="signature-section">
-            <div class="signature-boxes">
-                <div class="signature-box">
-                    <div class="signature-line"></div>
-                    <div class="signature-label">Customer Signature</div>
-                </div>
-                <div class="signature-box">
-                    <div class="signature-line"></div>
-                    <div class="signature-label">Authorized Signatory</div>
-                </div>
-            </div>
-        </div>
-
         <!-- Terms and Conditions -->
         <div class="terms-section">
             <div class="terms-header">TERMS AND CONDITIONS</div>
             <ol class="terms-list">
-                <li>Goods once sold will not be taken back or exchanged.</li>
-                <li>All disputes are subject to Chennai jurisdiction only.</li>
-                <li>Payment should be made within the due date mentioned above.</li>
-                <li>Interest @ 24% per annum will be charged on delayed payments.</li>
-                <li>All goods remain the property of the seller until fully paid for.</li>
+                {{termsList}}
             </ol>
         </div>
 

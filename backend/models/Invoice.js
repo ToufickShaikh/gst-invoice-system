@@ -28,6 +28,18 @@ const invoiceSchema = new mongoose.Schema({
     shippingCharges: { type: Number, default: 0 },
     paymentMethod: { type: String },
     pdfPath: { type: String }, // Path to generated PDF
+    // Portal access fields
+    portalToken: { type: String },
+    portalTokenExpires: { type: Date },
+    // Export/SEZ info for GSTR-1 exp section
+    exportInfo: {
+        isExport: { type: Boolean, default: false },
+        exportType: { type: String, enum: ['SEZ', 'EXPORT', ''], default: '' }, // SEZ or Overseas Export
+        withTax: { type: Boolean, default: false }, // true => WPAY, false => WOPAY
+        shippingBillNo: { type: String, default: '' },
+        shippingBillDate: { type: Date },
+        portCode: { type: String, default: '' },
+    }
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);

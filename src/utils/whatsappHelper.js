@@ -23,7 +23,7 @@ export const generateInvoiceMessage = (invoiceData, customerData, items, invoice
     const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
 
     // Generate the public PDF URL that works without authentication
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gst-invoice-system-back.onrender.com/api';
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
     const publicPdfUrl = `${baseUrl}/billing/public/pdf/${invoiceId}`;
 
     // Get current date in Indian format

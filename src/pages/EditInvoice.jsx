@@ -103,6 +103,15 @@ const EditInvoice = () => {
                     id: item.id || Date.now() + index, // Add unique ID if missing
                     itemId: item.item?._id || ''
                 })),
+                exportInfo: {
+                  isExport: false,
+                  exportType: '',
+                  withTax: false,
+                  shippingBillNo: '',
+                  shippingBillDate: '',
+                  portCode: '',
+                  ...(fetchedInvoice.exportInfo || {})
+                }
             });
 
         } catch (err) {
@@ -181,32 +190,39 @@ const EditInvoice = () => {
                 item: itemId, // Send only the ID
             }));
 
-            const dataToSend = { ...invoiceData, items: itemsForBackend };
+            const rawExp = invoiceData.exportInfo || {};
+            const exportInfo = rawExp.isExport ? {
+              isExport: true,
+              exportType: rawExp.exportType || '', // 'SEZ' or 'EXPORT'
+              withTax: !!rawExp.withTax,
+              shippingBillNo: rawExp.shippingBillNo || '',
+              shippingBillDate: rawExp.shippingBillDate || undefined,
+              portCode: rawExp.portCode || '',
+            } : { isExport: false };
+
+            const dataToSend = { ...invoiceData, items: itemsForBackend, exportInfo };
 
             const response = await billingAPI.updateInvoice(id, dataToSend);
             toast.dismiss('update-toast');
             toast.success('Invoice updated successfully!');
 
-            if (response.pdfPath) {
-                // Show success message with download option
-                toast.success(
-                    <div>
-                        <p>Invoice updated successfully!</p>
-                        <button
-                            className="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
-                            onClick={() => {
-                                // Fix URL construction to avoid double slashes
-                                const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-                                const pdfUrl = `${baseUrl}${response.pdfPath}`; // response.pdfPath already starts with '/'
-                                window.open(pdfUrl, '_blank');
-                            }}
-                        >
-                            View Updated Invoice
-                        </button>
-                    </div>,
-                    { duration: 5000 }
-                );
-            }
+            // No immediate PDF generation. Provide quick link to on-demand download.
+            toast(
+              <div>
+                <p>Need the PDF?</p>
+                <button
+                  className="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
+                  onClick={() => {
+                    const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+                    const url = `${baseUrl}/api/billing/public/pdf/${id}`;
+                    window.open(url, '_blank');
+                  }}
+                >
+                  Download PDF
+                </button>
+              </div>,
+              { duration: 5000 }
+            );
 
             // Delay navigation slightly to allow toast to be seen
             setTimeout(() => navigate('/invoices'), 1000);
@@ -229,6 +245,16 @@ const EditInvoice = () => {
     if (!invoiceData) {
         return <Layout><div>No invoice data available.</div></Layout>;
     }
+
+    const setExportInfoField = (field, value) => {
+      setInvoiceData(prev => ({
+        ...prev,
+        exportInfo: {
+          ...(prev.exportInfo || {}),
+          [field]: value
+        }
+      }));
+    };
 
     // Render a form similar to Billing.jsx but for editing
     return (
@@ -361,6 +387,74 @@ const EditInvoice = () => {
                         </div>
                     </div>
 
+                    {/* Export / SEZ Section */}
+                    <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-base font-semibold">Export Details</div>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={!!invoiceData.exportInfo?.isExport}
+                            onChange={(e)=> setExportInfoField('isExport', e.target.checked)}
+                          />
+                          Mark as Export/SEZ
+                        </label>
+                      </div>
+                      {invoiceData.exportInfo?.isExport && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-xs text-gray-600">Type</label>
+                            <select
+                              className="w-full px-3 py-2 border rounded-lg"
+                              value={invoiceData.exportInfo?.exportType || ''}
+                              onChange={(e)=> setExportInfoField('exportType', e.target.value)}
+                            >
+                              <option value="">Select</option>
+                              <option value="EXPORT">Overseas Export</option>
+                              <option value="SEZ">SEZ Supply</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-600">With Tax?</label>
+                            <select
+                              className="w-full px-3 py-2 border rounded-lg"
+                              value={invoiceData.exportInfo?.withTax ? 'yes':'no'}
+                              onChange={(e)=> setExportInfoField('withTax', e.target.value==='yes')}
+                            >
+                              <option value="no">Without Tax (WOPAY)</option>
+                              <option value="yes">With Tax (WPAY)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-600">Port Code</label>
+                            <input
+                              className="w-full px-3 py-2 border rounded-lg"
+                              value={invoiceData.exportInfo?.portCode || ''}
+                              onChange={(e)=> setExportInfoField('portCode', e.target.value)}
+                              placeholder="e.g., INMAA1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-600">Shipping Bill No.</label>
+                            <input
+                              className="w-full px-3 py-2 border rounded-lg"
+                              value={invoiceData.exportInfo?.shippingBillNo || ''}
+                              onChange={(e)=> setExportInfoField('shippingBillNo', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-600">Shipping Bill Date</label>
+                            <input
+                              type="date"
+                              className="w-full px-3 py-2 border rounded-lg"
+                              value={invoiceData.exportInfo?.shippingBillDate ? String(invoiceData.exportInfo.shippingBillDate).substring(0,10) : ''}
+                              onChange={(e)=> setExportInfoField('shippingBillDate', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Summary Section */}
                     <div className="border-t pt-4">
                         <h3 className="text-lg font-medium mb-4">Summary</h3>
@@ -407,7 +501,17 @@ const EditInvoice = () => {
                         <div className="flex gap-2">
                             <Button
                                 onClick={() => {
-                                    // Add hasBeenEdited flag to mark this invoice as edited
+                                    const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+                                    const url = `${baseUrl}/api/billing/public/pdf/${id}`;
+                                    window.open(url, '_blank');
+                                }}
+                                variant="secondary"
+                                size="lg"
+                            >
+                                Download PDF
+                            </Button>
+                            <Button
+                                onClick={() => {
                                     const updatedData = {
                                         ...invoiceData,
                                         hasBeenEdited: true
