@@ -19,17 +19,31 @@ const cashDrawerRoutes = require('./routes/cashDrawerRoutes');
 const app = express(); // Create Express app instance
 
 // Middleware setup
-const allowedOrigins = [
+// Allow local dev and VPS IP by default; support overriding via ALLOWED_ORIGINS env (comma-separated)
+const defaultOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
-    'http://localhost:5001'
+    'http://localhost:5001',
+    'http://185.52.53.253',
+    'https://185.52.53.253'
 ];
+const extraOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+const allowedOrigins = new Set([...defaultOrigins, ...extraOrigins]);
+
 app.use(cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+        // Allow non-browser requests (no Origin header)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.has(origin)) return callback(null, true);
+        return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control', 'Pragma', 'Expires']
-})); // Enable CORS for local dev only
+})); // Enable CORS for dev + configured origins
 
 // Handle preflight requests explicitly
 
