@@ -3,13 +3,13 @@ import Layout from '../components/Layout';
 import { cashDrawerAPI } from '../api/cashDrawer';
 import { formatCurrency } from '../utils/dateHelpers';
 
-const DENOMS = [500, 100, 50, 20, 10, 5, 2, 1];
+const DENOMS = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 const keyOf = (v) => `d${v}`;
 
 const CashDrawer = () => {
   const [status, setStatus] = useState(null);
   const [mode, setMode] = useState('add'); // 'add' | 'remove'
-  const [denoms, setDenoms] = useState({ d500:0,d100:0,d50:0,d20:0,d10:0,d5:0,d2:0,d1:0 });
+  const [denoms, setDenoms] = useState({ d500:0,d200:0,d100:0,d50:0,d20:0,d10:0,d5:0,d2:0,d1:0 });
   const [note, setNote] = useState('');
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +33,7 @@ const CashDrawer = () => {
     const k = keyOf(v);
     setDenoms(prev => ({ ...prev, [k]: Math.max(0, Number(val) || 0) }));
   };
-  const clearAll = () => setDenoms({ d500:0,d100:0,d50:0,d20:0,d10:0,d5:0,d2:0,d1:0 });
+  const clearAll = () => setDenoms({ d500:0,d200:0,d100:0,d50:0,d20:0,d10:0,d5:0,d2:0,d1:0 });
 
   const submit = async () => {
     if (amount <= 0) return; // nothing to do

@@ -276,7 +276,7 @@ const EnhancedBillingForm = () => {
 
   // ===== Cash change-making helpers =====
   // Denominations used in India (no 2000 notes in backend)
-  const denomOrder = [500, 100, 50, 20, 10, 5, 2, 1];
+  const denomOrder = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
   function sumDenoms(d = {}) {
     return denomOrder.reduce((sum, v) => sum + v * (d[`d${v}`] || 0), 0);
@@ -306,7 +306,7 @@ const EnhancedBillingForm = () => {
 
   function makePreferredChange(amount, available = {}) {
     // Prefer 20 and 10 first, then fallback greedy
-    const preferredOrder = [20, 10, 500, 100, 50, 5, 2, 1];
+  const preferredOrder = [20, 10, 200, 500, 100, 50, 5, 2, 1];
     let remaining = amount;
     const result = {};
     for (const v of preferredOrder) {
@@ -1265,8 +1265,8 @@ const EnhancedBillingForm = () => {
               {recordPaymentNow && paymentMethod === 'Cash' && (
                 <div className="mt-4">
                   <div className="text-xs font-semibold text-gray-700 mb-2">Cash denominations (for drawer)</div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[500,100,50,20,10,5,2,1].map((v) => (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[500,200,100,50,20,10,5,2,1].map((v) => (
                       <div key={v} className="flex items-center gap-2">
                         <label className="text-xs w-12">₹{v}</label>
                         <input
