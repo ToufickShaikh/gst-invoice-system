@@ -4,6 +4,7 @@ const Invoice = require('../models/Invoice');
 function computeTotalFromDenoms(denoms = {}) {
   return (
     (denoms.d500 || 0) * 500 +
+  (denoms.d200 || 0) * 200 +
     (denoms.d100 || 0) * 100 +
     (denoms.d50 || 0) * 50 +
     (denoms.d20 || 0) * 20 +
@@ -16,8 +17,8 @@ function computeTotalFromDenoms(denoms = {}) {
 
 function cloneDenoms(d) {
   return {
-    d500: Number(d?.d500||0), d100: Number(d?.d100||0), d50: Number(d?.d50||0), d20: Number(d?.d20||0),
-    d10: Number(d?.d10||0), d5: Number(d?.d5||0), d2: Number(d?.d2||0), d1: Number(d?.d1||0),
+  d500: Number(d?.d500||0), d200: Number(d?.d200||0), d100: Number(d?.d100||0), d50: Number(d?.d50||0), d20: Number(d?.d20||0),
+  d10: Number(d?.d10||0), d5: Number(d?.d5||0), d2: Number(d?.d2||0), d1: Number(d?.d1||0),
   };
 }
 
@@ -55,7 +56,7 @@ exports.adjustCash = async (req, res) => {
     const deltaAmount = computeTotalFromDenoms(denominations);
 
     // Update denominations
-    const fields = ['d500','d100','d50','d20','d10','d5','d2','d1'];
+  const fields = ['d500','d200','d100','d50','d20','d10','d5','d2','d1'];
     fields.forEach(f => {
       const inc = Number(denominations[f]) || 0;
       drawer.denominations[f] = (drawer.denominations[f] || 0) + (type==='adjust-add' ? inc : -inc);
@@ -103,7 +104,7 @@ exports.recordSaleCash = async (req, res) => {
     const beforeDenoms = cloneDenoms(drawer.denominations || {});
 
     // Increment denominations by received cash
-    const fields = ['d500','d100','d50','d20','d10','d5','d2','d1'];
+  const fields = ['d500','d200','d100','d50','d20','d10','d5','d2','d1'];
     fields.forEach(f => {
       drawer.denominations[f] = (drawer.denominations[f] || 0) + (Number(denominations[f]) || 0);
     });

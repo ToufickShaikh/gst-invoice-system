@@ -36,7 +36,7 @@ const EnhancedBillingForm = () => {
   const [paidAmount, setPaidAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   // Cash denominations for cash drawer recording
-  const [cashDenoms, setCashDenoms] = useState({ d500:0,d100:0,d50:0,d20:0,d10:0,d5:0,d2:0,d1:0 });
+  const [cashDenoms, setCashDenoms] = useState({ d500:0,d200:0,d100:0,d50:0,d20:0,d10:0,d5:0,d2:0,d1:0 });
   const [drawerStatus, setDrawerStatus] = useState(null);
   // Change computation states
   const [changeSuggestions, setChangeSuggestions] = useState([]);

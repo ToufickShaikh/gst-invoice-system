@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const denominationSchema = new mongoose.Schema({
   d500: { type: Number, default: 0 },
+  d200: { type: Number, default: 0 },
   d100: { type: Number, default: 0 },
   d50: { type: Number, default: 0 },
   d20: { type: Number, default: 0 },
