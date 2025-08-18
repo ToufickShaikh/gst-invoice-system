@@ -187,7 +187,9 @@ const InvoiceManagement = () => {
   };
 
   const handleWhatsAppInvoice = (invoice) => {
-    const message = `Hi ${invoice.customer?.name}, your invoice ${invoice.invoiceNumber} for ${formatCurrency(invoice.total)} is ready. You can view it here: ${window.location.origin}/invoice/${invoice._id}`;
+  const appBase = import.meta.env.BASE_URL || '/';
+  const invoiceUrl = `${window.location.origin.replace(/\/$/, '')}${appBase.replace(/\/$/, '')}/invoice/${invoice._id}`;
+  const message = `Hi ${invoice.customer?.name}, your invoice ${invoice.invoiceNumber} for ${formatCurrency(invoice.total)} is ready. You can view it here: ${invoiceUrl}`;
     const whatsappUrl = `https://wa.me/${invoice.customer?.phone?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };

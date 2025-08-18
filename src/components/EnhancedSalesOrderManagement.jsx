@@ -118,7 +118,10 @@ const EnhancedSalesOrderManagement = () => {
       toast.success('Converted to invoice');
       // Optionally open invoice in new tab
       if (invoice?._id) {
-        window.open(`/edit-invoice/${invoice._id}`, '_blank');
+        const appBase = import.meta.env.BASE_URL || '/';
+        const base = window.location.origin.replace(/\/$/, '') + appBase.replace(/\/$/, '');
+        const url = `${base}/edit-invoice/${invoice._id}`;
+        window.open(url, '_blank');
       }
       fetchAll();
     } catch (e) {
