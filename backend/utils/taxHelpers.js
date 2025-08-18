@@ -74,17 +74,37 @@ const calculateTotals = (items, customerState) => {
     }
 
     items.forEach((item, index) => {
-        const itemTotal = (item.rate || item.price) * item.quantity;
-        subTotal += itemTotal;
+        // Normalize values
+        const qty = Number(item.quantity || 0);
+        const rate = Number(item.rate ?? item.price ?? 0);
+        const taxRate = Number(item.taxSlab ?? item.taxRate ?? 0);
+        const discountPct = Number(item.discount || 0);
 
-        const taxRate = item.taxSlab || 0;
+        if (qty <= 0) {
+            console.log(`[TAX CALC] Skipping item ${index + 1} with non-positive quantity`);
+            return;
+        }
+
         if (GST_RATES[taxRate] === undefined) {
             console.log(`[TAX CALC] Invalid tax slab for item ${index + 1}:`, taxRate);
             return;
         }
 
-        const tax = (itemTotal * taxRate) / 100;
-        console.log(`[TAX CALC] Item ${index + 1}: Total=${itemTotal}, TaxRate=${taxRate}%, Tax=${tax}`);
+        // Determine taxable unit price depending on price type
+        const priceType = (item.priceType || item.price_type || 'Exclusive');
+        const unitTaxable = (String(priceType) === 'Inclusive')
+            ? (rate / (1 + taxRate / 100))
+            : rate;
+
+        const baseAmount = unitTaxable * qty;
+        const discountAmount = (baseAmount * (discountPct || 0)) / 100;
+        const discountedBase = Math.max(0, baseAmount - discountAmount);
+
+        const tax = (discountedBase * taxRate) / 100;
+
+        console.log(`[TAX CALC] Item ${index + 1}: qty=${qty}, rate=${rate}, priceType=${priceType}, taxableUnit=${unitTaxable}, base=${baseAmount}, discount=${discountAmount}, discountedBase=${discountedBase}, taxRate=${taxRate}, tax=${tax}`);
+
+        subTotal += discountedBase;
 
         if (isInterState) {
             totalIgst += tax;

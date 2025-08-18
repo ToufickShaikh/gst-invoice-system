@@ -567,7 +567,9 @@ const EnhancedBillingForm = () => {
         })),
         discount: formData.discountType === 'amount' ? Number(formData.discountValue||0) : 0,
         shippingCharges: Number(formData.shippingCharges||0),
-        paidAmount: recordPaymentNow ? Number(paidAmount||0) : 0,
+        // If payment is Cash and we plan to record it via cash-drawer API (to handle change),
+        // do not set paidAmount here; cash drawer recordSale will update the invoice paidAmount
+        paidAmount: (recordPaymentNow && paymentMethod !== 'Cash') ? Number(paidAmount||0) : 0,
         paymentMethod: recordPaymentNow ? paymentMethod : '',
         billingType: 'invoice',
         exportInfo: exportInfo.isExport ? {
@@ -588,10 +590,14 @@ const EnhancedBillingForm = () => {
         if (recordPaymentNow && paymentMethod === 'Cash' && Number(paidAmount) > 0) {
           const inv = created.invoice || created; const invoiceId = inv?._id;
           if (invoiceId) {
-            await cashDrawerAPI.recordSale({ invoiceId, amount: Number(paidAmount), denominations: cashDenoms });
-            // Compute change and optionally remove from drawer
+            // Compute change and net collected amount
             const totalDue = Number(totals.total || 0);
-            const change = Math.max(0, Math.round(Number(paidAmount) - totalDue));
+            const rawPaid = Number(paidAmount || 0);
+            const change = Math.max(0, Math.round(rawPaid - totalDue));
+            const netCollected = Math.max(0, rawPaid - change);
+
+            // Record only net collected cash into drawer
+            await cashDrawerAPI.recordSale({ invoiceId, amount: Number(netCollected), denominations: cashDenoms });
             if (change > 0) {
               // Use selected suggestion if valid; else greedy
               const available = addDenoms(drawerStatus?.denominations || {}, cashDenoms);

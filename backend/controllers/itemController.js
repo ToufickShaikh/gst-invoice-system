@@ -37,9 +37,17 @@ const getItems = async (req, res) => {
 const createItem = async (req, res) => {
     const { name, hsnCode, rate, priceType, taxSlab, units, quantityInStock } = req.body;
 
-    // Basic input validation
-    if (!name || !hsnCode || !rate || !taxSlab || !units) {
-        return sendErrorResponse(res, 400, 'Please include all required item fields: name, hsnCode, rate, taxSlab, units');
+    // Basic input validation — treat 0 as a valid numeric value for rate and taxSlab
+    const missingFields = [];
+    if (!name) missingFields.push('name');
+    if (!hsnCode) missingFields.push('hsnCode');
+    // rate and taxSlab can be 0 — only reject when they are null/undefined
+    if (rate == null) missingFields.push('rate');
+    if (taxSlab == null) missingFields.push('taxSlab');
+    if (!units) missingFields.push('units');
+
+    if (missingFields.length > 0) {
+        return sendErrorResponse(res, 400, `Please include required item fields: ${missingFields.join(', ')}`);
     }
 
     try {
