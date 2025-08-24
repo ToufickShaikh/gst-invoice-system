@@ -351,9 +351,9 @@ const EditInvoice = () => {
                         </div>
                         <div className="space-y-4">
                             {invoiceData.items.map((billItem, index) => (
-                                <div key={billItem.id || `item-${index}`} className="flex gap-4 items-end">
-                                    <div className="flex-1">
-                                        <label>Item</label>
+                                <div key={billItem.id || `item-${index}`} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                                    <div className="md:col-span-4 col-span-1">
+                                        <label className="block text-sm font-medium">Item</label>
                                         <select
                                             value={billItem.itemId}
                                             onChange={(e) => handleItemChange(index, 'itemId', e.target.value)}
@@ -365,15 +365,81 @@ const EditInvoice = () => {
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="w-32">
+
+                                    <div className="md:col-span-1 col-span-1">
                                         <InputField
-                                            label="Quantity"
+                                            label="Qty"
                                             type="number"
                                             value={billItem.quantity}
-                                            onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 1)}
+                                            onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
                                         />
                                     </div>
-                                    <Button onClick={() => handleRemoveItem(index)} variant="danger" size="sm">Remove</Button>
+
+                                    <div className="md:col-span-2 col-span-1">
+                                        <InputField
+                                            label="Rate"
+                                            type="number"
+                                            value={billItem.price ?? billItem.rate ?? 0}
+                                            onChange={(e) => handleItemChange(index, 'price', parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-1 col-span-1">
+                                        <InputField
+                                            label="Tax %"
+                                            type="number"
+                                            value={billItem.taxSlab ?? billItem.taxRate ?? 0}
+                                            onChange={(e) => handleItemChange(index, 'taxSlab', parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-2 col-span-1">
+                                        <label className="block text-sm font-medium">Price Type</label>
+                                        <select
+                                            value={billItem.priceType || 'Exclusive'}
+                                            onChange={(e) => handleItemChange(index, 'priceType', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                        >
+                                            <option value="Exclusive">Exclusive</option>
+                                            <option value="Inclusive">Inclusive</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="md:col-span-1 col-span-1">
+                                        <InputField
+                                            label="HSN"
+                                            type="text"
+                                            value={billItem.hsnCode || ''}
+                                            onChange={(e) => handleItemChange(index, 'hsnCode', e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-1 col-span-1 text-right">
+                                        <div className="text-sm text-gray-500">Amount</div>
+                                        <div className="font-medium text-gray-900">{formatCurrency((() => {
+                                            const qty = Number(billItem.quantity || 0);
+                                            const price = Number(billItem.price ?? billItem.rate ?? 0);
+                                            const disc = Number(invoiceData.discount || 0) || 0;
+                                            const tax = Number(billItem.taxSlab ?? billItem.taxRate ?? 0) || 0;
+                                            if ((billItem.priceType || billItem.item?.priceType) === 'Inclusive' && tax) {
+                                                const line = price * qty;
+                                                const totalBase = (invoiceData.items || []).reduce((s, it) => s + (Number(it.price ?? it.rate ?? 0) * Number(it.quantity ?? 0)), 0) || 1;
+                                                const propDiscount = (line / totalBase) * disc;
+                                                const discountedInclusive = Math.max(0, line - propDiscount);
+                                                return (discountedInclusive).toFixed(2);
+                                            }
+                                            const line = price * qty;
+                                            const totalBase = (invoiceData.items || []).reduce((s, it) => s + (Number(it.price ?? it.rate ?? 0) * Number(it.quantity ?? 0)), 0) || 1;
+                                            const propDiscount = (line / totalBase) * disc;
+                                            const taxable = Math.max(0, line - propDiscount);
+                                            const taxAmt = taxable * (tax / 100);
+                                            return (taxable + taxAmt).toFixed(2);
+                                        })())}</div>
+                                    </div>
+
+                                    <div className="md:col-span-1 col-span-1 flex justify-end">
+                                        <Button onClick={() => handleRemoveItem(index)} variant="danger" size="sm">Remove</Button>
+                                    </div>
                                 </div>
                             ))}
                         </div>

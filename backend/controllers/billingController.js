@@ -113,15 +113,29 @@ const createInvoice = async (req, res) => {
     const { customer, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '', exportInfo } = req.body;
 
     // Input validation
-    if (!customer || !items || items.length === 0) {
-        return sendErrorResponse(res, 400, 'Customer and at least one item are required');
+    // Allow missing customer for POS quick billing when billingType === 'POS'
+    if (!items || items.length === 0) {
+        return sendErrorResponse(res, 400, 'At least one item is required');
+    }
+    if (!customer && String(billingType || '').toUpperCase() !== 'POS') {
+        return sendErrorResponse(res, 400, 'Customer is required for non-POS invoices');
     }
 
     try {
         // Ensure customer data is populated for tax calculation
-        const customerDetails = await Customer.findById(customer);
-        if (!customerDetails) {
-            return sendErrorResponse(res, 400, 'Customer not found');
+        let customerDetails = null;
+        if (customer) {
+            customerDetails = await Customer.findById(customer);
+            if (!customerDetails) {
+                return sendErrorResponse(res, 400, 'Customer not found');
+            }
+        } else {
+            // POS quick billing: treat as anonymous B2C in company state
+            customerDetails = {
+                state: company.state || '',
+                customerType: 'B2C',
+                firmName: 'B2C-Guest'
+            };
         }
 
         // Normalize items to backend shape
@@ -530,8 +544,14 @@ const generatePublicPdf = async (req, res) => {
             return sendErrorResponse(res, 404, 'Invoice not found');
         }
 
+        const format = req.query.format || 'a4';
         const tempFileName = `public-invoice-${invoiceId}-${Date.now()}.pdf`;
-        const webPath = await pdfGenerator.generateInvoicePDF(invoice, tempFileName);
+        let webPath;
+        if (format === 'thermal') {
+            webPath = await pdfGenerator.generateThermalPDF(invoice, tempFileName);
+        } else {
+            webPath = await pdfGenerator.generateInvoicePDF(invoice, tempFileName);
+        }
         const fileName = path.basename(webPath);
         const fullPath = path.resolve(__dirname, '../invoices', fileName);
 

@@ -47,6 +47,34 @@ async function generateInvoicePDF(invoiceData, fileName) {
     }
 }
 
+async function generateThermalPDF(invoiceData, fileName) {
+    console.log(`[PDF] Starting thermal PDF generation for invoice: ${invoiceData.invoiceNumber}`);
+    let browser = null;
+    try {
+        const templatePath = path.resolve(__dirname, '../templates/thermal-2in5.html');
+        let html = await fs.readFile(templatePath, 'utf-8');
+        html = await replacePlaceholders(html, invoiceData);
+
+        const outputDir = path.resolve(__dirname, '../invoices');
+        await fs.mkdir(outputDir, { recursive: true });
+        const pdfFileName = fileName && fileName.toString().trim().length > 0 ? fileName : `invoice-thermal-${invoiceData.invoiceNumber || Date.now()}.pdf`;
+        const pdfPath = path.join(outputDir, pdfFileName);
+
+        browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'], headless: true });
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.pdf({ path: pdfPath, width: '64mm', height: 'auto', printBackground: true, margin: { top: 0, right: 0, bottom: 0, left: 0 } });
+
+        console.log(`[PDF] Thermal PDF generated successfully: ${pdfPath}`);
+        return `/invoices/${path.basename(pdfPath)}`;
+    } catch (error) {
+        console.error(`[PDF] Failed to generate thermal PDF for invoice ${invoiceData.invoiceNumber}:`, error);
+        throw new Error(`Thermal PDF generation failed: ${error.message}`);
+    } finally {
+        if (browser) await browser.close();
+    }
+}
+
 async function replacePlaceholders(html, invoiceData) {
     // Company details
     html = html.replace(/{{companyName}}/g, escapeHtml(company.name));
@@ -216,4 +244,4 @@ function formatCurrency(amount) {
     }).replace('₹', '').trim();
 }
 
-module.exports = { generateInvoicePDF };
+module.exports = { generateInvoicePDF, generateThermalPDF };
