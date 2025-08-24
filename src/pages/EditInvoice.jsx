@@ -46,13 +46,24 @@ const EditInvoice = () => {
         }, 0);
 
         const itemsWithTax = (invoiceData.items || []).map(billItem => {
-            if (!billItem.item && !billItem.price) return null;
-            const price = billItem.price || billItem.item?.price || 0;
-            const taxSlab = billItem.taxSlab || billItem.item?.taxSlab || 0;
+            if (!billItem.item && (billItem.price == null)) return null;
+            const price = Number((billItem.price ?? billItem.rate ?? billItem.item?.rate) || 0);
+            const taxSlab = Number((billItem.taxSlab ?? billItem.taxRate ?? billItem.item?.taxSlab) || 0);
+            const priceType = String(billItem.priceType ?? billItem.item?.priceType ?? 'Exclusive');
 
-            const itemTotal = price * billItem.quantity;
-            const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * (invoiceData.discount || 0) : 0;
-            const taxableAmount = itemTotal - discountAmount;
+            const qty = Number(billItem.quantity || 0);
+            const itemTotal = price * qty;
+            const discountAmount = totalBeforeDiscount > 0 ? (itemTotal / totalBeforeDiscount) * (Number(invoiceData.discount) || 0) : 0;
+
+            let taxableAmount = 0;
+            if (priceType === 'Inclusive' && taxSlab) {
+                const unitTaxable = price / (1 + taxSlab / 100);
+                taxableAmount = unitTaxable * qty - discountAmount;
+            } else {
+                taxableAmount = itemTotal - discountAmount;
+            }
+
+            if (taxableAmount < 0) taxableAmount = 0;
             const tax = calculateTax(taxableAmount, taxSlab, isInterState);
 
             return { ...billItem, taxableAmount, tax };
@@ -99,10 +110,14 @@ const EditInvoice = () => {
                 // Handle case where customer might be null or missing from the DB
                 customer: fetchedInvoice.customer?._id || '',
                 items: (fetchedInvoice.items || []).map((item, index) => ({
-                    ...item,
-                    id: item.id || Date.now() + index, // Add unique ID if missing
-                    itemId: item.item?._id || ''
-                })),
+                        ...item,
+                        id: item.id || Date.now() + index, // Add unique ID if missing
+                        itemId: item.item?._id || '',
+                        price: item.price ?? item.rate ?? (item.item?.rate ?? 0),
+                        taxSlab: item.taxSlab ?? item.taxRate ?? (item.item?.taxSlab ?? 0),
+                        priceType: item.priceType ?? item.item?.priceType ?? 'Exclusive',
+                        name: item.name || item.item?.name || ''
+                    })),
                 exportInfo: {
                   isExport: false,
                   exportType: '',
@@ -131,7 +146,16 @@ const EditInvoice = () => {
         const updatedItems = [...invoiceData.items];
         if (field === 'itemId') {
             const selectedItem = items.find(i => i._id === value);
-            updatedItems[index] = { ...updatedItems[index], itemId: value, item: selectedItem, price: selectedItem.price, taxSlab: selectedItem.taxSlab, name: selectedItem.name, hsnCode: selectedItem.hsnCode };
+            updatedItems[index] = {
+                ...updatedItems[index],
+                itemId: value,
+                item: selectedItem,
+                price: selectedItem?.rate ?? selectedItem?.price ?? 0,
+                taxSlab: selectedItem?.taxSlab ?? 0,
+                priceType: selectedItem?.priceType ?? 'Exclusive',
+                name: selectedItem?.name ?? '',
+                hsnCode: selectedItem?.hsnCode ?? ''
+            };
         } else {
             updatedItems[index][field] = value;
         }
@@ -146,6 +170,7 @@ const EditInvoice = () => {
             item: null,
             price: 0,
             taxSlab: 0,
+            priceType: 'Exclusive',
             name: '',
             hsnCode: ''
         };

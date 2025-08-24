@@ -591,7 +591,7 @@ const InvoiceManagement = () => {
                     <div className="flex items-center space-x-2">
                       {/* Edit */}
                       <a
-                        href={`${window.location.origin.replace(/\/$/, '') + (import.meta.env.BASE_URL || '/').replace(/\/$/, '')}/edit-invoice/${invoice._id}`}
+                        href={`${window.location.origin.replace(/\/$/, '')}${(import.meta.env.BASE_URL || '/').replace(/\/$/, '')}/edit-invoice/${invoice._id}`}
                         className="text-gray-700 hover:text-gray-900"
                         title="Edit Invoice"
                       >
