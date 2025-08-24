@@ -181,17 +181,10 @@ const Items = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    // Normalize entered rate: convert Inclusive input to canonical Exclusive rate for storage
-    const enteredRate = parseFloat(formData.rate) || 0
-    const tax = formData.taxSlab !== undefined && formData.taxSlab !== '' ? parseFloat(formData.taxSlab) : 0
-    const inputType = formData.rateInputType || formData.priceType || 'Exclusive'
-    let canonicalRate = enteredRate
-    if (inputType === 'Inclusive' && tax > 0) {
-      canonicalRate = enteredRate / (1 + tax / 100)
-    }
+    // Send raw entered rate to backend and include rateInputType so server normalizes once
     const itemData = {
       ...formData,
-      rate: Number(canonicalRate.toFixed(2)),
+      rate: parseFloat(formData.rate) || 0,
       taxSlab: parseFloat(formData.taxSlab)
     }
     // If adding, allow initial stock entry - use quantityInStock for backend
@@ -310,22 +303,15 @@ const Items = () => {
       let successCount = 0
       for (const item of validItems) {
         try {
-          // Normalize rate: convert Inclusive-entered rate to canonical Exclusive rate for storage
-          const inputRate = parseFloat(item.rate) || 0
-          const tax = item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 0
-          const inputType = item.rateInputType || item.priceType || 'Exclusive'
-          let canonicalRate = inputRate
-          if (inputType === 'Inclusive' && tax > 0) {
-            canonicalRate = inputRate / (1 + tax / 100)
-          }
+          // Send raw rates to backend; server will normalize based on rateInputType/priceType
           const itemData = {
             ...item,
-            rate: Number(canonicalRate.toFixed(2)),
-            taxSlab: tax,
-            // store quantity under backend field
+            rate: parseFloat(item.rate) || 0,
+            taxSlab: item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 0,
             quantityInStock: parseInt(item.stock) || 0,
-            // store rates in canonical (exclusive) format
-            priceType: 'Exclusive'
+            // Preserve any rateInputType supplied so server knows how to normalize
+            rateInputType: item.rateInputType || item.priceType || 'Exclusive',
+            priceType: item.priceType || 'Exclusive'
           }
           await itemsAPI.create(itemData)
           successCount++
@@ -462,19 +448,14 @@ const Items = () => {
 
       for (const item of csvData) {
         try {
-          // Normalize CSV rate: if CSV priceType indicates Inclusive, convert to canonical Exclusive
+          // For CSV import, send raw rate and preserve priceType if present; backend will normalize
           const csvRate = parseFloat(item.rate) || 0
           const csvTax = item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 0
-          const csvPriceType = (item.priceType || 'Exclusive')
-          let canonicalRate = csvRate
-          if (csvPriceType === 'Inclusive' && csvTax > 0) {
-            canonicalRate = csvRate / (1 + csvTax / 100)
-          }
           const itemData = {
             name: item.name,
             hsnCode: item.hsnCode,
-            rate: Number(canonicalRate.toFixed(2)),
-            priceType: 'Exclusive',
+            rate: csvRate,
+            priceType: item.priceType || 'Exclusive',
             taxSlab: csvTax,
             units: item.units || 'per piece',
             quantityInStock: 0
