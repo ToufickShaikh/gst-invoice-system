@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { createInvoice, getInvoices, getInvoiceById, updateInvoice, reprintInvoice, getDashboardStats, generatePaymentQr, deleteInvoice, generatePublicPdf, recordCustomerPayment, emailCustomerStatement, createInvoicePortalLink, createCustomerPortalLink, getPublicInvoice, getPublicCustomerStatement } = require('../controllers/billingController.js');
+const { createInvoice, getInvoices, getInvoiceById, updateInvoice, reprintInvoice, getDashboardStats, generatePaymentQr, deleteInvoice, generatePublicPdf, generatePublicThermalHtml, recordCustomerPayment, emailCustomerStatement, createInvoicePortalLink, createCustomerPortalLink, getPublicInvoice, getPublicCustomerStatement } = require('../controllers/billingController.js');
 const { protect } = require('../middleware/authMiddleware');
 
 // Public routes (no auth)
 router.route('/public/pdf/:invoiceId').get(generatePublicPdf);
+router.route('/public/print/thermal/:invoiceId').get(generatePublicThermalHtml);
 router.route('/public/invoices/:id').get(getPublicInvoice);
 router.route('/public/customers/:customerId/statement').get(getPublicCustomerStatement);
 

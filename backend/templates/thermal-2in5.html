@@ -18,20 +18,52 @@
 </head>
 <body>
   <div class="header">
-    {{companyName}}<br>
+    <div style="font-size:14px;font-weight:700">{{companyName}}</div>
     <div class="small">{{companyAddress}}</div>
+    <div class="small">Phone: {{companyPhone}}</div>
     <div class="small">GSTIN: {{companyGSTIN}}</div>
   </div>
-  <div>Bill No: {{invoiceNumber}}</div>
-  <div>Date: {{invoiceDate}}</div>
-  <table class="items">
-    {{items}}
+
+  <div style="display:flex;justify-content:space-between;margin-top:6px">
+    <div><strong>Bill No:</strong> {{invoiceNumber}}</div>
+    <div style="text-align:right"><strong>Date:</strong> {{invoiceDate}}</div>
+  </div>
+
+  <div style="margin-top:6px">
+    <div><strong>Bill To:</strong></div>
+    <div class="small">{{customerName}}</div>
+    <div class="small">{{customerPhone}}</div>
+    <div class="small">GSTIN: {{customerGSTIN}}</div>
+  </div>
+
+  <table class="items" style="margin-top:6px">
+    <thead>
+      <tr>
+        <td style="width:6%;text-align:center">#</td>
+        <td style="width:48%">Item</td>
+        <td style="width:12%;text-align:right">Qty</td>
+        <td style="width:17%;text-align:right">Rate</td>
+        <td style="width:17%;text-align:right">Amount</td>
+      </tr>
+    </thead>
+    <tbody>
+      {{items}}
+    </tbody>
   </table>
+
   <div class="totals small">
     <div style="display:flex;justify-content:space-between"><div>Subtotal</div><div class="right">{{subtotal}}</div></div>
+    <div style="display:flex;justify-content:space-between"><div>Discount</div><div class="right">{{totalDiscount}}</div></div>
     <div style="display:flex;justify-content:space-between"><div>Tax</div><div class="right">{{totalGST}}</div></div>
     <div style="display:flex;justify-content:space-between;font-weight:bold"><div>Total</div><div class="right">{{totalAmount}}</div></div>
   </div>
-  <div class="center small">Thank you for your purchase</div>
+
+  <div style="margin-top:8px;text-align:center">
+    <div>{{upiQrCode}}</div>
+    <div class="small">Scan to pay via UPI</div>
+  </div>
+
+  <div class="center small" style="margin-top:8px">Thank you for your purchase</div>
+  <div class="center xsmall" style="margin-top:6px">Powered by GST Invoice System</div>
 </body>
 </html>

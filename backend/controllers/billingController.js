@@ -754,11 +754,29 @@ const createInvoicePortalLink = async (req, res) => {
     // default expiry 30 days
     invoice.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await invoice.save();
-        // Respect PUBLIC_BASE_URL if set (should include subpath like /shaikhcarpets),
-        // or construct from host and optional PUBLIC_BASE_PATH
-        const publicBase = process.env.PUBLIC_BASE_URL
-            || (req.protocol + '://' + req.get('host')) + (process.env.PUBLIC_BASE_PATH || '');
-        const url = `${publicBase.replace(/\/$/, '')}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
+            // Respect PUBLIC_BASE_URL if set (should include subpath like /shaikhcarpets).
+            // If not set, try to detect a base path from the referer/origin header so links created from the UI
+            // include the SPA subpath (eg. /shaikhcarpets) instead of pointing to the bare host.
+            const detectBaseFromReferer = () => {
+                try {
+                    const ref = req.get('referer') || req.get('origin');
+                    if (!ref) return null;
+                    const u = new URL(ref);
+                    // If referer pathname contains a known app prefix, prefer that
+                    if (u.pathname && u.pathname.includes('/shaikhcarpets')) return `${u.origin}/shaikhcarpets`;
+                    // Otherwise use the first path segment (if any) as a possible base
+                    const seg = u.pathname && u.pathname.split('/').filter(Boolean)[0];
+                    if (seg) return `${u.origin}/${seg}`;
+                    return u.origin;
+                } catch (e) {
+                    return null;
+                }
+            };
+
+            const publicBase = process.env.PUBLIC_BASE_URL
+                || detectBaseFromReferer()
+                || (req.protocol + '://' + req.get('host')) + (process.env.PUBLIC_BASE_PATH || '');
+            const url = `${publicBase.replace(/\/$/, '')}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
     res.json({ url, token: invoice.portalToken, expiresAt: invoice.portalTokenExpires });
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to create portal link', error);
@@ -774,9 +792,24 @@ const createCustomerPortalLink = async (req, res) => {
     customer.portalToken = crypto.randomBytes(16).toString('hex');
     customer.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await customer.save();
-        const publicBase = process.env.PUBLIC_BASE_URL
-            || (req.protocol + '://' + req.get('host')) + (process.env.PUBLIC_BASE_PATH || '');
-        const url = `${publicBase.replace(/\/$/, '')}/portal/customer/${customer._id}/${customer.portalToken}/statement`;
+            const detectBaseFromReferer2 = () => {
+                try {
+                    const ref = req.get('referer') || req.get('origin');
+                    if (!ref) return null;
+                    const u = new URL(ref);
+                    if (u.pathname && u.pathname.includes('/shaikhcarpets')) return `${u.origin}/shaikhcarpets`;
+                    const seg = u.pathname && u.pathname.split('/').filter(Boolean)[0];
+                    if (seg) return `${u.origin}/${seg}`;
+                    return u.origin;
+                } catch (e) {
+                    return null;
+                }
+            };
+
+            const publicBase = process.env.PUBLIC_BASE_URL
+                || detectBaseFromReferer2()
+                || (req.protocol + '://' + req.get('host')) + (process.env.PUBLIC_BASE_PATH || '');
+            const url = `${publicBase.replace(/\/$/, '')}/portal/customer/${customer._id}/${customer.portalToken}/statement`;
     res.json({ url, token: customer.portalToken, expiresAt: customer.portalTokenExpires });
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to create customer portal link', error);
@@ -816,6 +849,36 @@ const getPublicInvoice = async (req, res) => {
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to fetch public invoice', error);
   }
+};
+
+// @desc    Generate printable thermal HTML for public viewing/print
+// @route   GET /api/billing/public/print/thermal/:invoiceId
+// @access  Public
+const generatePublicThermalHtml = async (req, res) => {
+    try {
+        const { invoiceId } = req.params;
+        const { token } = req.query;
+        const invoice = await Invoice.findById(invoiceId).populate('customer').populate('items.item');
+        if (!invoice) return sendErrorResponse(res, 404, 'Invoice not found');
+        if (!invoice.portalToken || token !== invoice.portalToken) return sendErrorResponse(res, 401, 'Invalid token');
+        if (invoice.portalTokenExpires && new Date(invoice.portalTokenExpires) < new Date()) return sendErrorResponse(res, 401, 'Portal link expired');
+
+        // Read template and replace placeholders using existing helper
+        const templatePath = path.resolve(__dirname, '../templates/thermal-2in5.html');
+        let html = await fs.readFile(templatePath, 'utf-8');
+        html = await replacePlaceholders(html, invoice);
+
+        // Inject small print script to auto-open print dialog and close after printing
+        const printScript = `<script>
+            window.onload = function() { setTimeout(function(){ window.print(); }, 300); };
+        </script>`;
+
+        // Serve as HTML for direct printing (do not force download)
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html + printScript);
+    } catch (error) {
+        sendErrorResponse(res, 500, 'Failed to generate thermal HTML', error);
+    }
 };
 
 // Public: Get customer statement by token and date range
@@ -862,4 +925,5 @@ module.exports = {
     createCustomerPortalLink,
     getPublicInvoice,
     getPublicCustomerStatement,
+    generatePublicThermalHtml,
 };
