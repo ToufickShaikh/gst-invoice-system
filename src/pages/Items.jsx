@@ -26,6 +26,7 @@ const Items = () => {
       hsnCode: '',
       rate: '',
       priceType: 'Exclusive',
+      rateInputType: 'Exclusive',
       taxSlab: '',
       units: 'per piece',
       stock: 0
@@ -36,6 +37,7 @@ const Items = () => {
     hsnCode: '',
     rate: '',
     priceType: 'Exclusive',  // GST price type selection
+    rateInputType: 'Exclusive', // whether entered rate is Exclusive or Inclusive
     taxSlab: '',
     units: 'per piece'
   })
@@ -190,9 +192,17 @@ const Items = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    // Normalize entered rate: convert Inclusive input to canonical Exclusive rate for storage
+    const enteredRate = parseFloat(formData.rate) || 0
+    const tax = formData.taxSlab !== undefined && formData.taxSlab !== '' ? parseFloat(formData.taxSlab) : 0
+    const inputType = formData.rateInputType || formData.priceType || 'Exclusive'
+    let canonicalRate = enteredRate
+    if (inputType === 'Inclusive' && tax > 0) {
+      canonicalRate = enteredRate / (1 + tax / 100)
+    }
     const itemData = {
       ...formData,
-      rate: parseFloat(formData.rate),
+      rate: Number(canonicalRate.toFixed(2)),
       taxSlab: parseFloat(formData.taxSlab)
     }
     // If adding, allow initial stock entry - use quantityInStock for backend
@@ -279,8 +289,9 @@ const Items = () => {
       {
         name: '',
         hsnCode: '',
-        rate: '',
-        priceType: 'Exclusive',
+  rate: '',
+  priceType: 'Exclusive',
+  rateInputType: 'Exclusive',
         taxSlab: '',
         units: 'per piece',
         stock: 0
@@ -310,11 +321,22 @@ const Items = () => {
       let successCount = 0
       for (const item of validItems) {
         try {
+          // Normalize rate: convert Inclusive-entered rate to canonical Exclusive rate for storage
+          const inputRate = parseFloat(item.rate) || 0
+          const tax = item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 0
+          const inputType = item.rateInputType || item.priceType || 'Exclusive'
+          let canonicalRate = inputRate
+          if (inputType === 'Inclusive' && tax > 0) {
+            canonicalRate = inputRate / (1 + tax / 100)
+          }
           const itemData = {
             ...item,
-            rate: parseFloat(item.rate),
-            taxSlab: item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 18,
-            quantityInStock: parseInt(item.stock) || 0
+            rate: Number(canonicalRate.toFixed(2)),
+            taxSlab: tax,
+            // store quantity under backend field
+            quantityInStock: parseInt(item.stock) || 0,
+            // store rates in canonical (exclusive) format
+            priceType: 'Exclusive'
           }
           await itemsAPI.create(itemData)
           successCount++
@@ -335,6 +357,7 @@ const Items = () => {
         hsnCode: '',
         rate: '',
         priceType: 'Exclusive',
+        rateInputType: 'Exclusive',
         taxSlab: '',
         units: 'per piece',
         stock: 0
@@ -450,12 +473,20 @@ const Items = () => {
 
       for (const item of csvData) {
         try {
+          // Normalize CSV rate: if CSV priceType indicates Inclusive, convert to canonical Exclusive
+          const csvRate = parseFloat(item.rate) || 0
+          const csvTax = item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 0
+          const csvPriceType = (item.priceType || 'Exclusive')
+          let canonicalRate = csvRate
+          if (csvPriceType === 'Inclusive' && csvTax > 0) {
+            canonicalRate = csvRate / (1 + csvTax / 100)
+          }
           const itemData = {
             name: item.name,
             hsnCode: item.hsnCode,
-            rate: parseFloat(item.rate) || 0,
-            priceType: item.priceType || 'Exclusive',
-            taxSlab: item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 18,
+            rate: Number(canonicalRate.toFixed(2)),
+            priceType: 'Exclusive',
+            taxSlab: csvTax,
             units: item.units || 'per piece',
             quantityInStock: 0
           }
@@ -862,6 +893,18 @@ const Items = () => {
               onChange={handleChange}
               required
             />
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rate Input Type</label>
+              <select
+                name="rateInputType"
+                value={formData.rateInputType}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="Exclusive">Entering exclusive rate</option>
+                <option value="Inclusive">Entering inclusive (tax included) rate</option>
+              </select>
+            </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Price Type <span className="text-red-500">*</span>

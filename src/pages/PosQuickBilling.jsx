@@ -12,6 +12,7 @@ const PosQuickBilling = () => {
   const [loading, setLoading] = useState(false);
   const [saleItems, setSaleItems] = useState([]);
   const [paidAmount, setPaidAmount] = useState(0);
+  const [discount, setDiscount] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -39,25 +40,51 @@ const PosQuickBilling = () => {
 
   const removeLine = (i) => setSaleItems(prev => prev.filter((_, idx) => idx !== i));
 
-  const subtotal = saleItems.reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-  const totalTax = saleItems.reduce((s, it) => {
-    const price = Number(it.price || 0) * Number(it.quantity || 0);
-    const tax = Number(it.taxSlab || 0);
-    if ((it.priceType || 'Exclusive') === 'Inclusive' && tax) {
-      const taxable = price / (1 + tax/100);
-      return s + (taxable * (tax/100));
-    }
-    return s + (price * (tax/100));
-  }, 0);
+  // Compute totals with proportional discount and correct Inclusive handling
+  const totalBase = saleItems.reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 0)), 0) || 0;
 
-  const grandTotal = subtotal + totalTax;
+  const totals = saleItems.reduce((acc, it) => {
+    const lineBase = Number(it.price || 0) * Number(it.quantity || 0); // inclusive amount if priceType=Inclusive
+    const tax = Number(it.taxSlab || 0) || 0;
+    const propDiscount = totalBase > 0 ? (lineBase / totalBase) * Number(discount || 0) : 0;
+
+    if ((it.priceType || 'Exclusive') === 'Inclusive' && tax) {
+      const discountedInclusive = Math.max(0, lineBase - propDiscount);
+      const taxable = discountedInclusive / (1 + tax / 100);
+      const taxAmt = Math.max(0, discountedInclusive - taxable);
+      const lineTotal = discountedInclusive; // user-visible inclusive amount
+      acc.subtotal += taxable; // taxable base added to subtotal-before-tax
+      acc.tax += taxAmt;
+      acc.grand += lineTotal;
+    } else {
+      const taxable = Math.max(0, lineBase - propDiscount);
+      const taxAmt = taxable * (tax / 100);
+      const lineTotal = taxable + taxAmt;
+      acc.subtotal += taxable;
+      acc.tax += taxAmt;
+      acc.grand += lineTotal;
+    }
+    return acc;
+  }, { subtotal: 0, tax: 0, grand: 0 });
+
+  const subtotal = totals.subtotal;
+  const totalTax = totals.tax;
+  const grandTotal = totals.grand;
+  const change = Math.max(0, Number(paidAmount || 0) - grandTotal);
 
   const handleSavePOS = async () => {
     if (saleItems.length === 0) return toast.error('Add items');
+    // POS must be fully paid (no credit allowed)
+    if (Number(paidAmount || 0) < Number(grandTotal || 0)) return toast.error('POS requires full payment (no credit allowed)');
     setLoading(true);
     try {
       const itemsForBackend = saleItems.map(({ id, ...rest }) => ({ ...rest, item: rest.itemId }));
-      const payload = { billingType: 'POS', items: itemsForBackend, paidAmount: Number(paidAmount || 0) };
+      const payload = {
+        billingType: 'POS',
+        items: itemsForBackend,
+        paidAmount: Number(paidAmount || 0),
+        discount: Number(discount || 0)
+      };
       const res = await billingAPI.createInvoice(payload);
       toast.success('POS Invoice saved');
       // open thermal print if ID available
@@ -67,7 +94,7 @@ const PosQuickBilling = () => {
         window.open(`${baseUrl}/api/billing/public/pdf/${id}?format=thermal`, '_blank');
       }
       // reset
-      setSaleItems([]); setPaidAmount(0);
+      setSaleItems([]); setPaidAmount(0); setDiscount(0);
     } catch (err) {
       console.error(err); toast.error('Failed to save POS invoice');
     } finally { setLoading(false); }
@@ -104,12 +131,23 @@ const PosQuickBilling = () => {
 
             <div className="mt-4 border-t pt-4 space-y-2">
               <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+              <div className="flex justify-between"><span>Discount</span><span>- {formatCurrency(discount)}</span></div>
               <div className="flex justify-between"><span>Tax</span><span>{formatCurrency(totalTax)}</span></div>
               <div className="flex justify-between font-bold"><span>Grand Total</span><span>{formatCurrency(grandTotal)}</span></div>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 <InputField label="Paid Amount (₹)" type="number" value={paidAmount} onChange={(e)=> setPaidAmount(parseFloat(e.target.value||0))} />
                 <div className="flex items-end">
                   <Button onClick={handleSavePOS} variant="primary" disabled={loading}>Save & Print</Button>
+                </div>
+              </div>
+              <div className="flex justify-between text-sm text-gray-600">
+                <div>
+                  <label className="text-xs">Discount (₹)</label>
+                  <input className="ml-2 border rounded px-2 py-1 w-28" type="number" value={discount} onChange={(e) => setDiscount(parseFloat(e.target.value||0))} />
+                </div>
+                <div>
+                  <div>Change: <span className="font-medium">{formatCurrency(change)}</span></div>
+                  {Number(paidAmount||0) < Number(grandTotal||0) && <div className="text-red-600 text-xs">Paid amount less than total — POS requires full payment</div>}
                 </div>
               </div>
             </div>
