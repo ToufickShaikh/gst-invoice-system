@@ -34,8 +34,10 @@ const getItems = async (req, res) => {
 // @desc    Create a new item
 // @route   POST /api/items
 // @access  Private
+const normalizeRate = require('../utils/normalizeRate')
+
 const createItem = async (req, res) => {
-    const { name, hsnCode, rate, priceType, taxSlab, units, quantityInStock } = req.body;
+    const { name, hsnCode, rate, priceType, taxSlab, units, quantityInStock, rateInputType } = req.body;
 
     // Basic input validation — treat 0 as a valid numeric value for rate and taxSlab
     const missingFields = [];
@@ -52,11 +54,14 @@ const createItem = async (req, res) => {
 
     try {
         console.log('[ITEM] Create request received:', req.body);
+        // Normalize rate on server to ensure canonical Exclusive storage
+        const inputType = rateInputType || priceType || 'Exclusive'
+        const canonicalRate = normalizeRate({ rate, taxSlab, inputType })
         const item = new Item({
             name,
             hsnCode,
-            rate,
-            priceType: priceType || 'Exclusive', // Default to Exclusive if not provided
+            rate: canonicalRate,
+            priceType: 'Exclusive', // store canonical format
             taxSlab,
             units,
             quantityInStock: quantityInStock || 0, // Default to 0 if not provided
@@ -85,7 +90,17 @@ const updateItem = async (req, res) => {
         console.log('[ITEM] Update request for ID:', req.params.id);
         console.log('[ITEM] Update data:', req.body);
 
-        const item = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        // If client sent priceType or rateInputType indicating Inclusive, normalize rate
+        const updateData = { ...req.body }
+        const incomingRate = updateData.rate
+        const incomingTax = updateData.taxSlab
+        const incomingInputType = updateData.rateInputType || updateData.priceType
+        if (incomingRate !== undefined && (incomingInputType === 'Inclusive' || updateData.priceType === 'Inclusive')) {
+            updateData.rate = normalizeRate({ rate: incomingRate, taxSlab: incomingTax, inputType: incomingInputType })
+            updateData.priceType = 'Exclusive'
+        }
+
+        const item = await Item.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
         if (!item) {
             return sendErrorResponse(res, 404, 'Item not found');
         }
