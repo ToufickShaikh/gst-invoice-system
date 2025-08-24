@@ -868,14 +868,27 @@ const generatePublicThermalHtml = async (req, res) => {
         let html = await fs.readFile(templatePath, 'utf-8');
         html = await replacePlaceholders(html, invoice);
 
-        // Inject small print script to auto-open print dialog and close after printing
-        const printScript = `<script>
-            window.onload = function() { setTimeout(function(){ window.print(); }, 300); };
+        // Inject preview/print script to allow user to choose print or download
+        const script = `<script>
+            function openWindow(url) { window.open(url, '_blank'); }
+            window.addEventListener('load', function(){
+                const printBtn = document.getElementById('printBtn');
+                const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+                const downloadA4Btn = document.getElementById('downloadA4Btn');
+                if (printBtn) printBtn.addEventListener('click', function(){ window.print(); });
+                if (downloadPdfBtn) downloadPdfBtn.addEventListener('click', function(){ openWindow('/api/billing/public/pdf/${invoice._id}?format=thermal'); });
+                if (downloadA4Btn) downloadA4Btn.addEventListener('click', function(){ openWindow('/api/billing/public/pdf/${invoice._id}'); });
+                // attempt to auto-open UPI deep link if present (may be blocked by popup rules)
+                const upiAnchor = document.getElementById('upiAnchor');
+                if (upiAnchor && upiAnchor.href) {
+                    try { window.location.href = upiAnchor.href; } catch(e) { /* ignore */ }
+                }
+            });
         </script>`;
 
-        // Serve as HTML for direct printing (do not force download)
+        // Serve as HTML for direct preview (do not force download)
         res.setHeader('Content-Type', 'text/html');
-        res.send(html + printScript);
+        res.send(html + script);
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to generate thermal HTML', error);
     }

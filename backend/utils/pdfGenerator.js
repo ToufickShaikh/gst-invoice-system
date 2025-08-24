@@ -239,9 +239,14 @@ async function replacePlaceholders(html, invoiceData) {
 
     // Payment details
     const paymentDetails = invoiceData.paymentDetails || {};
-    const upiQr = paymentDetails.upiId ? await generateUpiQr(paymentDetails.upiId, invoiceData.invoiceNumber) : null;
+    // Determine amount to encode in UPI QR: prefer explicit balance, else grandTotal/totalAmount
+    const totalForBalance = (invoiceData.grandTotal != null ? invoiceData.grandTotal : invoiceData.totalAmount) || 0;
+    const balance = Number(invoiceData.balance ?? totalForBalance) || 0;
+    const amountForQr = balance > 0 ? balance.toFixed(2) : undefined;
+    const upiQr = paymentDetails.upiId ? await generateUpiQr(paymentDetails.upiId, amountForQr) : null;
     const upiQrCode = upiQr ? upiQr.qrCodeImage : '';
     const upiQrImage = upiQr ? upiQr.qrCodeImage : '';
+    const upiLink = upiQr ? upiQr.upiLink : '';
     const paymentMode = paymentDetails.mode || 'Not specified';
     const transactionId = paymentDetails.transactionId || paymentDetails.txnId || 'N/A';
     const paymentDate = paymentDetails.date ? new Date(paymentDetails.date).toLocaleDateString('en-GB') : 'N/A';
@@ -250,6 +255,7 @@ async function replacePlaceholders(html, invoiceData) {
     // UPI placeholders: insert data-url into src attributes
     html = html.replace(/{{upiQrCode}}/g, upiQrCode || '');
     html = html.replace(/{{upiQrImage}}/g, upiQrImage || '');
+    html = html.replace(/{{upiLink}}/g, escapeHtml(upiLink || ''));
     html = html.replace(/{{guestName}}/g, escapeHtml(invoiceData.guestName || ''));
     html = html.replace(/{{paymentMode}}/g, escapeHtml(paymentMode));
     html = html.replace(/{{transactionId}}/g, escapeHtml(transactionId));

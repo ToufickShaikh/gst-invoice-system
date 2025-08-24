@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Thermal Invoice</title>
   <style>
-    body{font-family:monospace;font-size:12px;margin:0;padding:6px;width:240px}
+  body{font-family:monospace;font-size:12px;margin:0;padding:6px;width:240px}
+  .no-print{display:block}
+  @media print{.no-print{display:none}}
     .header{text-align:center;font-weight:bold;margin-bottom:6px}
     .small{font-size:11px}
     table{width:100%;border-collapse:collapse}
@@ -17,6 +19,18 @@
   </style>
 </head>
 <body>
+  <div class="no-print" style="margin-bottom:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <div>
+        <button id="printBtn" style="padding:6px 10px;margin-right:6px">Print</button>
+        <button id="downloadPdfBtn" style="padding:6px 10px;margin-right:6px">Download Thermal PDF</button>
+        <button id="downloadA4Btn" style="padding:6px 10px">Download A4 PDF</button>
+      </div>
+      <div style="font-size:12px;color:#444">Preview</div>
+    </div>
+    <!-- hidden upi anchor for auto-open -->
+    <a id="upiAnchor" href="{{upiLink}}" style="display:none"></a>
+  </div>
   <div class="header">
     <div style="font-size:14px;font-weight:700">{{companyName}}</div>
     <div class="small">{{companyAddress}}</div>
