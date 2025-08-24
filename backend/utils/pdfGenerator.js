@@ -235,13 +235,17 @@ async function replacePlaceholders(html, invoiceData) {
 
     // Payment details
     const paymentDetails = invoiceData.paymentDetails || {};
-    const upiQrCode = paymentDetails.upiId ? await generateUpiQr(paymentDetails.upiId, invoiceData.invoiceNumber) : '';
+    const upiQr = paymentDetails.upiId ? await generateUpiQr(paymentDetails.upiId, invoiceData.invoiceNumber) : null;
+    const upiQrCode = upiQr ? upiQr.qrCodeImage : '';
+    const upiQrImage = upiQr ? upiQr.qrCodeImage : '';
     const paymentMode = paymentDetails.mode || 'Not specified';
     const transactionId = paymentDetails.transactionId || paymentDetails.txnId || 'N/A';
     const paymentDate = paymentDetails.date ? new Date(paymentDetails.date).toLocaleDateString('en-GB') : 'N/A';
     const amountPaid = paymentDetails.amount ? Number(paymentDetails.amount).toFixed(2) : 0.00;
 
     html = html.replace(/{{upiQrCode}}/g, upiQrCode);
+    html = html.replace(/{{upiQrImage}}/g, upiQrImage);
+    html = html.replace(/{{guestName}}/g, escapeHtml(invoiceData.guestName || ''));
     html = html.replace(/{{paymentMode}}/g, escapeHtml(paymentMode));
     html = html.replace(/{{transactionId}}/g, escapeHtml(transactionId));
     html = html.replace(/{{paymentDate}}/g, escapeHtml(paymentDate));

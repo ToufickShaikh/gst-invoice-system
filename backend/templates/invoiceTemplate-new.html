@@ -429,16 +429,23 @@
     <div class="invoice-container">
         <!-- Header Section -->
         <div class="header">
-            <div class="header-top">
-                <div class="header-brand">
-                    <img src="{{companyLogo}}" class="company-logo" alt="Company Logo" />
-                    <div>
-                        <div class="company-name">{{companyName}}</div>
-                        <div class="company-details">{{companyAddress}}<br />Phone: {{companyPhone}}{{companyEmail ? ` | Email: ${{{companyEmail}}}` : ''}}{{companyGSTIN ? ` | GSTIN: ${{{companyGSTIN}}}` : ''}}</div>
+                <div class="header-top">
+                    <div class="header-brand" style="justify-content:space-between;align-items:flex-start;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <img src="{{companyLogo}}" class="company-logo" alt="Company Logo" />
+                            <div>
+                                <div class="company-name">{{companyName}}</div>
+                                <div class="company-details">{{companyAddress}}<br />Phone: {{companyPhone}} {{companyEmail ? ' | Email: ' + companyEmail : ''}} {{companyGSTIN ? ' | GSTIN: ' + companyGSTIN : ''}}</div>
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-weight:bold;margin-bottom:6px">TAX INVOICE</div>
+                            <div style="margin-bottom:6px">{{invoiceNumber}}</div>
+                            <div><img src="{{upiQrCode}}" alt="UPI QR" style="width:90px; height:auto; border:0;"/></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="invoice-title">TAX INVOICE</div>
+            
         </div>
 
         <!-- Party Details -->
