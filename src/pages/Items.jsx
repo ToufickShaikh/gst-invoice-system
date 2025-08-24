@@ -45,15 +45,6 @@ const Items = () => {
   const columns = [
     { key: 'name', label: 'Item Name' },
     { key: 'hsnCode', label: 'HSN Code' },
-    {
-      key: 'priceType',
-      label: 'Price Type',
-      render: (value) => (
-        <span className={`px-2 py-1 rounded text-xs font-medium ${value === 'Inclusive' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-          {value || 'Exclusive'}
-        </span>
-      )
-    },
     { key: 'formattedRate', label: 'Rate' },
     { key: 'units', label: 'Units' },
     {
@@ -95,7 +86,6 @@ const Items = () => {
   // Advanced filters like Zoho
   const [filters, setFilters] = useState({
     query: '',
-    priceType: 'ALL',
     tax: 'ALL',
     stock: 'ALL', // ALL | IN | LOW | OUT
     units: 'ALL',
@@ -119,7 +109,7 @@ const Items = () => {
     const q = filters.query.trim().toLowerCase()
     return items.filter((it) => {
       if (!it) return false
-      if (filters.priceType !== 'ALL' && (it.priceType || 'Exclusive') !== filters.priceType) return false
+  // Price Type filtering removed because all items are stored as canonical Exclusive
       if (filters.tax !== 'ALL' && String(it.taxSlab || 0) !== filters.tax) return false
       if (filters.units !== 'ALL' && (it.units || '') !== filters.units) return false
       const stock = Number(it.stock ?? 0)
@@ -166,12 +156,11 @@ const Items = () => {
 
   // Export CSV of current view
   const exportCsv = () => {
-    const headers = ['name','hsnCode','rate','priceType','taxSlab','units','stock']
+    const headers = ['name','hsnCode','rate','taxSlab','units','stock']
     const rows = filteredItems.map(i => [
       i.name,
       i.hsnCode,
       i.rate,
-      i.priceType || 'Exclusive',
       i.taxSlab || 0,
       i.units || '',
       i.stock ?? 0
@@ -441,8 +430,8 @@ const Items = () => {
   }
 
   const downloadCsvTemplate = () => {
-    const headers = 'name,hsnCode,rate,priceType,taxSlab,units\n'
-    const sample = 'Sample Carpet,12345678,1000,Exclusive,18,per piece\n'
+  const headers = 'name,hsnCode,rate,taxSlab,units\n'
+  const sample = 'Sample Carpet,12345678,1000,18,per piece\n'
     const csvContent = headers + sample
     
     const blob = new Blob([csvContent], { type: 'text/csv' })
@@ -784,18 +773,7 @@ const Items = () => {
                 className="w-full px-3 py-2 border rounded-lg"
               />
             </div>
-            <div>
-              <label className="text-xs text-gray-600">Price Type</label>
-              <select
-                value={filters.priceType}
-                onChange={(e) => setFilters(prev => ({ ...prev, priceType: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg"
-              >
-                <option value="ALL">All</option>
-                <option value="Exclusive">Exclusive</option>
-                <option value="Inclusive">Inclusive</option>
-              </select>
-            </div>
+            {/* Price Type filter removed - rates are stored canonical Exclusive */}
             <div>
               <label className="text-xs text-gray-600">Tax Slab</label>
               <select
@@ -905,20 +883,7 @@ const Items = () => {
                 <option value="Inclusive">Entering inclusive (tax included) rate</option>
               </select>
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Price Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="priceType"
-                value={formData.priceType}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Exclusive">Exclusive of GST</option>
-                <option value="Inclusive">Inclusive of GST</option>
-              </select>
-            </div>
+            {/* Price Type input removed - storing canonical Exclusive rates only. */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Units <span className="text-red-500">*</span>
@@ -1023,19 +988,7 @@ const Items = () => {
                       onChange={(e) => handleBulkChange(index, 'rate', e.target.value)}
                       required
                     />
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Price Type
-                      </label>
-                      <select
-                        value={item.priceType}
-                        onChange={(e) => handleBulkChange(index, 'priceType', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="Exclusive">Exclusive of GST</option>
-                        <option value="Inclusive">Inclusive of GST</option>
-                      </select>
-                    </div>
+                    {/* Price Type removed from bulk entry - rates will be normalized to Exclusive */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Units
@@ -1114,7 +1067,7 @@ const Items = () => {
             <div className="bg-blue-50 p-4 rounded-lg">
               <h4 className="font-medium text-blue-900 mb-2">CSV Format Required</h4>
               <p className="text-blue-800 text-sm mb-3">
-                Your CSV file must have these columns: name, hsnCode, rate, priceType, taxSlab, units<br/>
+                Your CSV file must have these columns: name, hsnCode, rate, taxSlab, units<br/>
                 <span className="text-xs">Note: Stock will be set to 0 for all imported items. Use Purchase system to manage stock.</span>
               </p>
               <Button 
@@ -1151,7 +1104,7 @@ const Items = () => {
                         <th className="border border-gray-300 px-2 py-1 text-left text-xs">Name</th>
                         <th className="border border-gray-300 px-2 py-1 text-left text-xs">HSN</th>
                         <th className="border border-gray-300 px-2 py-1 text-left text-xs">Rate</th>
-                        <th className="border border-gray-300 px-2 py-1 text-left text-xs">Price Type</th>
+                        {/* Price Type column removed from CSV preview - rates will be normalized to Exclusive */}
                         <th className="border border-gray-300 px-2 py-1 text-left text-xs">Tax</th>
                         <th className="border border-gray-300 px-2 py-1 text-left text-xs">Units</th>
                       </tr>
@@ -1162,7 +1115,7 @@ const Items = () => {
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.name}</td>
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.hsnCode}</td>
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.rate}</td>
-                          <td className="border border-gray-300 px-2 py-1 text-xs">{item.priceType || 'Exclusive'}</td>
+                          {/* Price Type removed from preview */}
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.taxSlab}%</td>
                           <td className="border border-gray-300 px-2 py-1 text-xs">{item.units}</td>
                         </tr>

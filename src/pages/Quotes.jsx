@@ -284,15 +284,7 @@ const Quotes = () => {
                     onChange={(e) => handleItemChange(idx, 'rate', e.target.value)}
                     required
                   />
-                  <select
-                    name="priceType"
-                    value={item.priceType || 'Exclusive'}
-                    onChange={e => handleItemChange(idx, 'priceType', e.target.value)}
-                    className="mt-1 block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  >
-                    <option value="Exclusive">Exclusive of GST</option>
-                    <option value="Inclusive">Inclusive of GST</option>
-                  </select>
+                  {/* Price Type selector removed - using canonical Exclusive rates */}
                   <Button variant="danger" onClick={() => handleRemoveItem(idx)}>Remove</Button>
                 </div>
               ))}

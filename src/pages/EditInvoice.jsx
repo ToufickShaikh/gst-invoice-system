@@ -392,17 +392,7 @@ const EditInvoice = () => {
                                         />
                                     </div>
 
-                                    <div className="md:col-span-2 col-span-1">
-                                        <label className="block text-sm font-medium">Price Type</label>
-                                        <select
-                                            value={billItem.priceType || 'Exclusive'}
-                                            onChange={(e) => handleItemChange(index, 'priceType', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                        >
-                                            <option value="Exclusive">Exclusive</option>
-                                            <option value="Inclusive">Inclusive</option>
-                                        </select>
-                                    </div>
+                                    {/* Price Type selector removed - rates stored canonical Exclusive. */}
 
                                     <div className="md:col-span-1 col-span-1">
                                         <InputField
@@ -420,7 +410,9 @@ const EditInvoice = () => {
                                             const price = Number(billItem.price ?? billItem.rate ?? 0);
                                             const disc = Number(invoiceData.discount || 0) || 0;
                                             const tax = Number(billItem.taxSlab ?? billItem.taxRate ?? 0) || 0;
-                                            if ((billItem.priceType || billItem.item?.priceType) === 'Inclusive' && tax) {
+                                            const priceType = String(billItem.priceType ?? billItem.item?.priceType ?? 'Exclusive');
+                                            if (priceType === 'Inclusive' && tax) {
+                                                // Backwards compatibility: if the item/document still marks Inclusive, handle it
                                                 const line = price * qty;
                                                 const totalBase = (invoiceData.items || []).reduce((s, it) => s + (Number(it.price ?? it.rate ?? 0) * Number(it.quantity ?? 0)), 0) || 1;
                                                 const propDiscount = (line / totalBase) * disc;

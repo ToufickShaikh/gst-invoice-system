@@ -992,14 +992,7 @@ const EnhancedQuoteManagement = () => {
                                     />
                                   </td>
                                   <td className="px-3 py-2">
-                                    <select
-                                      value={item.priceType || 'Exclusive'}
-                                      onChange={(e) => updateQuoteItem(item.id, 'priceType', e.target.value)}
-                                      className="w-28 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    >
-                                      <option value="Exclusive">Exclusive</option>
-                                      <option value="Inclusive">Inclusive</option>
-                                    </select>
+                                    {/* Price Type removed - system stores canonical Exclusive rates. */}
                                   </td>
                               <td className="px-3 py-2 text-sm text-gray-900">
                                     {(() => {

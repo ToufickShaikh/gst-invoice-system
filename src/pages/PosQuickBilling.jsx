@@ -21,7 +21,7 @@ const PosQuickBilling = () => {
     })();
   }, []);
 
-  const addEmpty = () => setSaleItems(prev => ([...prev, { id: Date.now(), itemId: '', quantity: 1, price: 0, taxSlab: 0, priceType: 'Exclusive' }]));
+  const addEmpty = () => setSaleItems(prev => ([...prev, { id: Date.now(), itemId: '', quantity: 1, price: 0, taxSlab: 0 }]));
 
   const updateLine = (i, field, val) => {
     const copy = [...saleItems];
@@ -32,7 +32,7 @@ const PosQuickBilling = () => {
       if (sel) {
         copy[i].price = sel.rate ?? sel.price ?? 0;
         copy[i].taxSlab = sel.taxSlab ?? 0;
-        copy[i].priceType = sel.priceType ?? 'Exclusive';
+        // priceType intentionally not stored via POS UI; backend/items remain canonical
       }
     }
     setSaleItems(copy);
@@ -44,16 +44,18 @@ const PosQuickBilling = () => {
   const totalBase = saleItems.reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 0)), 0) || 0;
 
   const totals = saleItems.reduce((acc, it) => {
-    const lineBase = Number(it.price || 0) * Number(it.quantity || 0); // inclusive amount if priceType=Inclusive
+    const lineBase = Number(it.price || 0) * Number(it.quantity || 0);
     const tax = Number(it.taxSlab || 0) || 0;
     const propDiscount = totalBase > 0 ? (lineBase / totalBase) * Number(discount || 0) : 0;
+    const priceType = String(it.priceType ?? it.item?.priceType ?? 'Exclusive');
 
-    if ((it.priceType || 'Exclusive') === 'Inclusive' && tax) {
+    if (priceType === 'Inclusive' && tax) {
+      // Backwards compatibility: if item document still marks Inclusive, handle it
       const discountedInclusive = Math.max(0, lineBase - propDiscount);
       const taxable = discountedInclusive / (1 + tax / 100);
       const taxAmt = Math.max(0, discountedInclusive - taxable);
-      const lineTotal = discountedInclusive; // user-visible inclusive amount
-      acc.subtotal += taxable; // taxable base added to subtotal-before-tax
+      const lineTotal = discountedInclusive;
+      acc.subtotal += taxable;
       acc.tax += taxAmt;
       acc.grand += lineTotal;
     } else {

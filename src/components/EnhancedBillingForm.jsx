@@ -844,14 +844,7 @@ const EnhancedBillingForm = () => {
                   className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   min={0}
                 />
-                <select
-                  value={currentItem.priceType}
-                  onChange={(e) => setCurrentItem(prev => ({ ...prev, priceType: e.target.value }))}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Exclusive">Exclusive of GST</option>
-                  <option value="Inclusive">Inclusive of GST</option>
-                </select>
+                {/* Price Type input removed - system stores canonical Exclusive rates. */}
                 <select
                   value={currentItem.taxRate}
                   onChange={(e) => setCurrentItem(prev => ({ ...prev, taxRate: Number(e.target.value) }))}

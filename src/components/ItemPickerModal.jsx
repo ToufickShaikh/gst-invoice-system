@@ -2,14 +2,14 @@ import React, { useMemo, useState } from 'react';
 
 export default function ItemPickerModal({ open, onClose, items = [], onPick }) {
   const [q, setQ] = useState('');
-  const [priceType, setPriceType] = useState('ALL');
+  // priceType filter removed - all items stored as Exclusive
   const [inStockOnly, setInStockOnly] = useState(false);
   const [taxSlab, setTaxSlab] = useState('ALL');
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return items.filter((it) => {
-      const type = it.priceType || 'Exclusive';
+    const type = 'Exclusive';
       const stock = Number(it.quantityInStock ?? it.stock ?? 0);
       const tax = String(it.taxSlab ?? it.taxRate ?? '');
       if (priceType !== 'ALL' && type !== priceType) return false;
@@ -47,11 +47,7 @@ export default function ItemPickerModal({ open, onClose, items = [], onPick }) {
               placeholder="Search by name, HSN, description, rate, tax…"
               className="flex-1 border rounded-lg px-3 py-2 text-sm"
             />
-            <select className="border rounded-lg px-2 py-2 text-sm" value={priceType} onChange={(e) => setPriceType(e.target.value)}>
-              <option value="ALL">All Prices</option>
-              <option value="Exclusive">Exclusive</option>
-              <option value="Inclusive">Inclusive</option>
-            </select>
+            {/* Price type filter removed - items are canonical Exclusive */}
             <select className="border rounded-lg px-2 py-2 text-sm" value={taxSlab} onChange={(e) => setTaxSlab(e.target.value)}>
               <option value="ALL">All Tax</option>
               <option value="0">0%</option>
@@ -72,7 +68,7 @@ export default function ItemPickerModal({ open, onClose, items = [], onPick }) {
               <div className="col-span-2">HSN</div>
               <div className="col-span-1 text-right">Rate</div>
               <div className="col-span-1 text-right">Tax</div>
-              <div className="col-span-1 text-right">Type</div>
+              {/* Type column removed (canonical Exclusive) */}
               <div className="col-span-1 text-right">Stock</div>
               <div className="col-span-1" />
             </div>
@@ -86,7 +82,7 @@ export default function ItemPickerModal({ open, onClose, items = [], onPick }) {
                   <div className="col-span-2">{it.hsnCode}</div>
                   <div className="col-span-1 text-right">₹{Number(it.sellingPrice ?? it.rate ?? 0).toFixed(2)}</div>
                   <div className="col-span-1 text-right">{Number(it.taxSlab ?? it.taxRate ?? 0)}%</div>
-                  <div className="col-span-1 text-right">{it.priceType || 'Exclusive'}</div>
+                  {/* Price type removed; rates are canonical Exclusive */}
                   <div className="col-span-1 text-right">{Number(it.quantityInStock ?? it.stock ?? 0)}</div>
                   <div className="col-span-1 text-right">
                     <button
