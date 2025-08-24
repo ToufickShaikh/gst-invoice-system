@@ -183,24 +183,52 @@ const CashDrawer = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...status.transactions].slice(-10).reverse().map((t, idx) => (
-                    <tr key={idx} className="border-t align-top">
-                      <td className="px-3 py-2">{t.createdAt ? new Date(t.createdAt).toLocaleString() : ''}</td>
-                      <td className="px-3 py-2">{t.type}</td>
-                      <td className="px-3 py-2">{t.direction}</td>
-                      <td className="px-3 py-2 text-right">{formatCurrency(t.amount || 0)}</td>
-                      <td className="px-3 py-2 max-w-xs whitespace-pre-wrap">{t.reason || t.note || ''}</td>
-                      <td className="px-3 py-2">{t.performedBy?.name || t.performedBy?.email || '-'}</td>
-                      <td className="px-3 py-2 text-right">
-                        {formatCurrency(t.beforeTotal || 0)} → {formatCurrency(t.afterTotal || 0)}
-                        <div className="text-xs text-gray-500 mt-1">
-                          {t.beforeDenoms ? DENOMS.map(v=>`${v}:${t.beforeDenoms[`d${v}`]||0}`).join(' ') : ''}
-                          <br />
-                          {t.afterDenoms ? DENOMS.map(v=>`${v}:${t.afterDenoms[`d${v}`]||0}`).join(' ') : ''}
+                  {[...status.transactions].slice(-10).reverse().map((t, idx) => {
+                    const time = t.createdAt ? new Date(t.createdAt).toLocaleString() : '';
+                    const actor = t.performedBy?.name || t.performedBy?.email || t.performedBy || t.userName || t.user || 'System';
+                    const typeLabel = String(t.type || '').replace(/-/g, ' ');
+                    const dir = String(t.direction || '').toUpperCase();
+                    const amt = Number(t.amount || 0);
+                    const before = Number(t.beforeTotal || 0);
+                    const after = Number(t.afterTotal || 0);
+
+                    const renderDenomBadges = (denomsObj) => {
+                      if (!denomsObj) return null;
+                      const parts = DENOMS.map(v => ({ v, c: denomsObj[`d${v}`] || 0 })).filter(x => x.c > 0);
+                      if (parts.length === 0) return <span className="text-xs text-gray-400">(none)</span>;
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {parts.map(p => (
+                            <span key={p.v} className="text-xs bg-gray-100 border px-2 py-0.5 rounded">{p.v}×{p.c}</span>
+                          ))}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
+                      );
+                    };
+
+                    return (
+                      <tr key={idx} className="border-t align-top hover:bg-gray-50">
+                        <td className="px-3 py-2 align-top text-sm text-gray-700">{time}</td>
+                        <td className="px-3 py-2 align-top text-sm">
+                          <span className={`inline-block text-xs px-2 py-0.5 rounded ${typeLabel.toLowerCase().includes('add') ? 'bg-green-100 text-green-800' : typeLabel.toLowerCase().includes('remove') ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {typeLabel || '-'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 align-top text-sm">
+                          <span className={`text-xs font-medium ${dir === 'IN' ? 'text-green-700' : dir === 'OUT' ? 'text-red-700' : 'text-gray-700'}`}>{dir || '-'}</span>
+                        </td>
+                        <td className={`px-3 py-2 align-top text-right font-semibold ${amt > 0 ? 'text-green-700' : amt < 0 ? 'text-red-700' : 'text-gray-700'}`}>{formatCurrency(amt)}</td>
+                        <td className="px-3 py-2 max-w-xs whitespace-pre-wrap text-sm text-gray-800" title={t.reason || t.note || ''}>{t.reason || t.note || '-'}</td>
+                        <td className="px-3 py-2 text-sm text-gray-800">{actor}</td>
+                        <td className="px-3 py-2 text-right text-sm">
+                          <div className="font-medium">{formatCurrency(before)} → {formatCurrency(after)}</div>
+                          <div className="mt-1 text-xs text-gray-600">
+                            <div className="mb-1">Before: {renderDenomBadges(t.beforeDenoms)}</div>
+                            <div>After: {renderDenomBadges(t.afterDenoms)}</div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

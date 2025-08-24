@@ -38,7 +38,8 @@ const EnhancedQuoteManagement = () => {
     quantity: 1,
     rate: 0,
     discount: 0,
-    taxRate: 18,
+  taxRate: 18,
+  priceType: 'Exclusive',
     units: 'per piece'
   });
   const [bulkAction, setBulkAction] = useState('');
@@ -104,16 +105,32 @@ const EnhancedQuoteManagement = () => {
 
   const calculateQuoteTotal = (items) => {
     return items.reduce((total, item) => {
-      const subtotal = item.quantity * item.rate;
-      const discountAmount = (subtotal * (item.discount || 0)) / 100;
-      const afterDiscount = subtotal - discountAmount;
-      const taxAmount = (afterDiscount * (item.taxRate || 0)) / 100;
-      return total + afterDiscount + taxAmount;
+      const qty = Number(item.quantity || 0);
+      const rate = Number(item.rate || 0);
+      const discPct = Number(item.discount || 0) || 0;
+      const taxRate = Number(item.taxRate || 0) || 0;
+      let lineTotal = 0;
+
+      // If priceType is Inclusive, derive taxable base from rate
+      if (String(item.priceType) === 'Inclusive' && taxRate) {
+        const unitTaxable = rate / (1 + taxRate / 100);
+        const taxable = unitTaxable * qty * (1 - discPct / 100);
+        const taxAmount = taxable * (taxRate / 100);
+        // Visible total for inclusive price is the provided rate * qty minus discount
+        lineTotal = rate * qty * (1 - discPct / 100);
+        // (lineTotal already includes tax)
+      } else {
+        const taxable = rate * qty * (1 - discPct / 100);
+        const taxAmount = taxable * (taxRate / 100);
+        lineTotal = taxable + taxAmount;
+      }
+
+      return total + lineTotal;
     }, 0);
   };
 
   const addItemToQuote = () => {
-    if (!currentItem.name || currentItem.quantity <= 0 || currentItem.rate <= 0) {
+    if (!currentItem.name || currentItem.quantity <= 0 || currentItem.rate < 0) {
       toast.error('Please fill all required item fields');
       return;
     }
@@ -121,7 +138,8 @@ const EnhancedQuoteManagement = () => {
     const newItem = {
       ...currentItem,
       id: Date.now(),
-      amount: currentItem.quantity * currentItem.rate
+      amount: currentItem.quantity * currentItem.rate,
+      priceType: currentItem.priceType || 'Exclusive'
     };
 
     setCurrentQuote(prev => ({
@@ -138,7 +156,8 @@ const EnhancedQuoteManagement = () => {
       quantity: 1,
       rate: 0,
       discount: 0,
-      taxRate: 18,
+  taxRate: 18,
+  priceType: 'Exclusive',
       units: 'per piece'
     });
 
@@ -864,6 +883,7 @@ const EnhancedQuoteManagement = () => {
                             hsnCode: selectedItem.hsnCode || '',
                             rate: selectedItem.rate || 0,
                             taxRate: selectedItem.taxSlab || 18,
+                            priceType: selectedItem.priceType || 'Exclusive',
                             units: selectedItem.units || 'per piece'
                           }));
                         } else {
@@ -930,6 +950,7 @@ const EnhancedQuoteManagement = () => {
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Discount</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tax</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price Type</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                           </tr>
@@ -962,16 +983,37 @@ const EnhancedQuoteManagement = () => {
                                   className="w-16 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                               </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="number"
-                                  value={item.taxRate}
-                                  onChange={(e) => updateQuoteItem(item.id, 'taxRate', parseFloat(e.target.value) || 0)}
-                                  className="w-16 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                              </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={item.taxRate}
+                                      onChange={(e) => updateQuoteItem(item.id, 'taxRate', parseFloat(e.target.value) || 0)}
+                                      className="w-16 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <select
+                                      value={item.priceType || 'Exclusive'}
+                                      onChange={(e) => updateQuoteItem(item.id, 'priceType', e.target.value)}
+                                      className="w-28 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    >
+                                      <option value="Exclusive">Exclusive</option>
+                                      <option value="Inclusive">Inclusive</option>
+                                    </select>
+                                  </td>
                               <td className="px-3 py-2 text-sm text-gray-900">
-                                {formatCurrency(item.quantity * item.rate)}
+                                    {(() => {
+                                      const qty = Number(item.quantity || 0);
+                                      const rate = Number(item.rate || 0);
+                                      const discPct = Number(item.discount || 0) || 0;
+                                      const taxRate = Number(item.taxRate || 0) || 0;
+                                      if (String(item.priceType) === 'Inclusive' && taxRate) {
+                                        return formatCurrency(rate * qty * (1 - discPct / 100));
+                                      }
+                                      const taxable = rate * qty * (1 - discPct / 100);
+                                      const taxAmt = taxable * (taxRate / 100);
+                                      return formatCurrency(taxable + taxAmt);
+                                    })()}
                               </td>
                               <td className="px-3 py-2">
                                 <button

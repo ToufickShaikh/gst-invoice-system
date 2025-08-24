@@ -9,6 +9,8 @@ import AdvancedInvoicePrint from './AdvancedInvoicePrint';
 import { cashDrawerAPI } from '../api/cashDrawer';
 
 const EnhancedBillingForm = () => {
+  // Feature flag: disable cash drawer interactions when false
+  const CASH_DRAWER_ENABLED = false;
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     customer: null,
@@ -97,10 +99,12 @@ const EnhancedBillingForm = () => {
       ...prev,
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     }));
-    // Load cash drawer status
-    (async () => {
-      try { const s = await cashDrawerAPI.getStatus(); setDrawerStatus(s); } catch (e) { console.warn('Drawer status load failed:', e?.message||e); }
-    })();
+    // Load cash drawer status (guarded by feature flag)
+    if (CASH_DRAWER_ENABLED) {
+      (async () => {
+        try { const s = await cashDrawerAPI.getStatus(); setDrawerStatus(s); } catch (e) { console.warn('Drawer status load failed:', e?.message||e); }
+      })();
+    }
   }, []);
 
   // Preselect customer when coming from Customers page
@@ -587,7 +591,7 @@ const EnhancedBillingForm = () => {
 
       // Record cash in drawer only if payment is Cash and paidAmount > 0
       try {
-        if (recordPaymentNow && paymentMethod === 'Cash' && Number(paidAmount) > 0) {
+        if (CASH_DRAWER_ENABLED && recordPaymentNow && paymentMethod === 'Cash' && Number(paidAmount) > 0) {
           const inv = created.invoice || created; const invoiceId = inv?._id;
           if (invoiceId) {
             // Compute change and net collected amount
@@ -612,8 +616,10 @@ const EnhancedBillingForm = () => {
                 console.warn('Unable to compute exact change removal; skipped adjust-remove.');
               }
             }
-            // Refresh drawer status
-            try { const s = await cashDrawerAPI.getStatus(); setDrawerStatus(s); } catch {}
+            // Refresh drawer status (guarded)
+            if (CASH_DRAWER_ENABLED) {
+              try { const s = await cashDrawerAPI.getStatus(); setDrawerStatus(s); } catch {}
+            }
           }
         }
       } catch (e) {

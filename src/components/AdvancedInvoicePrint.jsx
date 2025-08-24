@@ -54,12 +54,27 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
       const rate = Number(it.rate ?? src?.rate ?? src?.price ?? src?.sellingPrice ?? 0) || 0;
       const taxRate = Number(it.taxSlab ?? it.taxRate ?? src?.taxSlab ?? 0) || 0;
       const discountPct = Number(it.discount || 0) || 0;
+      const priceType = (it.priceType || src?.priceType || 'Exclusive');
 
-      const taxable = rate * quantity * (1 - discountPct / 100);
+      // Handle Inclusive pricing: derive taxable unit price from inclusive rate
+      let unitTaxable;
+      if ((priceType || 'Exclusive') === 'Inclusive' && taxRate) {
+        unitTaxable = rate / (1 + taxRate / 100);
+      } else {
+        unitTaxable = rate;
+      }
+
+      // Apply discount on the taxable unit price, then multiply by quantity
+      const discountedUnit = unitTaxable * (1 - (discountPct || 0) / 100);
+      const taxable = discountedUnit * quantity;
       const tax = (taxable * taxRate) / 100;
-      const lineTotal = taxable + tax;
 
-      return { name, hsnCode, quantity, rate, taxRate, discount: discountPct, amount: lineTotal, taxable, tax };
+      // For Inclusive pricing the visible line amount equals rate * quantity * (1 - discount)
+      const lineTotal = (priceType === 'Inclusive')
+        ? rate * quantity * (1 - (discountPct || 0) / 100)
+        : taxable + tax;
+
+      return { name, hsnCode, quantity, rate, taxRate, discount: discountPct, priceType, amount: lineTotal, taxable, tax };
     });
 
     const subTotal = inv.subTotal ?? inv.subtotal ?? items.reduce((s, it) => s + it.taxable, 0);
