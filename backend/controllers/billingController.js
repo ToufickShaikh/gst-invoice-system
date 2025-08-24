@@ -754,7 +754,11 @@ const createInvoicePortalLink = async (req, res) => {
     // default expiry 30 days
     invoice.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await invoice.save();
-    const url = `${process.env.PUBLIC_BASE_URL || req.protocol + '://' + req.get('host')}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
+        // Respect PUBLIC_BASE_URL if set (should include subpath like /shaikhcarpets),
+        // or construct from host and optional PUBLIC_BASE_PATH
+        const publicBase = process.env.PUBLIC_BASE_URL
+            || (req.protocol + '://' + req.get('host')) + (process.env.PUBLIC_BASE_PATH || '');
+        const url = `${publicBase.replace(/\/$/, '')}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
     res.json({ url, token: invoice.portalToken, expiresAt: invoice.portalTokenExpires });
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to create portal link', error);
@@ -770,7 +774,9 @@ const createCustomerPortalLink = async (req, res) => {
     customer.portalToken = crypto.randomBytes(16).toString('hex');
     customer.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await customer.save();
-    const url = `${process.env.PUBLIC_BASE_URL || req.protocol + '://' + req.get('host')}/portal/customer/${customer._id}/${customer.portalToken}/statement`;
+        const publicBase = process.env.PUBLIC_BASE_URL
+            || (req.protocol + '://' + req.get('host')) + (process.env.PUBLIC_BASE_PATH || '');
+        const url = `${publicBase.replace(/\/$/, '')}/portal/customer/${customer._id}/${customer.portalToken}/statement`;
     res.json({ url, token: customer.portalToken, expiresAt: customer.portalTokenExpires });
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to create customer portal link', error);
