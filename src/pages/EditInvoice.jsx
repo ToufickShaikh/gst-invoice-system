@@ -19,6 +19,7 @@ const EditInvoice = () => {
     const [customers, setCustomers] = useState([]);
     const [items, setItems] = useState([]);
     const [invoiceData, setInvoiceData] = useState(null);
+    const [isPOS, setIsPOS] = useState(false);
     const [summary, setSummary] = useState({
         totalBeforeTax: 0,
         totalTax: 0,
@@ -186,8 +187,8 @@ const EditInvoice = () => {
     const handleUpdateInvoice = async () => {
         setLoading(true);
 
-        // Validate form before submitting
-        if (!invoiceData.customer) {
+        // Validate form before submitting (customer required unless POS quick-bill enabled)
+        if (!isPOS && !invoiceData.customer) {
             toast.error('Please select a customer');
             setLoading(false);
             return;
@@ -226,32 +227,32 @@ const EditInvoice = () => {
               portCode: rawExp.portCode || '',
             } : { isExport: false };
 
-            const dataToSend = { ...invoiceData, items: itemsForBackend, exportInfo };
+            const dataToSend = { ...invoiceData, items: itemsForBackend, exportInfo, billingType: isPOS ? 'POS' : invoiceData.billingType };
 
             const response = await billingAPI.updateInvoice(id, dataToSend);
             toast.dismiss('update-toast');
             toast.success('Invoice updated successfully!');
 
-            // No immediate PDF generation. Provide quick link to on-demand download.
-            toast(
-              <div>
-                <p>Need the PDF?</p>
-                <button
-                  className="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
-                  onClick={() => {
-                    const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-                    const url = `${baseUrl}/api/billing/public/pdf/${id}`;
-                    window.open(url, '_blank');
-                  }}
-                >
-                  Download PDF
-                </button>
-              </div>,
-              { duration: 5000 }
-            );
+                        // No immediate PDF generation. Provide quick link to on-demand download.
+                        toast(
+                            <div>
+                                <p>Need the PDF?</p>
+                                <button
+                                    className="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
+                                    onClick={() => {
+                                        const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+                                        const url = `${baseUrl}/api/billing/public/pdf/${id}`;
+                                        window.open(url, '_blank');
+                                    }}
+                                >
+                                    Download PDF
+                                </button>
+                            </div>,
+                            { duration: 5000 }
+                        );
 
-            // Delay navigation slightly to allow toast to be seen
-            setTimeout(() => navigate('/invoices'), 1000);
+                        // Delay navigation slightly to allow toast to be seen
+                        setTimeout(() => navigate('/invoices'), 1000);
         } catch (error) {
             toast.dismiss('update-toast');
             toast.error('Failed to update invoice: ' + (error.response?.data?.message || error.message || 'Unknown error'));
@@ -259,18 +260,6 @@ const EditInvoice = () => {
             setLoading(false);
         }
     };
-
-    if (loading) {
-        return <Layout><div>Loading...</div></Layout>;
-    }
-
-    if (error) {
-        return <Layout><div className="text-red-500 text-center p-4">{error}</div></Layout>;
-    }
-
-    if (!invoiceData) {
-        return <Layout><div>No invoice data available.</div></Layout>;
-    }
 
     const setExportInfoField = (field, value) => {
       setInvoiceData(prev => ({
@@ -330,17 +319,27 @@ const EditInvoice = () => {
 
                     {/* Customer Selection */}
                     <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-                        <select
-                            value={invoiceData.customer}
-                            onChange={(e) => handleInputChange('customer', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        >
-                            <option value="">-- Select Customer --</option>
-                            {customers.map(c => (
-                                <option key={c._id} value={c._id}>{c.firmName || c.name} {c.gstin ? `(GSTIN: ${c.gstin})` : ''}</option>
-                            ))}
-                        </select>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-sm font-medium text-gray-700">Customer</label>
+                            <label className="flex items-center text-sm">
+                                <input type="checkbox" className="mr-2" checked={isPOS} onChange={(e) => setIsPOS(e.target.checked)} />
+                                POS / Quick Bill (no customer)
+                            </label>
+                        </div>
+                        {!isPOS ? (
+                          <select
+                              value={invoiceData.customer}
+                              onChange={(e) => handleInputChange('customer', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          >
+                              <option value="">-- Select Customer --</option>
+                              {customers.map(c => (
+                                  <option key={c._id} value={c._id}>{c.firmName || c.name} {c.gstin ? `(GSTIN: ${c.gstin})` : ''}</option>
+                              ))}
+                          </select>
+                        ) : (
+                          <div className="p-3 bg-yellow-50 rounded">This invoice will be saved as POS/Walk-in (no customer required).</div>
+                        )}
                     </div>
 
                     {/* Items Section */}
@@ -601,6 +600,17 @@ const EditInvoice = () => {
                                 size="lg"
                             >
                                 Download PDF
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+                                    const url = `${baseUrl}/api/billing/public/pdf/${id}?format=thermal`;
+                                    window.open(url, '_blank');
+                                }}
+                                variant="secondary"
+                                size="lg"
+                            >
+                                Print Thermal
                             </Button>
                             <Button
                                 onClick={() => {

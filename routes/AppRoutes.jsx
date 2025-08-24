@@ -19,6 +19,7 @@ import EnhancedSalesOrderManagement from '../src/components/EnhancedSalesOrderMa
 import PortalInvoice from '../src/pages/PortalInvoice'
 import PortalStatement from '../src/pages/PortalStatement'
 import GstFilings from '../src/pages/GstFilings'
+import PosQuickBilling from '../src/pages/PosQuickBilling'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -60,6 +61,7 @@ const AppRoutes = () => {
       <Route path="/quotes/new" element={<PrivateRoute><NewQuote /></PrivateRoute>} />
       <Route path="/suppliers" element={<PrivateRoute><Suppliers /></PrivateRoute>} />
       <Route path="/cash-drawer" element={<PrivateRoute><CashDrawer /></PrivateRoute>} />
+  <Route path="/pos" element={<PrivateRoute><PosQuickBilling /></PrivateRoute>} />
       <Route path="/gst-filings" element={<PrivateRoute><GstFilings /></PrivateRoute>} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
