@@ -235,7 +235,26 @@ const InvoiceManagement = () => {
       const res = await portalAPI.createInvoicePortalLink(invoice._id);
       const url = res?.url;
       if (!url) throw new Error('No URL returned');
-      await navigator.clipboard.writeText(url);
+      // Use navigator.clipboard when available, otherwise fallback to a temporary textarea
+      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        // prevent scrolling to bottom
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+        } catch (execErr) {
+          console.error('Fallback copy failed', execErr);
+          throw execErr;
+        } finally {
+          document.body.removeChild(ta);
+        }
+      }
       toast.success('Portal link copied to clipboard');
     } catch (e) {
       console.error(e);

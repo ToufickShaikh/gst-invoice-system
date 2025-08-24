@@ -13,6 +13,7 @@ const PosQuickBilling = () => {
   const [saleItems, setSaleItems] = useState([]);
   const [paidAmount, setPaidAmount] = useState(0);
   const [discount, setDiscount] = useState(0);
+  const [customerName, setCustomerName] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -84,6 +85,7 @@ const PosQuickBilling = () => {
       const payload = {
         billingType: 'POS',
         items: itemsForBackend,
+  customerName: customerName || undefined,
         paidAmount: Number(paidAmount || 0),
         discount: Number(discount || 0)
       };
@@ -96,7 +98,7 @@ const PosQuickBilling = () => {
         window.open(`${baseUrl}/api/billing/public/pdf/${id}?format=thermal`, '_blank');
       }
       // reset
-      setSaleItems([]); setPaidAmount(0); setDiscount(0);
+  setSaleItems([]); setPaidAmount(0); setDiscount(0); setCustomerName('');
     } catch (err) {
       console.error(err); toast.error('Failed to save POS invoice');
     } finally { setLoading(false); }
@@ -112,6 +114,9 @@ const PosQuickBilling = () => {
 
         <div className="bg-white p-4 rounded shadow">
           <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <InputField label="Name (optional)" type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+            </div>
             {saleItems.map((line, idx) => (
               <div key={line.id} className="grid grid-cols-12 gap-2 items-end">
                 <div className="col-span-5">

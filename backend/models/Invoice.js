@@ -31,6 +31,7 @@ const invoiceSchema = new mongoose.Schema({
     // Portal access fields
     portalToken: { type: String },
     portalTokenExpires: { type: Date },
+    guestName: { type: String },
     // Export/SEZ info for GSTR-1 exp section
     exportInfo: {
         isExport: { type: Boolean, default: false },

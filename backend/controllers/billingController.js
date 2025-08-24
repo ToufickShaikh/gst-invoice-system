@@ -110,7 +110,7 @@ const getInvoiceById = async (req, res) => {
 // @access  Private
 const createInvoice = async (req, res) => {
     console.log('--- Starting Invoice Creation ---');
-    const { customer, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '', exportInfo } = req.body;
+    const { customer, customerName, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '', exportInfo } = req.body;
 
     // Input validation
     // Allow missing customer for POS quick billing when billingType === 'POS'
@@ -180,6 +180,7 @@ const createInvoice = async (req, res) => {
             invoiceNumber,
             customer,
             items: normalizedItems,
+            guestName: customerName || undefined,
             subTotal,
             cgst: taxAmount.cgst,
             sgst: taxAmount.sgst,
@@ -548,7 +549,13 @@ const generatePublicPdf = async (req, res) => {
         const tempFileName = `public-invoice-${invoiceId}-${Date.now()}.pdf`;
         let webPath;
         if (format === 'thermal') {
-            webPath = await pdfGenerator.generateThermalPDF(invoice, tempFileName);
+            try {
+                webPath = await pdfGenerator.generateThermalPDF(invoice, tempFileName);
+            } catch (pdfErr) {
+                console.error('[BILLING] generateThermalPDF failed:', pdfErr && pdfErr.stack ? pdfErr.stack : pdfErr);
+                // rethrow so outer catch returns 500
+                throw pdfErr;
+            }
         } else {
             webPath = await pdfGenerator.generateInvoicePDF(invoice, tempFileName);
         }

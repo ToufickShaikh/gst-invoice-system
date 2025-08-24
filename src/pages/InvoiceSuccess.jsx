@@ -463,7 +463,7 @@ const InvoiceSuccess = () => {
                   {/* Additional sharing options */}
                   <div className="mt-3 flex flex-wrap gap-2 justify-center">
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
                         const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5001';
                         const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
 
@@ -474,13 +474,45 @@ const InvoiceSuccess = () => {
                             url: fullPdfUrl
                           }).then(() => {
                             toast.success('Shared successfully!');
-                          }).catch(() => {
-                            navigator.clipboard.writeText(fullPdfUrl);
-                            toast.success('PDF link copied to clipboard!');
+                          }).catch(async () => {
+                            try {
+                              if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                                await navigator.clipboard.writeText(fullPdfUrl);
+                              } else {
+                                const ta = document.createElement('textarea');
+                                ta.value = fullPdfUrl;
+                                ta.style.position = 'fixed';
+                                ta.style.left = '-9999px';
+                                document.body.appendChild(ta);
+                                ta.select();
+                                document.execCommand('copy');
+                                document.body.removeChild(ta);
+                              }
+                              toast.success('PDF link copied to clipboard!');
+                            } catch (copyErr) {
+                              console.error('Copy failed', copyErr);
+                              toast.error('Failed to copy PDF link');
+                            }
                           });
                         } else {
-                          navigator.clipboard.writeText(fullPdfUrl);
+                        try {
+                          if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                            await navigator.clipboard.writeText(fullPdfUrl);
+                          } else {
+                            const ta = document.createElement('textarea');
+                            ta.value = fullPdfUrl;
+                            ta.style.position = 'fixed';
+                            ta.style.left = '-9999px';
+                            document.body.appendChild(ta);
+                            ta.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(ta);
+                          }
                           toast.success('PDF link copied to clipboard!');
+                        } catch (copyErr) {
+                          console.error('Copy failed', copyErr);
+                          toast.error('Failed to copy PDF link');
+                        }
                         }
                       }}
                       variant="outline"

@@ -254,7 +254,18 @@ const Customers = () => {
       const res = await portalAPI.createCustomerPortalLink(drawerCustomer._id);
       const url = res?.url;
       if (!url) throw new Error('No URL returned');
-      await navigator.clipboard.writeText(url);
+      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
       toast.success('Customer portal link copied');
     } catch (e) {
       console.error(e);

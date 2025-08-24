@@ -63,12 +63,39 @@ async function generateThermalPDF(invoiceData, fileName) {
         browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'], headless: true });
         const page = await browser.newPage();
         await page.setContent(html, { waitUntil: 'networkidle0' });
-        await page.pdf({ path: pdfPath, width: '64mm', height: 'auto', printBackground: true, margin: { top: 0, right: 0, bottom: 0, left: 0 } });
 
-        console.log(`[PDF] Thermal PDF generated successfully: ${pdfPath}`);
-        return `/invoices/${path.basename(pdfPath)}`;
+        try {
+            // Puppeteer may reject non-numeric height, so only set width and let height auto-size
+            await page.pdf({ path: pdfPath, width: '64mm', printBackground: true, margin: { top: 0, right: 0, bottom: 0, left: 0 } });
+            console.log(`[PDF] Thermal PDF generated successfully: ${pdfPath}`);
+            return `/invoices/${path.basename(pdfPath)}`;
+        } catch (pdfErr) {
+            console.error('[PDF] Thermal PDF page.pdf() failed:', pdfErr && pdfErr.stack ? pdfErr.stack : pdfErr);
+            // dump HTML to debug file for inspection
+            try {
+                const debugDir = path.resolve(__dirname, '../invoices/debug-html');
+                await fs.mkdir(debugDir, { recursive: true });
+                const debugFile = path.join(debugDir, `thermal-html-${invoiceData._id || invoiceData.invoiceNumber || Date.now()}.html`);
+                await fs.writeFile(debugFile, html, 'utf-8');
+                console.log('[PDF] Wrote thermal HTML to debug file:', debugFile);
+            } catch (writeErr) {
+                console.error('[PDF] Failed to write thermal HTML debug file:', writeErr && writeErr.stack ? writeErr.stack : writeErr);
+            }
+            // Attempt fallback to regular A4 invoice PDF to avoid blocking the user
+            try {
+                console.log('[PDF] Attempting fallback: generate A4 invoice PDF instead');
+                if (browser) await browser.close();
+                // reuse generateInvoicePDF which will create its own browser instance
+                const fallbackPath = await generateInvoicePDF(invoiceData, fileName && fileName.toString().trim().length > 0 ? fileName : undefined);
+                console.log('[PDF] Fallback A4 PDF generated:', fallbackPath);
+                return fallbackPath;
+            } catch (fallbackErr) {
+                console.error('[PDF] Fallback A4 PDF generation also failed:', fallbackErr && fallbackErr.stack ? fallbackErr.stack : fallbackErr);
+                throw new Error(`Thermal PDF generation failed and fallback also failed: ${pdfErr.message}; ${fallbackErr.message}`);
+            }
+        }
     } catch (error) {
-        console.error(`[PDF] Failed to generate thermal PDF for invoice ${invoiceData.invoiceNumber}:`, error);
+        console.error(`[PDF] Failed to generate thermal PDF for invoice ${invoiceData.invoiceNumber}:`, error && error.stack ? error.stack : error);
         throw new Error(`Thermal PDF generation failed: ${error.message}`);
     } finally {
         if (browser) await browser.close();
