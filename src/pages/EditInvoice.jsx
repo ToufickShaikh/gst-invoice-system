@@ -57,8 +57,9 @@ const EditInvoice = () => {
 
             let taxableAmount = 0;
             if (priceType === 'Inclusive' && taxSlab) {
-                const unitTaxable = price / (1 + taxSlab / 100);
-                taxableAmount = unitTaxable * qty - discountAmount;
+                // Apply discount to the inclusive line amount first, then derive taxable base
+                const discountedInclusive = Math.max(0, itemTotal - discountAmount);
+                taxableAmount = discountedInclusive / (1 + taxSlab / 100);
             } else {
                 taxableAmount = itemTotal - discountAmount;
             }

@@ -1,4 +1,4 @@
-vconst Item = require('../models/Item.js');
+const Item = require('../models/Item.js');
 
 // Helper function for consistent error responses
 const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
