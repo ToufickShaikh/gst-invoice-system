@@ -98,14 +98,14 @@ const InvoiceManagement = () => {
       }
       if (av < bv) return sortDir === 'asc' ? -1 : 1;
       if (av > bv) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    // Pagination
-    const totalCount = data.length;
-    const start = (page - 1) * pageSize;
-    const end = start + pageSize;
-    const pageData = data.slice(start, end);
+                        return (
+                          <a href={url} title="Edit Invoice">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5h2m2 0h2m-4 4h2m2 0h2M7 3h2m-2 0H5m2 4H5m0 0H3m9 4l6-6a2.121 2.121 0 013 3l-6 6M7 17l4 0 8-8" />
+                            </svg>
+                          </a>
+                        );
+                      })()}
 
     return { data: pageData, totalCount };
   };
@@ -590,8 +590,12 @@ const InvoiceManagement = () => {
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
                       {/* Edit */}
-                      <a
-                        href={`/edit-invoice/${invoice._id}`}
+                      {(() => {
+                        const appBase = import.meta.env.BASE_URL || '/';
+                        const base = window.location.origin.replace(/\/$/, '') + appBase.replace(/\/$/, '');
+                        const url = `${base}/edit-invoice/${invoice._id}`;
+                        return (
+                          <a href={url} title="Edit Invoice">
                         className="text-gray-700 hover:text-gray-900"
                         title="Edit Invoice"
                       >

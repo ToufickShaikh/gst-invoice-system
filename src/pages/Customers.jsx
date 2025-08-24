@@ -401,7 +401,14 @@ const Customers = () => {
                             <div className="font-medium text-sm">{inv.invoiceNumber || inv._id?.slice(-6)}</div>
                             <div className="text-xs text-gray-600">₹{Number(inv.grandTotal ?? inv.totalAmount ?? 0).toFixed(2)} • Balance ₹{Number(inv.balance ?? ((inv.grandTotal ?? inv.totalAmount ?? 0) - (inv.paidAmount || 0))).toFixed(2)}</div>
                           </div>
-                          <a href={`/edit-invoice/${inv._id}`} className="text-blue-600 text-xs hover:underline">Open</a>
+                          {
+                            (() => {
+                              const appBase = import.meta.env.BASE_URL || '/';
+                              const base = window.location.origin.replace(/\/$/, '') + appBase.replace(/\/$/, '');
+                              const url = `${base}/edit-invoice/${inv._id}`;
+                              return <a href={url} className="text-blue-600 text-xs hover:underline">Open</a>;
+                            })()
+                          }
                         </div>
                       ))}
                     </div>
