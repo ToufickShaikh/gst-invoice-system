@@ -215,6 +215,10 @@ async function replacePlaceholders(html, invoiceData) {
     html = html.replace(/{{totalGST}}/g, escapeHtml(formatCurrency(roundOff)));
     html = html.replace(/{{totalAmount}}/g, escapeHtml(formatCurrency(invoiceData.totalAmount || 0)));
     html = html.replace(/{{netAmount}}/g, escapeHtml(formatCurrency(invoiceData.netAmount || 0)));
+    // Provide both subtotal variants to be safe across templates
+    const subtotalVal = (invoiceData.subTotal ?? invoiceData.subtotal ?? totalTaxableAmount) || 0;
+    html = html.replace(/{{subTotal}}/g, escapeHtml(formatCurrency(subtotalVal)));
+    html = html.replace(/{{subtotal}}/g, escapeHtml(formatCurrency(subtotalVal)));
 
     // Tax summary table
     let taxSummaryHtml = '';
@@ -243,8 +247,9 @@ async function replacePlaceholders(html, invoiceData) {
     const paymentDate = paymentDetails.date ? new Date(paymentDetails.date).toLocaleDateString('en-GB') : 'N/A';
     const amountPaid = paymentDetails.amount ? Number(paymentDetails.amount).toFixed(2) : 0.00;
 
-    html = html.replace(/{{upiQrCode}}/g, upiQrCode);
-    html = html.replace(/{{upiQrImage}}/g, upiQrImage);
+    // UPI placeholders: insert data-url into src attributes
+    html = html.replace(/{{upiQrCode}}/g, upiQrCode || '');
+    html = html.replace(/{{upiQrImage}}/g, upiQrImage || '');
     html = html.replace(/{{guestName}}/g, escapeHtml(invoiceData.guestName || ''));
     html = html.replace(/{{paymentMode}}/g, escapeHtml(paymentMode));
     html = html.replace(/{{transactionId}}/g, escapeHtml(transactionId));

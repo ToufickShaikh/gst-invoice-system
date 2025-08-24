@@ -95,7 +95,20 @@ const PosQuickBilling = () => {
       const id = res?._id || res?.invoiceId || res?.id;
       if (id) {
         const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-        window.open(`${baseUrl}/api/billing/public/pdf/${id}?format=thermal`, '_blank');
+        try {
+          // Try to create a short-lived portal token for printing so we can open printable HTML
+          const tokenRes = await fetch(`${baseUrl}/api/billing/invoices/${id}/portal-link`, { method: 'POST' });
+          if (tokenRes.ok) {
+            const data = await tokenRes.json();
+            const printUrl = `${baseUrl}/api/billing/public/print/thermal/${id}?token=${data.token}`;
+            window.open(printUrl, '_blank');
+          } else {
+            // fallback to PDF generation
+            window.open(`${baseUrl}/api/billing/public/pdf/${id}?format=thermal`, '_blank');
+          }
+        } catch (e) {
+          window.open(`${baseUrl}/api/billing/public/pdf/${id}?format=thermal`, '_blank');
+        }
       }
       // reset
   setSaleItems([]); setPaidAmount(0); setDiscount(0); setCustomerName('');
