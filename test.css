@@ -1,8 +1,0 @@
-/* Test CSS file to check Tailwind processing */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-.test-class {
-  @apply bg-red-500 text-white p-4;
-}
