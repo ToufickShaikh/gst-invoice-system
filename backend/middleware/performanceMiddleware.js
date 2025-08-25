@@ -330,8 +330,7 @@ module.exports = {
   ],
 
   authStack: [
-    rateLimiters.auth,
-    securityMiddleware,
-    requestOptimization
+  securityMiddleware,
+  requestOptimization
   ]
 };

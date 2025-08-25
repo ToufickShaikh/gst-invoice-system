@@ -7,12 +7,13 @@ require('dotenv').config();
 
 // Enhanced middleware and optimizations
 const {
-  productionStack,
-  developmentStack,
-  publicStack,
-  authStack,
-  errorHandler,
-  dbHealthCheck
+    productionStack,
+    developmentStack,
+    publicStack,
+    authStack,
+    errorHandler,
+    dbHealthCheck,
+    rateLimiters
 } = require('./middleware/performanceMiddleware');
 const { cacheManager, cacheMiddleware, cacheConfig } = require('./utils/cacheManager');
 const { createIndexes } = require('./utils/databaseOptimization');
@@ -136,8 +137,8 @@ if (process.env.NODE_ENV === 'development') {
     });
 }
 
-// API Routes - Auth routes should be public for login/register
-app.use('/api/auth', authRoutes);
+// API Routes - Auth routes should be public for login/register (but rate-limited)
+app.use('/api/auth', rateLimiters.auth, authRoutes);
 
 // Protected API routes with caching
 app.use('/api/customers', 
