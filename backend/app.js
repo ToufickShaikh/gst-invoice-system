@@ -19,7 +19,6 @@ const { cacheManager, cacheMiddleware, cacheConfig } = require('./utils/cacheMan
 const { createIndexes } = require('./utils/databaseOptimization');
 
 // Import route handlers
-const authRoutes = require('./routes/authRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const itemRoutes = require('./routes/itemRoutes');
 const billingRoutes = require('./routes/billingRoutes');
@@ -139,8 +138,7 @@ if (process.env.NODE_ENV === 'development') {
     });
 }
 
-// API Routes - Auth routes should be public for login/register (but rate-limited)
-app.use('/api/auth', rateLimiters.auth, authRoutes);
+// Auth endpoints removed (JWT auth eliminated by request).
 
 // Protected API routes with caching
 app.use('/api/customers', 
@@ -191,8 +189,7 @@ app.use((req, res) => {
             'GET /api/health',
             'GET /api/customers',
             'GET /api/items',
-            'GET /api/billing',
-            'POST /api/auth/login'
+            'GET /api/billing'
         ]
     });
 });

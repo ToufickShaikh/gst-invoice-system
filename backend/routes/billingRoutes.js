@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { createInvoice, getInvoices, getInvoiceById, updateInvoice, reprintInvoice, getDashboardStats, generatePaymentQr, deleteInvoice, generatePublicPdf, generatePublicThermalHtml, recordCustomerPayment, createInvoicePortalLink, createCustomerPortalLink, getPublicInvoice, getPublicCustomerStatement } = require('../controllers/billingController.js');
-const { protect } = require('../middleware/authMiddleware');
-
+// Auth removed — public routes and protected behavior disabled
 // Public routes (no auth)
 router.route('/public/pdf/:invoiceId').get(generatePublicPdf);
 router.route('/public/print/thermal/:invoiceId').get(generatePublicThermalHtml);

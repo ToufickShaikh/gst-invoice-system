@@ -1,11 +1,7 @@
 const express = require('express');
 const { getItems, createItem, updateItem, deleteItem, updateStock } = require('../controllers/itemController.js');
-const { protect } = require('../middleware/authMiddleware');
-
+// Auth removed — routes are public
 const router = express.Router();
-
-// Protect all item routes
-router.use(protect);
 
 router.route('/')
     .get(getItems)

@@ -12,10 +12,8 @@ const axiosInstance = axios.create({
 });
 
 axiosInstance.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  // Authentication disabled — do not attach Authorization header
+  // If you later enable auth, re-enable token injection here
   return config;
 }, error => {
   return Promise.reject(error);

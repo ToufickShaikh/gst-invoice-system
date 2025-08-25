@@ -53,15 +53,13 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
         // Create a portal link (protected API expects auth; axiosInstance handles headers)
         const res = await portalAPI.createInvoicePortalLink(invoice._id);
         const url = res?.url;
-        const token = res?.token;
         // If backend returned a public URL we can open directly
         if (url) {
-          // Use the public thermal viewer endpoint with token to ensure server-side token check
-          const previewUrl = url.includes('/portal/invoice/') ? url.replace('/portal/invoice/', '/api/billing/public/print/thermal/') + `?token=${token}` : `/api/billing/public/print/thermal/${invoice._id}?token=${token}`;
+          const previewUrl = url.includes('/portal/invoice/') ? url.replace('/portal/invoice/', '/api/billing/public/print/thermal/') : `/api/billing/public/print/thermal/${invoice._id}`;
           if (mounted) setIframeSrc(previewUrl);
         } else {
-          // Fallback: call thermal endpoint directly with token
-          if (token && mounted) setIframeSrc(`/api/billing/public/print/thermal/${invoice._id}?token=${token}`);
+          // Fallback: call thermal endpoint directly
+          if (mounted) setIframeSrc(`/api/billing/public/print/thermal/${invoice._id}`);
         }
       } catch (e) {
         console.error('Failed to load thermal preview:', e);

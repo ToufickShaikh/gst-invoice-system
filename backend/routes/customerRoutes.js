@@ -1,11 +1,7 @@
 const express = require('express');
 const { getCustomers, createCustomer, updateCustomer, deleteCustomer } = require('../controllers/customerController.js');
-const { protect } = require('../middleware/authMiddleware');
-
+// Auth removed — routes are public
 const router = express.Router();
-
-// Protect all customer routes
-router.use(protect);
 
 router.route('/')
     .get(getCustomers)

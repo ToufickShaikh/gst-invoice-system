@@ -2,7 +2,8 @@
 // Enterprise-grade API routes for advanced features
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/authMiddleware');
+// Auth removed — provide a no-op protect so inline usages remain valid
+const protect = (req, res, next) => next();
 
 // Import enterprise services
 const whatsappService = require('../services/whatsappService');

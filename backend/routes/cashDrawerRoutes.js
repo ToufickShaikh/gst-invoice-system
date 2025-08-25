@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/authMiddleware');
+// Auth removed — routes are public
 const controller = require('../controllers/cashDrawerController');
-
-router.use(protect);
 
 router.get('/', controller.getStatus);
 router.post('/adjust', controller.adjustCash);

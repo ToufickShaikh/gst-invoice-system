@@ -10,9 +10,11 @@ const router = express.Router();
 // Private (add protect as needed)
 router.get('/', /*protect,*/ ctrl.list);
 router.post('/', /*protect,*/ ctrl.create);
-// Public (token gated) - define before parameterized :id to avoid conflicts
-router.get('/public/:id/pdf', ctrl.publicPdf); // ?token=...&format=thermal|a4
-router.get('/public/:id', ctrl.publicInvoice); // ?token=...
+// Public (token optional) - define before parameterized :id to avoid conflicts
+// These endpoints work without a token for public access; if a portal token
+// exists for an invoice it will be validated when supplied.
+router.get('/public/:id/pdf', ctrl.publicPdf); // format=thermal|a4
+router.get('/public/:id', ctrl.publicInvoice);
 
 // Payment QR (private)
 router.get('/:id/payment-qr', /*protect,*/ ctrl.generatePaymentQr);

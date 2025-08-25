@@ -3,17 +3,17 @@ import { useParams } from 'react-router-dom';
 import { portalAPI } from '../api/portal';
 
 const PortalInvoice = () => {
-  const { id, token } = useParams();
+  const { id } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     async function load() {
-      try { setError(''); const res = await portalAPI.getPublicInvoice(id, token); setData(res); }
+      try { setError(''); const res = await portalAPI.getPublicInvoice(id); setData(res); }
       catch (e) { setError(e?.response?.data?.message || 'Unable to load invoice'); }
     }
     load();
-  }, [id, token]);
+  }, [id]);
 
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
   if (!data) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;

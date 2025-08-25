@@ -218,7 +218,7 @@ RAZORPAY_KEY_SECRET=your-razorpay-secret
 STRIPE_SECRET_KEY=your-stripe-secret-key
 
 # Application
-JWT_SECRET=your-super-secure-jwt-secret
+# Authentication (JWT) removed in this build — no JWT secret required
 FRONTEND_URL=http://localhost:5173
 BACKEND_URL=http://localhost:5000
 ```

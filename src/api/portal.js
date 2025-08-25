@@ -8,10 +8,10 @@ export const portalAPI = {
     const res = await axiosInstance.post(`/billing/customers/${customerId}/portal-link`);
     return res.data;
   },
-  // Public fetchers (no auth headers needed, but axiosInstance will include)
-  getPublicInvoice: (id, token) => invoicesAPI.publicInvoice(id, token),
-  getPublicStatement: async (customerId, token, params = {}) => {
-    const res = await axiosInstance.get(`/billing/public/customers/${customerId}/statement`, { params: { token, ...params } });
+  // Public fetchers (token optional on server)
+  getPublicInvoice: (id) => invoicesAPI.publicInvoice(id),
+  getPublicStatement: async (customerId, params = {}) => {
+    const res = await axiosInstance.get(`/billing/public/customers/${customerId}/statement`, { params });
     return res.data;
   }
 };

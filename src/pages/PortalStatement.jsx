@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { portalAPI } from '../api/portal';
 
 const PortalStatement = () => {
-  const { customerId, token } = useParams();
+  const { customerId } = useParams();
   const [searchParams] = useSearchParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -14,14 +14,14 @@ const PortalStatement = () => {
         setError('');
         const from = searchParams.get('from') || undefined;
         const to = searchParams.get('to') || undefined;
-        const res = await portalAPI.getPublicStatement(customerId, token, { from, to });
+        const res = await portalAPI.getPublicStatement(customerId, { from, to });
         setData(res);
       } catch (e) {
         setError(e?.response?.data?.message || 'Unable to load statement');
       }
     }
     load();
-  }, [customerId, token, searchParams]);
+  }, [customerId, searchParams]);
 
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
   if (!data) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;

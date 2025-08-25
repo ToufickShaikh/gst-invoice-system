@@ -11,8 +11,8 @@ export const queryClient = new QueryClient({
     onError: (error, query) => {
       // Global error handling
       if (error?.response?.status === 401) {
-        // Handle authentication errors
-        localStorage.removeItem('auth-token');
+  // Authentication removed: clear legacy keys
+  localStorage.removeItem('auth-token');
         window.location.href = '/login';
         return;
       }

@@ -99,16 +99,10 @@ const PosQuickBilling = () => {
         const baseUrl = apiBase.replace(/\/api$/, '');
         try {
           // Create portal token via v2 endpoint
-          const tokenRes = await fetch(`${apiBase}/invoices/${id}/portal-link`, { method: 'POST', headers: { 'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '' } });
-          if (tokenRes.ok) {
-            const data = await tokenRes.json();
-            const printUrl = `${apiBase}/invoices/public/${id}/pdf?token=${data.token}&format=thermal`;
-            window.open(printUrl, '_blank');
-          } else {
-            window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal&token=`, '_blank');
-          }
+          // Portal link creation is now public; open the public PDF directly
+          window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal`, '_blank');
         } catch (e) {
-          window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal&token=`, '_blank');
+          window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal`, '_blank');
         }
       }
       // reset

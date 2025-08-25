@@ -49,13 +49,19 @@ exports.portalLink = async (req, res) => {
 };
 
 exports.publicInvoice = async (req, res) => {
-  try { const out = await service.getPublicInvoice(req.params.id, req.query.token); res.json({ success: true, ...out }); }
-  catch (e) { handleError(res, e, 400); }
+  try {
+    const token = req.query.token || undefined;
+    if (token) console.info('[PORTAL] publicInvoice token provided (masked)');
+    const out = await service.getPublicInvoice(req.params.id, token);
+    res.json({ success: true, ...out });
+  } catch (e) { handleError(res, e, 400); }
 };
 
 exports.publicPdf = async (req, res) => {
   try {
-    const { fullPath, downloadName } = await service.generatePublicPdf(req.params.id, req.query.token, { format: req.query.format });
+  const token = req.query.token || undefined;
+  if (token) console.info('[PORTAL] publicPdf token provided (masked)');
+  const { fullPath, downloadName } = await service.generatePublicPdf(req.params.id, token, { format: req.query.format });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
     return res.sendFile(fullPath, (err) => { if (err) console.error('Send PDF error', err); setTimeout(() => { try { fs.unlinkSync(fullPath); } catch (_) {} }, 30000); });

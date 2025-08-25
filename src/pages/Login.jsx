@@ -44,7 +44,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="max-w-md w-full">
+  <div className="max-w-md w-full">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-800">GST Billing System</h2>
@@ -53,7 +53,7 @@ const Login = () => {
               <p className="text-xs opacity-75">Professional Invoice Management</p>
             </div>
           </div>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => { e.preventDefault(); toast('Authentication removed from this build'); }}>
             <InputField
               label="Username"
               name="username"
@@ -83,14 +83,7 @@ const Login = () => {
               placeholder="Enter password"
               required
             />
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? (isRegisterMode ? 'Registering...' : 'Logging in...') : (isRegisterMode ? 'Register' : 'Login')}
-            </Button>
+            <Button type="button" variant="primary" className="w-full" onClick={() => toast('Authentication removed')}>Sign In Disabled</Button>
           </form>
           <p className="text-sm text-gray-600 text-center mt-4">
             {isRegisterMode ? (

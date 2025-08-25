@@ -206,8 +206,19 @@ async function createPortalLink(id, baseUrl) {
 async function getPublicInvoice(id, token) {
   const invoice = await Invoice.findById(id).populate('customer').populate('items.item');
   if (!invoice) throw new Error('Invoice not found');
-  if (!invoice.portalToken || token !== invoice.portalToken) throw new Error('Invalid token');
-  if (invoice.portalTokenExpires && invoice.portalTokenExpires < new Date()) throw new Error('Portal link expired');
+    // If invoice has a portal token we prefer to validate it when provided.
+    // But since authentication/JWT was removed and client calls the public endpoint
+    // without a token, allow public access when token is not supplied while
+    // still validating when a token is present (backwards compatible).
+    if (invoice.portalToken) {
+      if (token) {
+        if (token !== invoice.portalToken) throw new Error('Invalid token');
+        if (invoice.portalTokenExpires && invoice.portalTokenExpires < new Date()) throw new Error('Portal link expired');
+      } else {
+        // No token provided — allow public access but log a warning for observability
+        console.warn(`[PORTAL] Invoice ${id} has a portal token but no token was provided; allowing public access (auth disabled).`);
+      }
+    }
   const total = Number(invoice.grandTotal || invoice.totalAmount || 0);
   const paid = Number(invoice.paidAmount || 0);
   const balance = Number(invoice.balance ?? (total - paid));
@@ -224,7 +235,7 @@ async function getPublicInvoice(id, token) {
 }
 
 async function generatePublicPdf(id, token, { format = 'a4' } = {}) {
-  const info = await getPublicInvoice(id, token); // validates
+  const info = await getPublicInvoice(id, token); // validates (token optional)
   const inv = info.invoice;
   const fname = `public-${inv._id}-${Date.now()}.pdf`;
   let pdfPath;

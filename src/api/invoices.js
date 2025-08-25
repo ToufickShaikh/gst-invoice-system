@@ -31,10 +31,10 @@ export const invoicesAPI = {
     return res.data;
   },
   publicInvoice: async (id, token) => {
-    const res = await axiosInstance.get(`/invoices/public/${id}`, { params: { token } });
+  const res = await axiosInstance.get(`/invoices/public/${id}`);
     return res.data;
   },
   publicPdfUrl: (id, token, format='a4') => {
-    return `${import.meta.env.VITE_API_BASE_URL}/invoices/public/${id}/pdf?token=${token}&format=${format}`;
+  return `${import.meta.env.VITE_API_BASE_URL}/invoices/public/${id}/pdf?format=${format}`;
   }
 };

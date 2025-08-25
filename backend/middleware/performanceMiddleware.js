@@ -358,7 +358,6 @@ module.exports = {
   ],
 
   authStack: [
-  securityMiddleware,
-  requestOptimization
+  // Authentication stack intentionally left empty when auth is disabled
   ]
 };

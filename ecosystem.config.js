@@ -30,8 +30,8 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3000,
-        // Use values loaded from .env.production when available
-        JWT_SECRET: process.env.JWT_SECRET || 'replace_me_with_secure_jwt_secret',
+  // Use values loaded from .env.production when available
+  // JWT secret removed in this build — authentication disabled
         PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL || 'https://185.52.53.253/shaikhcarpets',
         MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/gst_invoice_system'
       },

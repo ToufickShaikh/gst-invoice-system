@@ -123,21 +123,14 @@ const Dashboard = () => {
       setAllInvoices(invoicesData);
 
       // Fetch all customers
-      const customersResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/customers`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const customersData = await customersResponse.json();
+  // Customers endpoint is public in the no-auth mode
+  const customersResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/customers`);
+  const customersData = await customersResponse.json();
       setAllCustomers(customersData);
 
       // Fetch all items
-      const itemsResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/items`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const itemsData = await itemsResponse.json();
+  const itemsResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/items`);
+  const itemsData = await itemsResponse.json();
       setAllItems(itemsData);
 
     } catch (error) {
