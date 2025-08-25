@@ -10,6 +10,15 @@ const path = require('path');
 const company = require('../config/company');
 const crypto = require('crypto');
 
+// Helper to safely extract an ObjectId string from either an id string or a populated object
+const extractId = (val) => {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    if (val._id) return typeof val._id === 'string' ? val._id : val._id.toString();
+    if (val.id) return val.id;
+    return null;
+};
+
 // Helper function for consistent error responses
 const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
     console.error(`[ERROR] ${message}:`, errorDetails);
@@ -112,6 +121,9 @@ const createInvoice = async (req, res) => {
     console.log('--- Starting Invoice Creation ---');
     const { customer, customerName, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '', exportInfo } = req.body;
 
+    // Accept customer as either an id string or a populated object
+    const customerIdFromBody = extractId(customer) || customer;
+
     // Input validation
     // Allow missing customer for POS quick billing when billingType === 'POS'
     if (!items || items.length === 0) {
@@ -124,8 +136,8 @@ const createInvoice = async (req, res) => {
     try {
         // Ensure customer data is populated for tax calculation
         let customerDetails = null;
-        if (customer) {
-            customerDetails = await Customer.findById(customer);
+        if (customerIdFromBody) {
+            customerDetails = await Customer.findById(customerIdFromBody);
             if (!customerDetails) {
                 return sendErrorResponse(res, 400, 'Customer not found');
             }
@@ -160,9 +172,10 @@ const createInvoice = async (req, res) => {
                 return sendErrorResponse(res, 400, 'Rate cannot be negative');
             }
             if (invoiceItem.item) {
-                const item = await Item.findById(invoiceItem.item);
+                const itemId = extractId(invoiceItem.item) || invoiceItem.item;
+                const item = await Item.findById(itemId);
                 if (!item) {
-                    return sendErrorResponse(res, 404, `Item with ID ${invoiceItem.item} not found`);
+                    return sendErrorResponse(res, 404, `Item with ID ${itemId} not found`);
                 }
             }
         }
@@ -202,7 +215,9 @@ const createInvoice = async (req, res) => {
         // Decrement stock quantities after successful save (can go negative) for linked catalog items only
         for (const invoiceItem of normalizedItems) {
             if (!invoiceItem.item) continue; // skip manual lines
-            const updated = await Item.findByIdAndUpdate(invoiceItem.item, {
+            const itemId = extractId(invoiceItem.item) || invoiceItem.item;
+            if (!itemId) continue;
+            const updated = await Item.findByIdAndUpdate(itemId, {
                 $inc: { quantityInStock: -invoiceItem.quantity },
             }, { new: true });
             if (updated && updated.quantityInStock < 0) {
@@ -237,8 +252,9 @@ const updateInvoice = async (req, res) => {
 
         // Revert stock for original items (only catalog items)
         for (const originalItem of originalInvoice.items) {
-            if (!originalItem.item) continue;
-            await Item.findByIdAndUpdate(originalItem.item, {
+            const originalItemId = extractId(originalItem.item) || originalItem.item;
+            if (!originalItemId) continue;
+            await Item.findByIdAndUpdate(originalItemId, {
                 $inc: { quantityInStock: originalItem.quantity },
             });
         }
@@ -310,8 +326,9 @@ const updateInvoice = async (req, res) => {
 
         // Decrement stock for updated items (only catalog items)
         for (const updatedItem of normalizedItems) {
-            if (!updatedItem.item) continue;
-            const updated = await Item.findByIdAndUpdate(updatedItem.item, {
+            const updatedItemId = extractId(updatedItem.item) || updatedItem.item;
+            if (!updatedItemId) continue;
+            const updated = await Item.findByIdAndUpdate(updatedItemId, {
                 $inc: { quantityInStock: -updatedItem.quantity },
             }, { new: true });
             if (updated && updated.quantityInStock < 0) {
@@ -345,23 +362,24 @@ const deleteInvoice = async (req, res) => {
 
         // Revert stock changes
         for (const invoiceItem of invoice.items) {
-            if (invoiceItem.item) {
-                await Item.findByIdAndUpdate(invoiceItem.item, {
-                    $inc: { quantityInStock: invoiceItem.quantity },
-                });
-            }
+            const itemId = extractId(invoiceItem.item) || invoiceItem.item;
+            if (!itemId) continue;
+            await Item.findByIdAndUpdate(itemId, {
+                $inc: { quantityInStock: invoiceItem.quantity },
+            });
         }
 
-        // Delete associated PDF file if it exists
-        if (invoice.pdfPath) {
-            const fullPath = path.join(__dirname, '../invoices', path.basename(invoice.pdfPath));
-            if (fs.existsSync(fullPath)) {
-                try {
+        // Delete associated PDF file if it exists and looks like a local path
+        if (invoice.pdfPath && typeof invoice.pdfPath === 'string') {
+            const fileName = path.basename(invoice.pdfPath);
+            const fullPath = path.resolve(__dirname, '../invoices', fileName);
+            try {
+                if (fs.existsSync(fullPath)) {
                     fs.unlinkSync(fullPath);
                     console.log(`[INFO] Deleted PDF file: ${fullPath}`);
-                } catch (fileError) {
-                    console.warn(`[WARN] Could not delete PDF file: ${fullPath}`, fileError.message);
                 }
+            } catch (fileError) {
+                console.warn(`[WARN] Could not delete PDF file: ${fullPath}`, fileError.message);
             }
         }
 
