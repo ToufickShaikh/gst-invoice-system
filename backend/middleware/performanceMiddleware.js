@@ -63,8 +63,9 @@ const speedLimiters = {
   api: slowDown({
     windowMs: 1 * 60 * 1000, // 1 minute
     delayAfter: 50, // Start slowing down after 50 requests
-    delayMs: 100, // Add 100ms delay per request after threshold
-    maxDelayMs: 2000 // Max 2 second delay
+    delayMs: () => 100, // Add 100ms delay per request after threshold (v2 syntax)
+    maxDelayMs: 2000, // Max 2 second delay
+    validate: { delayMs: false } // Disable deprecation warning
   })
 };
 
