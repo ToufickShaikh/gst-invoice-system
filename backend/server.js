@@ -3,26 +3,27 @@
 const app = require('./app.js');
 const connectDB = require('./config/db.js');
 const dotenv = require('dotenv');
+const logger = require('./utils/logger');
 
 dotenv.config(); // Load environment variables from .env file
 
-console.log('Starting GST Invoice Backend...');
-console.log('Environment:', process.env.NODE_ENV || 'development');
-console.log('MongoDB URI:', process.env.MONGODB_URI ? 'Set' : 'Using default localhost');
+logger.info('Starting GST Invoice Backend...');
+logger.info('Environment:', process.env.NODE_ENV || 'development');
+logger.debug('MongoDB URI present:', !!process.env.MONGODB_URI);
 
 // Connect to MongoDB with error handling
 connectDB().catch(err => {
-    console.error('Failed to connect to MongoDB:', err);
-    console.log('Server will continue without database connection...');
+    logger.error('Failed to connect to MongoDB:', err);
+    logger.warn('Server will continue without database connection...');
 });
 
 const PORT = process.env.PORT || 3000;
 
 // Start the Express server
 const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Backend server is running on port ${PORT}`);
-    console.log(`✅ CORS enabled for: http://localhost:5173, http://localhost:3000, http://localhost:${PORT}`);
-    console.log(`✅ Health check available at: http://localhost:${PORT}/api/health`);
+    logger.info(`✅ Backend server is running on port ${PORT}`);
+    logger.debug(`CORS allowed for local dev and port ${PORT}`);
+    logger.debug(`Health check available at: http://localhost:${PORT}/api/health`);
 });
 
 // Handle server errors

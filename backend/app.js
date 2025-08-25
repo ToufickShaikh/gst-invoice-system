@@ -36,6 +36,7 @@ const invoiceV2Routes = require('./routes/invoiceRoutes.v2');
 const authRoutes = require('./routes/authRoutes');
 
 const app = express();
+const logger = require('./utils/logger');
 
 // Trust proxy for accurate client IP detection
 app.set('trust proxy', 1);
@@ -205,9 +206,9 @@ app.use(errorHandler);
 // Initialize database optimizations
 const initializeOptimizations = async () => {
     try {
-        console.log('🚀 Initializing database optimizations...');
+        logger.info('🚀 Initializing database optimizations...');
         await createIndexes();
-        console.log('✅ All optimizations initialized successfully');
+        logger.info('✅ All optimizations initialized successfully');
     } catch (error) {
         console.error('❌ Optimization initialization failed:', error);
     }

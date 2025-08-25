@@ -10,6 +10,18 @@ const path = require('path');
 const company = require('../config/company');
 const crypto = require('crypto');
 const { cacheManager } = require('../utils/cacheManager');
+// Use invoice service directly for payment QR generation (avoid cross-controller circular requires)
+const invoiceService = require('../services/invoiceService');
+
+// Wrapper to expose generatePaymentQr on this controller
+const generatePaymentQr = async (req, res) => {
+    try {
+        const out = await invoiceService.generatePaymentQrForInvoice(req.params.id);
+        return res.json({ success: true, ...out });
+    } catch (e) {
+        return sendErrorResponse(res, 400, 'Failed to generate payment QR', e);
+    }
+};
 
 // Helper to safely extract an ObjectId string from either an id string or a populated object
 const extractId = (val) => {
@@ -20,9 +32,11 @@ const extractId = (val) => {
     return null;
 };
 
+const logger = require('../utils/logger');
+
 // Helper function for consistent error responses
 const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
-    console.error(`[ERROR] ${message}:`, errorDetails);
+    logger.error(`${message}:`, errorDetails);
     res.status(statusCode).json({
         message,
         error: errorDetails ? errorDetails.message || errorDetails.toString() : 'Unknown error',
@@ -62,13 +76,13 @@ async function generateInvoiceNumber(customerType) {
 // @route   GET /api/billing/invoices
 // @access  Private
 const getInvoices = async (req, res) => {
-    console.log('Fetching invoices with query:', req.query);
+    logger.debug('Fetching invoices with query:', req.query);
     try {
         const { billingType } = req.query;
         let query = {};
 
         if (billingType && ['B2B', 'B2C'].includes(billingType.toUpperCase())) {
-            console.log(`Filtering invoices for billing type: ${billingType.toUpperCase()}`);
+            logger.debug(`Filtering invoices for billing type: ${billingType.toUpperCase()}`);
 
             // Find customers with the specified customerType
             const customers = await Customer.find({ customerType: billingType.toUpperCase() });
@@ -77,16 +91,16 @@ const getInvoices = async (req, res) => {
             // Filter invoices by customer IDs
             query.customer = { $in: customerIds };
         } else {
-            console.log('No valid billingType filter applied - returning all invoices.');
+            logger.debug('No valid billingType filter applied - returning all invoices.');
         }
 
         const invoices = await Invoice.find(query).populate('customer').sort({ createdAt: -1 });
-        console.log(`Found ${invoices.length} invoices.`);
+    logger.info(`Found ${invoices.length} invoices.`);
 
         // Log invoices without customers for debugging
         const invoicesWithoutCustomers = invoices.filter(inv => !inv.customer);
         if (invoicesWithoutCustomers.length > 0) {
-            console.log(`⚠ Found ${invoicesWithoutCustomers.length} invoices without customers:`,
+            logger.warn(`⚠ Found ${invoicesWithoutCustomers.length} invoices without customers:`,
                 invoicesWithoutCustomers.map(inv => inv.invoiceNumber));
         }
 
@@ -877,8 +891,8 @@ const generatePublicThermalHtml = async (req, res) => {
         res.setHeader('Content-Type', 'text/html');
         return res.send(finalHtml);
     } catch (error) {
-        console.error('[BILLING] Preview generation failed:', error && error.stack ? error.stack : error);
-        sendErrorResponse(res, 500, 'Failed to generate preview', error);
+    logger.error('[BILLING] Preview generation failed:', error && error.stack ? error.stack : error);
+    sendErrorResponse(res, 500, 'Failed to generate preview', error);
     }
 };
 
