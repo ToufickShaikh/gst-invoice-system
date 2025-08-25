@@ -1,4 +1,5 @@
 const Item = require('../models/Item.js');
+const { cacheManager } = require('../utils/cacheManager');
 
 // Helper function for consistent error responses
 const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
@@ -68,6 +69,12 @@ const createItem = async (req, res) => {
         });
         await item.save();
         console.log('[ITEM] Item created successfully:', item._id);
+        // Invalidate item caches so front-end sees the new item immediately
+        try {
+            await cacheManager.invalidatePattern('items');
+        } catch (e) {
+            console.warn('[CACHE] Failed to invalidate items cache after create', e && e.message);
+        }
         res.status(201).json(item);
     } catch (error) {
         console.error('[ITEM] Error creating item:', error);
@@ -105,6 +112,11 @@ const updateItem = async (req, res) => {
             return sendErrorResponse(res, 404, 'Item not found');
         }
         console.log('[ITEM] Item updated successfully:', item._id);
+        try {
+            await cacheManager.invalidatePattern('items');
+        } catch (e) {
+            console.warn('[CACHE] Failed to invalidate items cache after update', e && e.message);
+        }
         res.json(item);
     } catch (error) {
         console.error('[ITEM] Error updating item:', error);
@@ -130,6 +142,11 @@ const deleteItem = async (req, res) => {
             return sendErrorResponse(res, 404, 'Item not found');
         }
         console.log('[ITEM] Item deleted successfully:', item._id);
+        try {
+            await cacheManager.invalidatePattern('items');
+        } catch (e) {
+            console.warn('[CACHE] Failed to invalidate items cache after delete', e && e.message);
+        }
         res.json({ message: 'Item deleted' });
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to delete item', error);
@@ -164,6 +181,11 @@ const updateStock = async (req, res) => {
 
         const operation = quantityChange > 0 ? 'increased' : 'decreased';
         console.log(`[ITEM] Stock ${operation} for item ${item.name} by ${Math.abs(quantityChange)}. New stock: ${item.quantityInStock}`);
+        try {
+            await cacheManager.invalidatePattern('items');
+        } catch (e) {
+            console.warn('[CACHE] Failed to invalidate items cache after stock update', e && e.message);
+        }
         res.json(item);
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to update item stock', error);
