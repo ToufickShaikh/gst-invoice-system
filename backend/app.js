@@ -63,6 +63,8 @@ app.use(cors({
         // Allow non-browser requests (no Origin header)
         if (!origin) return callback(null, true);
         if (allowedOrigins.has(origin)) return callback(null, true);
+        // Also allow any request from the server IP for internal proxy requests
+        if (origin && origin.includes('185.52.53.253')) return callback(null, true);
         return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
