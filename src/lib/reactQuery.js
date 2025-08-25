@@ -10,12 +10,13 @@ export const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error, query) => {
       // Global error handling
-      if (error?.response?.status === 401) {
+  if (error?.response?.status === 401) {
   // Authentication removed: clear legacy keys
   localStorage.removeItem('auth-token');
-        window.location.href = '/login';
-        return;
-      }
+    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+    window.location.href = `${base}/login`;
+    return;
+  }
       
       // Show error toast for user-facing errors
       const message = error?.response?.data?.message || error?.message || 'Something went wrong';
