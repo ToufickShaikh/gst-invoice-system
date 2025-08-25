@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+// No-op protect middleware (kept for compatibility). Importing so router.use(protect) is defined.
+const { protect } = require('../middleware/authMiddleware');
 const { createInvoice, getInvoices, getInvoiceById, updateInvoice, reprintInvoice, getDashboardStats, generatePaymentQr, deleteInvoice, generatePublicPdf, generatePublicThermalHtml, recordCustomerPayment, createInvoicePortalLink, createCustomerPortalLink, getPublicInvoice, getPublicCustomerStatement } = require('../controllers/billingController.js');
 // Auth removed — public routes and protected behavior disabled
 // Public routes (no auth)
