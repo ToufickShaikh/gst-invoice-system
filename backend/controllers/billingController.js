@@ -895,6 +895,13 @@ const generatePublicThermalHtml = async (req, res) => {
         const templatePath = path.resolve(__dirname, '../templates/thermal-2in5.html');
         let html = await fs.readFile(templatePath, 'utf-8');
         html = await replacePlaceholders(html, invoice);
+        // Defensive: remove any unreplaced template tokens like {{something}} to avoid showing 'undefined'
+        const leftoverTokens = html.match(/{{\s*[^}]+\s*}}/g);
+        if (leftoverTokens && leftoverTokens.length) {
+            console.warn('[BILLING] Thermal HTML contains leftover placeholders:', leftoverTokens.slice(0,10));
+            html = html.replace(/{{\s*[^}]+\s*}}/g, '');
+        }
+        console.log(`[BILLING] Generated thermal HTML for invoice ${invoice._id} (length: ${html.length})`);
 
         // Inject preview/print script to allow user to choose print or download
         const script = `<script>

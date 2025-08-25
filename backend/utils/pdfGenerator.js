@@ -129,7 +129,8 @@ async function replacePlaceholders(html, invoiceData) {
     html = html.replace(/{{customerState}}/g, escapeHtml(customerState));
 
     // Invoice meta
-    const invoiceNumber = invoiceData.invoiceNumber || invoiceData._id || '';
+    // Ensure invoice number is always a useful string (fallback to _id or 'N/A')
+    const invoiceNumber = invoiceData.invoiceNumber || (invoiceData._id ? String(invoiceData._id) : 'N/A');
     const invoiceDate = new Date(invoiceData.invoiceDate || Date.now()).toLocaleDateString('en-GB');
     const dueDate = new Date(invoiceData.dueDate || Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB');
     const placeOfSupply = customerState;
@@ -247,14 +248,16 @@ async function replacePlaceholders(html, invoiceData) {
     const upiQrCode = upiQr ? upiQr.qrCodeImage : '';
     const upiQrImage = upiQr ? upiQr.qrCodeImage : '';
     const upiLink = upiQr ? upiQr.upiLink : '';
+    // If no QR image is available, use a 1x1 transparent GIF data URI so <img src="..."> does not request the current document
+    const EMPTY_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
     const paymentMode = paymentDetails.mode || 'Not specified';
     const transactionId = paymentDetails.transactionId || paymentDetails.txnId || 'N/A';
     const paymentDate = paymentDetails.date ? new Date(paymentDetails.date).toLocaleDateString('en-GB') : 'N/A';
     const amountPaid = paymentDetails.amount ? Number(paymentDetails.amount).toFixed(2) : 0.00;
 
     // UPI placeholders: insert data-url into src attributes
-    html = html.replace(/{{upiQrCode}}/g, upiQrCode || '');
-    html = html.replace(/{{upiQrImage}}/g, upiQrImage || '');
+    html = html.replace(/{{upiQrCode}}/g, upiQrCode || EMPTY_PIXEL);
+    html = html.replace(/{{upiQrImage}}/g, upiQrImage || EMPTY_PIXEL);
     html = html.replace(/{{upiLink}}/g, escapeHtml(upiLink || ''));
     html = html.replace(/{{guestName}}/g, escapeHtml(invoiceData.guestName || ''));
     html = html.replace(/{{paymentMode}}/g, escapeHtml(paymentMode));
