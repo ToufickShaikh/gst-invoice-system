@@ -43,15 +43,13 @@ const createIndexes = async () => {
     const Customer = mongoose.model('Customer');
     await Promise.all([
       Customer.collection.createIndex({ firmName: 1 }),
-      Customer.collection.createIndex({ email: 1 }, { unique: true, sparse: true }),
       Customer.collection.createIndex({ contact: 1 }),
       Customer.collection.createIndex({ customerType: 1 }),
       Customer.collection.createIndex({ state: 1 }),
       // Text search
       Customer.collection.createIndex({
         firmName: 'text',
-        name: 'text',
-        email: 'text'
+        name: 'text'
       })
     ]);
 
