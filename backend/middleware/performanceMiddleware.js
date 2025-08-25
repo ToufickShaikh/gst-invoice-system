@@ -40,6 +40,30 @@ const isWhitelisted = (req) => {
   return false;
 };
 
+// Build exempt paths from env or defaults. These are regex strings matched against req.originalUrl
+const buildExemptPaths = () => {
+  const raw = process.env.RATE_LIMIT_EXEMPT_PATHS || '';
+  if (!raw) {
+    // sensible defaults: portal-link creation, invoice delete, dashboard-stats
+    return [
+      '/api/billing/invoices/.+/portal-link',
+      '/api/billing/invoices/.+',
+      '/api/billing/dashboard-stats'
+    ];
+  }
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
+};
+const RATE_EXEMPT_PATHS = buildExemptPaths().map(p => new RegExp(p));
+
+const isExemptPath = (req) => {
+  try {
+    const url = req.originalUrl || req.url || '';
+    return RATE_EXEMPT_PATHS.some(rx => rx.test(url));
+  } catch (e) {
+    return false;
+  }
+};
+
 const rateLimiters = {
   // Strict rate limiting for auth endpoints
   auth: rateLimit({
@@ -64,7 +88,7 @@ const rateLimiters = {
   api: rateLimit({
     windowMs: RATE_API_WINDOW_MS,
     max: RATE_API_MAX,
-    skip: (req) => isWhitelisted(req), // skip limiter for trusted/internal sources
+  skip: (req) => isWhitelisted(req) || isExemptPath(req), // skip limiter for trusted/internal sources or exempted paths
     message: {
       error: 'API rate limit exceeded',
       retryAfter: `${Math.ceil(RATE_API_WINDOW_MS / 1000)} seconds`
@@ -77,7 +101,7 @@ const rateLimiters = {
   public: rateLimit({
     windowMs: RATE_API_WINDOW_MS,
     max: RATE_PUBLIC_MAX,
-    skip: (req) => isWhitelisted(req),
+  skip: (req) => isWhitelisted(req) || isExemptPath(req),
     standardHeaders: true,
     legacyHeaders: false
   }),
