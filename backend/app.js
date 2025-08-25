@@ -31,6 +31,8 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const companyRoutes = require('./routes/companyRoutes');
 const cashDrawerRoutes = require('./routes/cashDrawerRoutes');
 const enterpriseRoutes = require('./routes/enterpriseRoutes');
+// New modular invoice v2 routes
+const invoiceV2Routes = require('./routes/invoiceRoutes.v2');
 
 const app = express();
 
@@ -157,6 +159,12 @@ app.use('/api/billing',
     ...authStack,
     cacheMiddleware(cacheConfig.invoices.ttl, cacheConfig.invoices.key),
     billingRoutes
+);
+// New cleaner invoice API (v2) - mounted after legacy to allow gradual migration
+app.use('/api/invoices',
+    ...authStack,
+    cacheMiddleware(cacheConfig.invoices.ttl, cacheConfig.invoices.key),
+    invoiceV2Routes
 );
 
 // Other protected routes

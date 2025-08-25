@@ -1,0 +1,241 @@
+// Clean, focused Invoice domain service (no Express/req/res code here)
+// Responsibilities:
+//  - Data validation & normalization
+//  - Sequential invoice number generation
+//  - Stock adjustments
+//  - Portal link token handling
+//  - Business calculations (delegates tax math to existing utils)
+
+const Invoice = require('../models/Invoice');
+const Item = require('../models/Item');
+const Customer = require('../models/Customer');
+const { calculateTotals } = require('../utils/taxHelpers');
+const pdfGenerator = require('../utils/pdfGenerator');
+const { generateUpiQr } = require('../utils/upiHelper');
+const company = require('../config/company');
+const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
+
+// ---------- Helpers ----------
+const extractId = (v) => {
+  if (!v) return null; if (typeof v === 'string') return v; if (v._id) return v._id.toString(); return null;
+};
+
+async function generateInvoiceNumber(customerType = 'B2C') {
+  const prefix = customerType.toUpperCase();
+  const last = await Invoice.findOne({ invoiceNumber: { $regex: `^${prefix}-` } }).sort({ invoiceNumber: -1 });
+  if (!last) return `${prefix}-01`;
+  const m = last.invoiceNumber.match(new RegExp(`^${prefix}-(\\d+)$`));
+  const next = m ? String(parseInt(m[1], 10) + 1).padStart(2, '0') : Date.now().toString().slice(-2);
+  return `${prefix}-${next}`;
+}
+
+function normalizeItems(raw = []) {
+  return raw.map(r => ({
+    item: extractId(r.item) || undefined,
+    name: r.name || r.item?.name || '',
+    hsnCode: r.hsnCode || r.item?.hsnCode || '',
+    rate: r.rate ?? r.price ?? 0,
+    taxSlab: r.taxSlab ?? r.taxRate ?? 0,
+    quantity: Number(r.quantity || 0)
+  }));
+}
+
+async function validateItems(items) {
+  for (const it of items) {
+    if (!it.quantity || it.quantity <= 0) throw new Error('Invalid item quantity');
+    if (it.rate == null || it.rate < 0) throw new Error('Invalid item rate');
+    if (it.item) {
+      const exists = await Item.findById(it.item).select('_id');
+      if (!exists) throw new Error(`Catalog item not found: ${it.item}`);
+    }
+  }
+}
+
+async function adjustStock(items, direction) {
+  // direction: +1 to increase (revert), -1 to decrease (consume)
+  for (const it of items) {
+    if (!it.item) continue;
+    await Item.findByIdAndUpdate(it.item, { $inc: { quantityInStock: direction * it.quantity } });
+  }
+}
+
+// ---------- Core Operations ----------
+async function listInvoices({ billingType } = {}) {
+  const filter = {};
+  if (billingType) {
+    const customers = await Customer.find({ customerType: billingType.toUpperCase() }).select('_id');
+    filter.customer = { $in: customers.map(c => c._id) };
+  }
+  return Invoice.find(filter).populate('customer').sort({ createdAt: -1 });
+}
+
+async function getInvoice(id) {
+  return Invoice.findById(id).populate('customer').populate('items.item');
+}
+
+async function createInvoice(data) {
+  const { customer, items, paidAmount = 0, discount = 0, shippingCharges = 0, paymentMethod = '', billingType = '', exportInfo, customerName } = data;
+  if (!items || !items.length) throw new Error('At least one item required');
+
+  const customerId = extractId(customer) || customer;
+  let customerDoc = null;
+  if (customerId) {
+    customerDoc = await Customer.findById(customerId);
+    if (!customerDoc) throw new Error('Customer not found');
+  } else {
+    customerDoc = { state: company.state || '', customerType: 'B2C', firmName: 'B2C-Guest' };
+  }
+
+  const normalized = normalizeItems(items);
+  await validateItems(normalized);
+
+  const { subTotal, taxAmount, totalAmount } = calculateTotals(normalized, customerDoc.state);
+  const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
+  const invoiceNumber = await generateInvoiceNumber(customerDoc.customerType);
+  const balance = totalAmount - paidAmount;
+
+  const invoice = await Invoice.create({
+    invoiceNumber,
+    customer: customerId,
+    items: normalized,
+    guestName: customerName || undefined,
+    subTotal,
+    cgst: taxAmount.cgst,
+    sgst: taxAmount.sgst,
+    igst: taxAmount.igst,
+    totalTax,
+    grandTotal: totalAmount,
+    totalAmount,
+    discount,
+    shippingCharges,
+    paidAmount,
+    balance,
+    paymentMethod,
+    billingType,
+    exportInfo: exportInfo || undefined,
+  });
+
+  await adjustStock(normalized, -1);
+  return invoice;
+}
+
+async function updateInvoice(id, data) {
+  const existing = await Invoice.findById(id);
+  if (!existing) throw new Error('Invoice not found');
+
+  // revert old stock
+  await adjustStock(existing.items, +1);
+
+  const { customer, items, paidAmount = 0, discount = 0, shippingCharges = 0, paymentMethod = '', billingType = '', exportInfo } = data;
+  if (!customer) throw new Error('Customer required');
+  if (!items || !items.length) throw new Error('At least one item required');
+  const customerDoc = await Customer.findById(customer);
+  if (!customerDoc) throw new Error('Customer not found');
+
+  const normalized = normalizeItems(items);
+  await validateItems(normalized);
+  const { subTotal, taxAmount, totalAmount } = calculateTotals(normalized, customerDoc.state);
+  const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
+  const balance = totalAmount - paidAmount;
+
+  Object.assign(existing, {
+    customer,
+    items: normalized,
+    subTotal,
+    cgst: taxAmount.cgst,
+    sgst: taxAmount.sgst,
+    igst: taxAmount.igst,
+    totalTax,
+    grandTotal: totalAmount,
+    totalAmount,
+    discount,
+    shippingCharges,
+    paidAmount,
+    balance,
+    paymentMethod,
+    billingType,
+    exportInfo: exportInfo ?? existing.exportInfo,
+  });
+
+  await existing.save();
+  await adjustStock(normalized, -1);
+  return existing.populate('customer').populate('items.item');
+}
+
+async function deleteInvoice(id) {
+  const invoice = await Invoice.findById(id);
+  if (!invoice) throw new Error('Invoice not found');
+  await adjustStock(invoice.items, +1);
+  if (invoice.pdfPath) {
+    const file = path.resolve(__dirname, '../invoices', path.basename(invoice.pdfPath));
+    if (fs.existsSync(file)) { try { fs.unlinkSync(file); } catch (_) { /* ignore */ } }
+  }
+  await invoice.deleteOne();
+  return { deletedId: id };
+}
+
+async function reprintInvoice(id, { format = 'a4' } = {}) {
+  const invoice = await Invoice.findById(id).populate('customer').populate('items.item');
+  if (!invoice) throw new Error('Invoice not found');
+  let pdfPath;
+  if (format === 'thermal') pdfPath = await pdfGenerator.generateThermalPDF(invoice);
+  else pdfPath = await pdfGenerator.generateInvoicePDF(invoice, format);
+  invoice.pdfPath = pdfPath; await invoice.save();
+  return { pdfPath, format };
+}
+
+async function createPortalLink(id, baseUrl) {
+  const invoice = await Invoice.findById(id);
+  if (!invoice) throw new Error('Invoice not found');
+  invoice.portalToken = crypto.randomBytes(16).toString('hex');
+  invoice.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await invoice.save();
+  const url = `${baseUrl.replace(/\/$/, '')}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
+  return { url, token: invoice.portalToken, expiresAt: invoice.portalTokenExpires, invoiceNumber: invoice.invoiceNumber };
+}
+
+async function getPublicInvoice(id, token) {
+  const invoice = await Invoice.findById(id).populate('customer').populate('items.item');
+  if (!invoice) throw new Error('Invoice not found');
+  if (!invoice.portalToken || token !== invoice.portalToken) throw new Error('Invalid token');
+  if (invoice.portalTokenExpires && invoice.portalTokenExpires < new Date()) throw new Error('Portal link expired');
+  const total = Number(invoice.grandTotal || invoice.totalAmount || 0);
+  const paid = Number(invoice.paidAmount || 0);
+  const balance = Number(invoice.balance ?? (total - paid));
+  let qrCodeImage = '';
+  try {
+    const upiId = company?.upi?.id;
+    if (upiId) {
+      const amt = balance > 0 ? balance.toFixed(2) : undefined;
+      const { qrCodeImage: img } = await generateUpiQr(upiId, amt);
+      qrCodeImage = img;
+    }
+  } catch (_) { /* silent */ }
+  return { invoice, balance, company, pdfUrl: `/api/invoices/public/pdf/${invoice._id}`, qrCodeImage };
+}
+
+async function generatePublicPdf(id, token, { format = 'a4' } = {}) {
+  const info = await getPublicInvoice(id, token); // validates
+  const inv = info.invoice;
+  const fname = `public-${inv._id}-${Date.now()}.pdf`;
+  let pdfPath;
+  if (format === 'thermal') pdfPath = await pdfGenerator.generateThermalPDF(inv, fname);
+  else pdfPath = await pdfGenerator.generateInvoicePDF(inv, fname);
+  const fileName = path.basename(pdfPath);
+  const fullPath = path.resolve(__dirname, '../invoices', fileName);
+  return { fullPath, downloadName: `invoice-${inv.invoiceNumber}.pdf` };
+}
+
+module.exports = {
+  listInvoices,
+  getInvoice,
+  createInvoice,
+  updateInvoice,
+  deleteInvoice,
+  reprintInvoice,
+  createPortalLink,
+  getPublicInvoice,
+  generatePublicPdf,
+};
