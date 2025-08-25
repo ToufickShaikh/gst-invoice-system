@@ -116,16 +116,21 @@ const requestOptimization = (req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
 
-  // Add response timing header
-  res.on('finish', () => {
+  // Add response timing header before response is sent
+  const originalSend = res.send;
+  res.send = function(data) {
     const duration = Date.now() - req.startTime;
-    res.setHeader('X-Response-Time', `${duration}ms`);
+    if (!res.headersSent) {
+      res.setHeader('X-Response-Time', `${duration}ms`);
+    }
     
     // Log slow requests in development
     if (process.env.NODE_ENV === 'development' && duration > 1000) {
       console.warn(`Slow request: ${req.method} ${req.originalUrl} - ${duration}ms`);
     }
-  });
+    
+    return originalSend.call(this, data);
+  };
 
   next();
 };
