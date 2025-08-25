@@ -83,9 +83,12 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
               : '';
             if (mounted) setIframeSrc(`${apiBase}/billing/public/print/thermal/${invoice._id}`);
           }
-        } else {
-          // Fallback: call thermal endpoint directly
-          if (mounted) setIframeSrc(`/api/billing/public/print/thermal/${invoice._id}`);
+          } else {
+          // Fallback: call thermal endpoint directly. Use axiosInstance baseURL when available
+          const apiBase = (axiosInstance && axiosInstance.defaults && axiosInstance.defaults.baseURL)
+            ? axiosInstance.defaults.baseURL.replace(/\/$/, '')
+            : (window.location.origin + (window.__basename || ''));
+          if (mounted) setIframeSrc(`${apiBase}/billing/public/print/thermal/${invoice._id}`);
         }
       } catch (e) {
         console.error('Failed to load thermal preview:', e);

@@ -315,9 +315,9 @@ const EnhancedDashboard = () => {
             <Card>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Recent Invoices</h3>
-                <a href="/invoices" className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
+                <Link to="/invoices" className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
                   View All →
-                </a>
+                </Link>
               </div>
               
               <div className="space-y-3">
@@ -351,9 +351,9 @@ const EnhancedDashboard = () => {
             <Card>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Top Customers</h3>
-                <a href="/customers" className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
+                <Link to="/customers" className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
                   View All →
-                </a>
+                </Link>
               </div>
               
               <div className="space-y-3">

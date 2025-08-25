@@ -296,4 +296,3 @@ function formatCurrency(amount) {
 }
 
 module.exports = { generateInvoicePDF, generateThermalPDF, replacePlaceholders };
-    html = html.replace(/{{signatureImage}}/g, '');
