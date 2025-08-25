@@ -19,18 +19,32 @@ export const CompanyProvider = ({ children }) => {
     async function load() {
       try {
         setLoading(true);
+        setError(null);
         const data = await getCompanyProfile();
         if (!active) return;
         setCompany(data);
       } catch (e) {
         if (!active) return;
-        console.error('Failed to load company profile', e);
+        console.error('Failed to load company profile:', e);
         setError(e);
+        // Set default company data instead of failing
+        setCompany({
+          name: 'GST Invoice System',
+          address: '',
+          gstin: '',
+          phone: '',
+          email: ''
+        });
       } finally {
         if (active) setLoading(false);
       }
     }
-    load();
+
+    // Only load if we're in a browser environment
+    if (typeof window !== 'undefined') {
+      load();
+    }
+
     return () => { active = false; };
   }, []);
 

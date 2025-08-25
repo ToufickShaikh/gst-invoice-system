@@ -14,17 +14,22 @@ import ErrorBoundary from './components/ErrorBoundary'
 
 // Optimizations
 import { queryClient } from './lib/reactQuery'
-import { useAppStore } from './store'
 
-// Performance monitoring (development only)
-if (process.env.NODE_ENV === 'development') {
-  import('web-vitals').then(({ getCLS, getFID, getFCP, getLCP, getTTFB }) => {
-    getCLS(console.log);
-    getFID(console.log);
-    getFCP(console.log);
-    getLCP(console.log);
-    getTTFB(console.log);
-  });
+// Performance monitoring (development only) - Fixed to prevent errors
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  const loadWebVitals = async () => {
+    try {
+      const { getCLS, getFID, getFCP, getLCP, getTTFB } = await import('web-vitals');
+      getCLS?.(console.log);
+      getFID?.(console.log);
+      getFCP?.(console.log);
+      getLCP?.(console.log);
+      getTTFB?.(console.log);
+    } catch (error) {
+      console.warn('Web Vitals could not be loaded:', error);
+    }
+  };
+  loadWebVitals();
 }
 
 // Enhanced loading component with better UX
@@ -43,16 +48,17 @@ const AppLoader = () => (
 
 // Enhanced App component with advanced features
 function App() {
-  const { theme, animations } = useAppStore((state) => ({
-    theme: state.theme,
-    animations: state.animations
-  }));
-
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter basename="/shaikhcarpets">
-          <div className={`app ${theme} ${animations ? 'animations-enabled' : 'animations-disabled'}`}>
+        <BrowserRouter 
+          basename="/shaikhcarpets"
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true
+          }}
+        >
+          <div className="app">
             <AuthProvider>
               <CompanyProvider>
                 <Suspense fallback={<AppLoader />}>

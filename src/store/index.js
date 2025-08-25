@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { shallow } from 'zustand/shallow';
 
 /**
  * Advanced Global State Management with Zustand
@@ -16,7 +17,7 @@ export const useAppStore = create(
       compactMode: false,
       animations: true,
       
-      // User preferences
+      // User preferences (immutable)
       userPreferences: {
         itemsPerPage: 25,
         defaultCurrency: 'INR',
@@ -26,7 +27,7 @@ export const useAppStore = create(
         keyboardShortcuts: true
       },
 
-      // Performance settings
+      // Performance settings (immutable)
       performance: {
         enableVirtualization: true,
         cacheSize: 100,
@@ -34,16 +35,16 @@ export const useAppStore = create(
         debounceDelay: 300
       },
 
-      // Actions
+      // Actions (stable references)
       setTheme: (theme) => set({ theme }),
-      toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
+      toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setCompactMode: (compact) => set({ compactMode: compact }),
-      updatePreferences: (prefs) => set({ 
-        userPreferences: { ...get().userPreferences, ...prefs }
-      }),
-      updatePerformance: (perf) => set({
-        performance: { ...get().performance, ...perf }
-      })
+      updatePreferences: (prefs) => set((state) => ({ 
+        userPreferences: { ...state.userPreferences, ...prefs }
+      })),
+      updatePerformance: (perf) => set((state) => ({
+        performance: { ...state.performance, ...perf }
+      }))
     }),
     {
       name: 'app-settings',

@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 backend/package-lock.json
 package-lock.json
+package-lock.json
