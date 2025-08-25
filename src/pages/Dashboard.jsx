@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { billingAPI } from '../api/billing';
+import { invoicesAPI } from '../api/invoices';
 import { formatCurrency } from '../utils/dateHelpers';
 import Layout from '../components/Layout';
 
@@ -96,7 +97,7 @@ const Dashboard = () => {
 
   const fetchRecentActivity = async () => {
     try {
-      const invoices = await billingAPI.getInvoices();
+  const invoices = await invoicesAPI.list();
       const recentInvoices = invoices
         .sort((a, b) => new Date(b.createdAt || b.invoiceDate) - new Date(a.createdAt || a.invoiceDate))
         .slice(0, 5)
@@ -118,7 +119,7 @@ const Dashboard = () => {
   const fetchAllData = async () => {
     try {
       // Fetch all invoices
-      const invoicesData = await billingAPI.getInvoices();
+  const invoicesData = await invoicesAPI.list();
       setAllInvoices(invoicesData);
 
       // Fetch all customers
@@ -219,7 +220,7 @@ const Dashboard = () => {
       console.log('Generating GST report for month:', selectedMonth, reportDateRange);
 
       // Fetch invoices for the date range
-      const invoices = await billingAPI.getInvoices();
+  const invoices = await invoicesAPI.list();
 
       // Filter invoices by date range
       const filteredInvoices = invoices.filter(invoice => {

@@ -1,10 +1,9 @@
 import axiosInstance from './axiosInstance';
+import { invoicesAPI } from './invoices';
 
 export const billingAPI = {
-  updateInvoice: async (id, invoiceData) => {
-    const res = await axiosInstance.put(`/billing/invoices/${id}`, invoiceData);
-    return res.data;
-  },
+  // Legacy wrapper -> new v2
+  updateInvoice: (id, invoiceData) => invoicesAPI.update(id, invoiceData),
   getDashboardStats: async (dateRange) => {
     console.log('API: Sending dashboard stats request with dateRange:', dateRange);
     try {
@@ -18,37 +17,20 @@ export const billingAPI = {
       throw error;
     }
   },
-  createInvoice: async (invoiceData) => {
-    const res = await axiosInstance.post(`/billing/invoices`, invoiceData);
-    return res.data;
-  },
+  createInvoice: (invoiceData) => invoicesAPI.create(invoiceData),
   // Function to fetch all invoices, with an optional filter for billing type (B2B/B2C)
-  getInvoices: async (billingType) => {
-    console.log('Fetching invoices with type:', billingType);
-    const response = await axiosInstance.get(`/billing/invoices`, {
-      params: { billingType },
-    });
-    return response.data;
-  },
+  getInvoices: (billingType) => invoicesAPI.list(billingType),
   // Get a single invoice by ID
-  getInvoiceById: async (id) => {
-    const res = await axiosInstance.get(`/billing/invoices/${id}`);
-    return res.data;
-  },
-  reprintInvoice: async (id) => {
-    const res = await axiosInstance.post(`/billing/invoices/${id}/reprint`);
-    return res.data;
-  },
+  getInvoiceById: (id) => invoicesAPI.get(id),
+  reprintInvoice: (id, format) => invoicesAPI.reprint(id, format),
   // Generate payment QR code
+  // Payment QR remains on legacy endpoint for now (no v2 equivalent yet)
   generatePaymentQr: async (id) => {
     const res = await axiosInstance.get(`/billing/invoices/${id}/payment-qr`);
     return res.data;
   },
   // Delete an invoice by ID
-  deleteInvoice: async (id) => {
-    const res = await axiosInstance.delete(`/billing/invoices/${id}`);
-    return res.data;
-  },
+  deleteInvoice: (id) => invoicesAPI.remove(id),
   // Get GST report data for a date range
   getGSTReport: async (dateRange) => {
     console.log('API: Fetching GST report for date range:', dateRange);

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../utils/dateHelpers';
-import { billingAPI } from '../api/billing';
+import { billingAPI } from '../api/billing'; // retains legacy (GST, payment QR)
+import { invoicesAPI } from '../api/invoices';
 import AdvancedInvoicePrint from './AdvancedInvoicePrint';
 import { portalAPI } from '../api/portal';
 
@@ -113,7 +114,7 @@ const InvoiceManagement = () => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      const response = await billingAPI.getInvoices();
+  const response = await invoicesAPI.list();
       const raw = Array.isArray(response) ? response : (response.invoices || []);
       const normalized = raw.map(normalizeInvoice);
       const { data, totalCount } = applyFiltersSortPaginate(normalized);
@@ -167,7 +168,7 @@ const InvoiceManagement = () => {
 
   const handlePrintInvoice = async (invoice) => {
     try {
-      const response = await billingAPI.getInvoiceById(invoice._id);
+  const response = await invoicesAPI.get(invoice._id);
       setCurrentInvoice(response); // API returns invoice object directly
       setShowPrintModal(true);
     } catch (error) {
@@ -197,7 +198,7 @@ const InvoiceManagement = () => {
   const handleMarkAsPaid = async (invoice) => {
     try {
       // Fetch full invoice to satisfy backend update validation
-      const full = await billingAPI.getInvoiceById(invoice._id);
+  const full = await invoicesAPI.get(invoice._id);
       if (!full) throw new Error('Invoice not found');
 
       // Build items payload compatible with backend normalizer
@@ -220,7 +221,7 @@ const InvoiceManagement = () => {
         billingType: full.billingType || '',
       };
 
-      await billingAPI.updateInvoice(invoice._id, payload);
+  await invoicesAPI.update(invoice._id, payload);
       toast.success(`Invoice ${invoice.invoiceNumber} marked as paid`);
       fetchInvoices();
     } catch (error) {
@@ -232,7 +233,7 @@ const InvoiceManagement = () => {
   // Create/copy secure customer portal link for an invoice
   const handleCopyPortalLink = async (invoice) => {
     try {
-      const res = await portalAPI.createInvoicePortalLink(invoice._id);
+  const res = await portalAPI.createInvoicePortalLink(invoice._id); // already v2 under the hood
       const url = res?.url;
       if (!url) throw new Error('No URL returned');
       // Use navigator.clipboard when available, otherwise fallback to a temporary textarea
@@ -267,7 +268,7 @@ const InvoiceManagement = () => {
       try {
         // Optimistic UI update: remove immediately
         setInvoices(prev => prev.filter(inv => inv._id !== invoice._id));
-        const res = await billingAPI.deleteInvoice(invoice._id);
+  const res = await invoicesAPI.remove(invoice._id);
         if (!res?.success) {
           // Re-fetch if backend did not confirm
             await fetchInvoices();
@@ -299,24 +300,15 @@ const InvoiceManagement = () => {
       switch (bulkAction) {
         case 'delete':
           if (window.confirm(`Are you sure you want to delete ${selectedInvoices.length} invoices?`)) {
-            await Promise.all(selectedInvoices.map(id => billingAPI.deleteInvoice(id)));
+            await Promise.all(selectedInvoices.map(id => invoicesAPI.remove(id)));
             toast.success(`${selectedInvoices.length} invoices deleted`);
           }
           break;
         case 'markPaid':
-          await Promise.all(selectedInvoices.map(id => 
-            billingAPI.updateInvoice(id, { 
-              status: 'paid',
-              paidDate: new Date().toISOString()
-            })
-          ));
-          toast.success(`${selectedInvoices.length} invoices marked as paid`);
+          toast.error('Mark paid bulk action not implemented in v2 (set paidAmount individually).');
           break;
         case 'markPending':
-          await Promise.all(selectedInvoices.map(id => 
-            billingAPI.updateInvoice(id, { status: 'pending' })
-          ));
-          toast.success(`${selectedInvoices.length} invoices marked as pending`);
+          toast.error('Mark pending bulk action not implemented in v2.');
           break;
         case 'export':
           await exportInvoices(selectedInvoices);

@@ -4,6 +4,7 @@ import InputField from '../components/InputField';
 import Button from '../components/Button';
 import { itemsAPI } from '../api/items';
 import { billingAPI } from '../api/billing';
+import { invoicesAPI } from '../api/invoices';
 import { formatCurrency } from '../utils/dateHelpers';
 import { toast } from 'react-hot-toast';
 
@@ -89,25 +90,25 @@ const PosQuickBilling = () => {
         paidAmount: Number(paidAmount || 0),
         discount: Number(discount || 0)
       };
-      const res = await billingAPI.createInvoice(payload);
+  const res = await invoicesAPI.create(payload);
       toast.success('POS Invoice saved');
       // open thermal print if ID available
       const id = res?._id || res?.invoiceId || res?.id;
       if (id) {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+        const apiBase = import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '');
+        const baseUrl = apiBase.replace(/\/api$/, '');
         try {
-          // Try to create a short-lived portal token for printing so we can open printable HTML
-          const tokenRes = await fetch(`${baseUrl}/api/billing/invoices/${id}/portal-link`, { method: 'POST' });
+          // Create portal token via v2 endpoint
+          const tokenRes = await fetch(`${apiBase}/invoices/${id}/portal-link`, { method: 'POST', headers: { 'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '' } });
           if (tokenRes.ok) {
             const data = await tokenRes.json();
-            const printUrl = `${baseUrl}/api/billing/public/print/thermal/${id}?token=${data.token}`;
+            const printUrl = `${apiBase}/invoices/public/${id}/pdf?token=${data.token}&format=thermal`;
             window.open(printUrl, '_blank');
           } else {
-            // fallback to PDF generation
-            window.open(`${baseUrl}/api/billing/public/pdf/${id}?format=thermal`, '_blank');
+            window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal&token=`, '_blank');
           }
         } catch (e) {
-          window.open(`${baseUrl}/api/billing/public/pdf/${id}?format=thermal`, '_blank');
+          window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal&token=`, '_blank');
         }
       }
       // reset

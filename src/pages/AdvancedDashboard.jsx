@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { billingAPI } from '../api/billing';
+import { invoicesAPI } from '../api/invoices';
 import Layout from '../components/Layout';
 import { formatCurrency } from '../utils/dateHelpers';
 import Button from '../components/Button';
@@ -37,7 +38,7 @@ const AdvancedDashboard = () => {
           startDate: getStartDate(dateRange),
           endDate: new Date().toISOString().split('T')[0]
         }),
-        billingAPI.getInvoices()
+  invoicesAPI.list()
       ]);
 
       // Process the data

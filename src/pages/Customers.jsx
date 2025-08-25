@@ -8,6 +8,7 @@ import InputField from '../components/InputField' // Import InputField
 import { customersAPI } from '../api/customers'
 import AddCustomerModal from '../components/AddCustomerModal'
 import { billingAPI } from '../api/billing'
+import { invoicesAPI } from '../api/invoices'
 import { portalAPI } from '../api/portal'
 
 const Customers = () => {
@@ -141,7 +142,7 @@ const Customers = () => {
       if (!drawerOpen || !drawerCustomer?._id) return
       try {
         setDrawerLoading(true)
-        const all = await billingAPI.getInvoices() // returns populated customer
+  const all = await invoicesAPI.list() // returns populated customer
         const filtered = Array.isArray(all) ? all.filter(inv => (inv.customer?._id || inv.customer) === drawerCustomer._id) : []
         setDrawerInvoices(filtered)
       } catch (e) {
@@ -219,7 +220,7 @@ const Customers = () => {
       const res = await billingAPI.recordCustomerPayment(drawerCustomer._id, { amount, method, notes });
       toast.success(`Payment recorded: ₹${amount.toFixed(2)}`);
       // Refresh invoices and stats
-      const all = await billingAPI.getInvoices();
+  const all = await invoicesAPI.list();
       const filtered = Array.isArray(all) ? all.filter(inv => (inv.customer?._id || inv.customer) === drawerCustomer._id) : [];
       setDrawerInvoices(filtered);
     } catch (e) {

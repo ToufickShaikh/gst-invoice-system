@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { billingAPI } from '../api/billing';
+import { invoicesAPI } from '../api/invoices';
 import { toast } from 'react-hot-toast';
 
 const BackendDiagnostic = () => {
@@ -39,7 +40,7 @@ const BackendDiagnostic = () => {
 
             // Test 3: Get Invoices
             try {
-                const invoices = await billingAPI.getInvoices();
+                const invoices = await invoicesAPI.list();
                 addResult('Get Invoices', true, `Found ${invoices.length} invoices`, invoices.slice(0, 3));
 
                 if (invoices.length > 0) {
