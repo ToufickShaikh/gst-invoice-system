@@ -41,6 +41,7 @@
   "lodash": "^4.17.21",
     "moment": "^2.30.1",
     "mongoose": "^8.8.5",
+  "jsonwebtoken": "^9.0.0",
     "multer": "^2.0.0-rc.4",
     "node-cache": "^5.1.2",
     "node-cron": "^3.0.3",

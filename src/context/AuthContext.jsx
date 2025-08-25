@@ -1,13 +1,12 @@
-import React, { createContext, useContext } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import { authAPI } from '../api/auth'
 
-// Minimal stub AuthContext after removing JWT auth.
-// Provides same API shape but no-op implementations.
 const AuthContext = createContext({
   user: null,
   userProfile: {},
   loading: false,
-  login: async () => { throw new Error('Authentication removed') },
-  register: async () => { throw new Error('Authentication removed') },
+  login: async () => {},
+  register: async () => {},
   logout: () => {},
   updateProfile: () => {},
   updatePreferences: () => {}
@@ -16,10 +15,55 @@ const AuthContext = createContext({
 export const useAuth = () => useContext(AuthContext)
 
 export const AuthProvider = ({ children }) => {
-  const login = async () => { throw new Error('Authentication removed from this build') }
-  const register = async () => { throw new Error('Authentication removed from this build') }
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      const userJson = localStorage.getItem('auth_user')
+      if (token && userJson) setUser(JSON.parse(userJson))
+    } catch (e) { /* ignore */ }
+  }, [])
+
+  const login = async (username, password) => {
+    setLoading(true)
+    try {
+      const res = await authAPI.login({ username, password })
+      if (res && res.token) {
+        localStorage.setItem('auth_token', res.token)
+        localStorage.setItem('auth_user', JSON.stringify(res.user || { username }))
+        setUser(res.user || { username })
+      }
+      return res
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const register = async (username, email, password) => {
+    setLoading(true)
+    try {
+      const res = await authAPI.register({ username, email, password })
+      if (res && res.token) {
+        localStorage.setItem('auth_token', res.token)
+        localStorage.setItem('auth_user', JSON.stringify(res.user || { username }))
+        setUser(res.user || { username })
+      }
+      return res
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const logout = () => {
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('auth_user')
+    setUser(null)
+  }
+
   return (
-    <AuthContext.Provider value={{ user: null, userProfile: {}, loading: false, login, register, logout: () => {}, updateProfile: () => {}, updatePreferences: () => {} }}>
+    <AuthContext.Provider value={{ user, userProfile: user || {}, loading, login, register, logout, updateProfile: () => {}, updatePreferences: () => {} }}>
       {children}
     </AuthContext.Provider>
   )
