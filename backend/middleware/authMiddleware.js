@@ -14,6 +14,16 @@ const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
 const protect = async (req, res, next) => {
     let token;
 
+    const rawAuthHeader = req.headers.authorization;
+    if (rawAuthHeader) {
+        try {
+            const masked = rawAuthHeader.length > 40
+                ? `${rawAuthHeader.slice(0, 20)}...${rawAuthHeader.slice(-10)}`
+                : rawAuthHeader;
+            console.warn('[AUTH] Authorization header present (masked):', masked);
+        } catch (e) { /* ignore logging errors */ }
+    }
+
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             // Get token from header
@@ -32,6 +42,12 @@ const protect = async (req, res, next) => {
             next();
         } catch (error) {
             console.error('[AUTH] Token verification failed:', error);
+            // Log the raw header again on failure (masked) to help debugging
+            try {
+                const raw = req.headers.authorization || '';
+                const masked = raw.length > 40 ? `${raw.slice(0,20)}...${raw.slice(-10)}` : raw;
+                console.warn('[AUTH] Authorization header at failure (masked):', masked);
+            } catch (e) { /* ignore */ }
             sendErrorResponse(res, 401, 'Not authorized, token failed', error);
         }
     } else {
