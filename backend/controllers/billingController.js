@@ -10,8 +10,18 @@ const path = require('path');
 const company = require('../config/company');
 const crypto = require('crypto');
 const { cacheManager } = require('../utils/cacheManager');
-// Reuse payment QR generator from the v2 invoice controller if available
-const { generatePaymentQr: generatePaymentQrV2 } = require('./invoiceController.v2');
+// Use invoice service directly for payment QR generation (avoid cross-controller circular requires)
+const invoiceService = require('../services/invoiceService');
+
+// Wrapper to expose generatePaymentQr on this controller
+const generatePaymentQr = async (req, res) => {
+    try {
+        const out = await invoiceService.generatePaymentQrForInvoice(req.params.id);
+        return res.json({ success: true, ...out });
+    } catch (e) {
+        return sendErrorResponse(res, 400, 'Failed to generate payment QR', e);
+    }
+};
 
 // Helper to safely extract an ObjectId string from either an id string or a populated object
 const extractId = (val) => {
@@ -919,7 +929,7 @@ module.exports = {
     updateInvoice,
     reprintInvoice,
     getDashboardStats,
-    generatePaymentQr: generatePaymentQrV2,
+    generatePaymentQr,
     getInvoices,
     getInvoiceById,
     deleteInvoice,
