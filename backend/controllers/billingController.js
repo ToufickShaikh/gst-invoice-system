@@ -332,6 +332,11 @@ const updateInvoice = async (req, res) => {
 const deleteInvoice = async (req, res) => {
     try {
         const { id } = req.params;
+        
+        if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+            return sendErrorResponse(res, 400, 'Invalid invoice ID format');
+        }
+
         const invoice = await Invoice.findById(id);
 
         if (!invoice) {
@@ -340,24 +345,35 @@ const deleteInvoice = async (req, res) => {
 
         // Revert stock changes
         for (const invoiceItem of invoice.items) {
-            await Item.findByIdAndUpdate(invoiceItem.item, {
-                $inc: { quantityInStock: invoiceItem.quantity },
-            });
+            if (invoiceItem.item) {
+                await Item.findByIdAndUpdate(invoiceItem.item, {
+                    $inc: { quantityInStock: invoiceItem.quantity },
+                });
+            }
         }
 
         // Delete associated PDF file if it exists
         if (invoice.pdfPath) {
             const fullPath = path.join(__dirname, '../invoices', path.basename(invoice.pdfPath));
             if (fs.existsSync(fullPath)) {
-                fs.unlinkSync(fullPath);
-                console.log(`[INFO] Deleted PDF file: ${fullPath}`);
+                try {
+                    fs.unlinkSync(fullPath);
+                    console.log(`[INFO] Deleted PDF file: ${fullPath}`);
+                } catch (fileError) {
+                    console.warn(`[WARN] Could not delete PDF file: ${fullPath}`, fileError.message);
+                }
             }
         }
 
-        await invoice.deleteOne();
+        await Invoice.findByIdAndDelete(id);
 
-        res.json({ message: 'Invoice removed successfully' });
+        res.json({ 
+            success: true,
+            message: 'Invoice deleted successfully',
+            deletedId: id 
+        });
     } catch (error) {
+        console.error('[ERROR] Delete invoice failed:', error);
         sendErrorResponse(res, 500, 'Failed to delete invoice', error);
     }
 };
@@ -366,6 +382,8 @@ const deleteInvoice = async (req, res) => {
 const reprintInvoice = async (req, res) => {
     try {
         const invoiceId = req.params.id;
+        const { format = 'a4' } = req.query; // Accept format parameter (a4, a5, thermal)
+        
         const invoice = await Invoice.findById(invoiceId).populate('customer').populate('items.item');
 
         if (!invoice) {
@@ -410,11 +428,22 @@ const reprintInvoice = async (req, res) => {
             await invoice.save();
         }
 
-        const pdfPath = await pdfGenerator.generateInvoicePDF(invoice);
+        // Generate PDF based on requested format
+        let pdfPath;
+        if (format === 'thermal') {
+            pdfPath = await pdfGenerator.generateThermalPDF(invoice);
+        } else {
+            pdfPath = await pdfGenerator.generateInvoicePDF(invoice, format);
+        }
+        
         invoice.pdfPath = pdfPath;
         await invoice.save();
 
-        res.json({ pdfPath, message: 'Invoice reprinted successfully' });
+        res.json({ 
+            pdfPath, 
+            message: `Invoice reprinted successfully in ${format.toUpperCase()} format`,
+            format 
+        });
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to generate PDF', error);
     }
@@ -659,37 +688,58 @@ const recordCustomerPayment = async (req, res) => {
 const createInvoicePortalLink = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return sendErrorResponse(res, 400, 'Invalid invoice ID format');
+    }
+
     const invoice = await Invoice.findById(id);
     if (!invoice) return sendErrorResponse(res, 404, 'Invoice not found');
+    
     invoice.portalToken = crypto.randomBytes(16).toString('hex');
     // default expiry 30 days
     invoice.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await invoice.save();
-            // Respect PUBLIC_BASE_URL if set (should include subpath like /shaikhcarpets).
-            // If not set, try to detect a base path from the referer/origin header so links created from the UI
-            // include the SPA subpath (eg. /shaikhcarpets) instead of pointing to the bare host.
-            const detectBaseFromReferer = () => {
-                try {
-                    const ref = req.get('referer') || req.get('origin');
-                    if (!ref) return null;
-                    const u = new URL(ref);
-                    // If referer pathname contains a known app prefix, prefer that
-                    if (u.pathname && u.pathname.includes('/shaikhcarpets')) return `${u.origin}/shaikhcarpets`;
-                    // Otherwise use the first path segment (if any) as a possible base
-                    const seg = u.pathname && u.pathname.split('/').filter(Boolean)[0];
-                    if (seg) return `${u.origin}/${seg}`;
-                    return u.origin;
-                } catch (e) {
-                    return null;
-                }
-            };
 
-            const publicBase = process.env.PUBLIC_BASE_URL
-                || detectBaseFromReferer()
-                || (req.protocol + '://' + req.get('host')) + (process.env.PUBLIC_BASE_PATH || '');
-            const url = `${publicBase.replace(/\/$/, '')}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
-    res.json({ url, token: invoice.portalToken, expiresAt: invoice.portalTokenExpires });
+    // Improved base URL detection
+    let publicBase;
+    
+    // Priority 1: Environment variable
+    if (process.env.PUBLIC_BASE_URL) {
+      publicBase = process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+    } else {
+      // Priority 2: Detect from request headers
+      const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+      const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3000';
+      
+      // Check if we're running under a subpath (like /shaikhcarpets)
+      const referer = req.get('referer');
+      let subpath = '';
+      
+      if (referer && referer.includes('/shaikhcarpets')) {
+        subpath = '/shaikhcarpets';
+      } else if (process.env.PUBLIC_BASE_PATH) {
+        subpath = process.env.PUBLIC_BASE_PATH.startsWith('/') 
+          ? process.env.PUBLIC_BASE_PATH 
+          : `/${process.env.PUBLIC_BASE_PATH}`;
+      }
+      
+      publicBase = `${protocol}://${host}${subpath}`;
+    }
+
+    const url = `${publicBase}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
+    
+    console.log(`[INFO] Created portal link for invoice ${invoice.invoiceNumber}: ${url}`);
+    
+    res.json({ 
+      success: true,
+      url, 
+      token: invoice.portalToken, 
+      expiresAt: invoice.portalTokenExpires,
+      invoiceNumber: invoice.invoiceNumber
+    });
   } catch (error) {
+    console.error('[ERROR] Create portal link failed:', error);
     sendErrorResponse(res, 500, 'Failed to create portal link', error);
   }
 };
