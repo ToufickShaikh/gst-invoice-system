@@ -2,7 +2,7 @@
 // Enterprise-grade API routes for advanced features
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
 // Import enterprise services
 const whatsappService = require('../services/whatsappService');
@@ -11,7 +11,7 @@ const reportingService = require('../services/reportingService');
 const { cacheManager } = require('../utils/cacheManager');
 
 // WhatsApp Integration Routes
-router.get('/whatsapp/stats', authenticateToken, async (req, res) => {
+router.get('/whatsapp/stats', protect, async (req, res) => {
     try {
         const { period = '24h' } = req.query;
         const stats = await whatsappService.getStats(period);
@@ -29,7 +29,7 @@ router.get('/whatsapp/stats', authenticateToken, async (req, res) => {
     }
 });
 
-router.post('/whatsapp/send-message', authenticateToken, async (req, res) => {
+router.post('/whatsapp/send-message', protect, async (req, res) => {
     try {
         const { to, message, type = 'text', priority = 'normal' } = req.body;
         
@@ -55,7 +55,7 @@ router.post('/whatsapp/send-message', authenticateToken, async (req, res) => {
     }
 });
 
-router.post('/whatsapp/send-invoice', authenticateToken, async (req, res) => {
+router.post('/whatsapp/send-invoice', protect, async (req, res) => {
     try {
         const { invoiceId, customerPhone, type = 'created' } = req.body;
         
@@ -95,7 +95,7 @@ router.post('/whatsapp/webhook', async (req, res) => {
 });
 
 // Payment Gateway Routes
-router.post('/payments/create-order', authenticateToken, async (req, res) => {
+router.post('/payments/create-order', protect, async (req, res) => {
     try {
         const {
             amount,
@@ -164,7 +164,7 @@ router.post('/payments/verify', async (req, res) => {
     }
 });
 
-router.post('/payments/offline', authenticateToken, async (req, res) => {
+router.post('/payments/offline', protect, async (req, res) => {
     try {
         const {
             invoiceId,
@@ -207,7 +207,7 @@ router.post('/payments/offline', authenticateToken, async (req, res) => {
     }
 });
 
-router.post('/payments/generate-upi-qr', authenticateToken, async (req, res) => {
+router.post('/payments/generate-upi-qr', protect, async (req, res) => {
     try {
         const { amount, invoiceNumber, description, merchantVpa } = req.body;
         
@@ -272,7 +272,7 @@ router.post('/payments/webhook/:gateway', async (req, res) => {
 });
 
 // Advanced Reporting Routes
-router.post('/reports/generate', authenticateToken, async (req, res) => {
+router.post('/reports/generate', protect, async (req, res) => {
     try {
         const { type, params, format = 'json' } = req.body;
         
@@ -322,7 +322,7 @@ router.post('/reports/generate', authenticateToken, async (req, res) => {
     }
 });
 
-router.post('/reports/export', authenticateToken, async (req, res) => {
+router.post('/reports/export', protect, async (req, res) => {
     try {
         const { reportData, format, filename } = req.body;
         
@@ -349,7 +349,7 @@ router.post('/reports/export', authenticateToken, async (req, res) => {
     }
 });
 
-router.get('/reports/dashboard', authenticateToken, async (req, res) => {
+router.get('/reports/dashboard', protect, async (req, res) => {
     try {
         const { period = '30d', realTime = false } = req.query;
         
@@ -374,7 +374,7 @@ router.get('/reports/dashboard', authenticateToken, async (req, res) => {
 
 // Cache Management Routes (Development only)
 if (process.env.NODE_ENV === 'development') {
-    router.get('/cache/stats', authenticateToken, async (req, res) => {
+    router.get('/cache/stats', protect, async (req, res) => {
         try {
             const stats = cacheManager.getStats();
             res.json({
@@ -391,7 +391,7 @@ if (process.env.NODE_ENV === 'development') {
         }
     });
 
-    router.delete('/cache/clear/:pattern?', authenticateToken, async (req, res) => {
+    router.delete('/cache/clear/:pattern?', protect, async (req, res) => {
         try {
             const { pattern } = req.params;
             
