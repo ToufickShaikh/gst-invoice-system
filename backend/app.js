@@ -136,33 +136,36 @@ if (process.env.NODE_ENV === 'development') {
     });
 }
 
-// API Routes with authentication stack for protected routes
-app.use('/api/auth', ...authStack, authRoutes);
+// API Routes - Auth routes should be public for login/register
+app.use('/api/auth', authRoutes);
 
 // Protected API routes with caching
 app.use('/api/customers', 
+    ...authStack,
     cacheMiddleware(cacheConfig.customers.ttl, cacheConfig.customers.key),
     customerRoutes
 );
 
 app.use('/api/items',
+    ...authStack,
     cacheMiddleware(cacheConfig.items.ttl, cacheConfig.items.key),
     itemRoutes
 );
 
 app.use('/api/billing',
+    ...authStack,
     cacheMiddleware(cacheConfig.invoices.ttl, cacheConfig.invoices.key),
     billingRoutes
 );
 
-// Other routes (with appropriate caching)
-app.use('/api/gst', gstRoutes);
-app.use('/api/purchases', purchaseRoutes);
-app.use('/api/sales-orders', salesOrderRoutes);
-app.use('/api/quotes', quoteRoutes);
-app.use('/api/suppliers', supplierRoutes);
-app.use('/api/company', companyRoutes);
-app.use('/api/cash-drawer', cashDrawerRoutes);
+// Other protected routes
+app.use('/api/gst', ...authStack, gstRoutes);
+app.use('/api/purchases', ...authStack, purchaseRoutes);
+app.use('/api/sales-orders', ...authStack, salesOrderRoutes);
+app.use('/api/quotes', ...authStack, quoteRoutes);
+app.use('/api/suppliers', ...authStack, supplierRoutes);
+app.use('/api/company', ...authStack, companyRoutes);
+app.use('/api/cash-drawer', ...authStack, cashDrawerRoutes);
 
 // Enterprise features with enhanced security
 app.use('/api/enterprise', ...authStack, enterpriseRoutes);
