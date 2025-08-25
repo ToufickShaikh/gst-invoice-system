@@ -32,6 +32,8 @@ const cashDrawerRoutes = require('./routes/cashDrawerRoutes');
 const enterpriseRoutes = require('./routes/enterpriseRoutes');
 // New modular invoice v2 routes
 const invoiceV2Routes = require('./routes/invoiceRoutes.v2');
+// Auth routes (stubs returning 410 Gone)
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
@@ -139,6 +141,9 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Auth endpoints removed (JWT auth eliminated by request).
+
+// Keep auth routes mounted so callers receive a clear 410 Gone instead of 404.
+app.use('/api/auth', authRoutes);
 
 // Protected API routes with caching
 app.use('/api/customers', 
