@@ -10,11 +10,41 @@ const { cacheManager, cacheMiddleware, cacheConfig } = require('../utils/cacheMa
  */
 
 // Rate limiting configurations
+// Allow configuring limits via environment variables and whitelist internal/trusted IPs
+const RATE_API_WINDOW_MS = Number(process.env.RATE_API_WINDOW_MS) || 1 * 60 * 1000; // default 1 minute
+const RATE_API_MAX = Number(process.env.RATE_API_MAX) || 100; // default 100 requests per window
+const RATE_PUBLIC_MAX = Number(process.env.RATE_PUBLIC_MAX) || 200;
+const RATE_AUTH_MAX = Number(process.env.RATE_AUTH_MAX) || 5;
+
+// Build whitelist from env var (comma separated IPs) and allow internal proxy header bypass
+const buildWhitelist = () => {
+  const raw = process.env.RATE_LIMIT_WHITELIST || '';
+  return new Set(raw.split(',').map(s => s.trim()).filter(Boolean));
+};
+const RATE_WHITELIST = buildWhitelist();
+
+const isWhitelisted = (req) => {
+  // Allow bypass via explicit header (used by trusted proxies) or by IP whitelist
+  try {
+    const internalHeader = (req.get('x-internal-request') || '').toString();
+    if (internalHeader === '1') return true;
+    const forwardedFor = req.get('x-forwarded-for');
+    if (forwardedFor) {
+      const ips = forwardedFor.split(',').map(s => s.trim());
+      for (const ip of ips) if (RATE_WHITELIST.has(ip)) return true;
+    }
+    if (RATE_WHITELIST.has(req.ip)) return true;
+  } catch (e) {
+    // ignore
+  }
+  return false;
+};
+
 const rateLimiters = {
   // Strict rate limiting for auth endpoints
   auth: rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 attempts per window
+    max: RATE_AUTH_MAX, // configurable
     message: {
       error: 'Too many authentication attempts, please try again later.',
       retryAfter: '15 minutes'
@@ -32,11 +62,12 @@ const rateLimiters = {
 
   // General API rate limiting
   api: rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 minute
-    max: 100, // 100 requests per minute
+    windowMs: RATE_API_WINDOW_MS,
+    max: RATE_API_MAX,
+    skip: (req) => isWhitelisted(req), // skip limiter for trusted/internal sources
     message: {
       error: 'API rate limit exceeded',
-      retryAfter: '1 minute'
+      retryAfter: `${Math.ceil(RATE_API_WINDOW_MS / 1000)} seconds`
     },
     standardHeaders: true,
     legacyHeaders: false
@@ -44,8 +75,9 @@ const rateLimiters = {
 
   // Lenient rate limiting for public endpoints
   public: rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 minute
-    max: 200, // 200 requests per minute
+    windowMs: RATE_API_WINDOW_MS,
+    max: RATE_PUBLIC_MAX,
+    skip: (req) => isWhitelisted(req),
     standardHeaders: true,
     legacyHeaders: false
   }),
