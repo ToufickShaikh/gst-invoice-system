@@ -879,51 +879,95 @@ const getPublicInvoice = async (req, res) => {
 };
 
 // @desc    Generate printable thermal HTML for public viewing/print
-// @route   GET /api/billing/public/print/thermal/:invoiceId
+// @route   GET /api/billing/public/print/thermal/:invoiceId/:token?
 // @access  Public
 const generatePublicThermalHtml = async (req, res) => {
     try {
         const { invoiceId } = req.params;
-        // Token may be passed as a query param (?token=...) or as an optional path segment (/.../:token)
         const token = req.params.token || req.query.token;
+
+        // Ensure invoice is populated with customer and items
         const invoice = await Invoice.findById(invoiceId).populate('customer').populate('items.item');
         if (!invoice) return sendErrorResponse(res, 404, 'Invoice not found');
         if (!invoice.portalToken || token !== invoice.portalToken) return sendErrorResponse(res, 401, 'Invalid token');
         if (invoice.portalTokenExpires && new Date(invoice.portalTokenExpires) < new Date()) return sendErrorResponse(res, 401, 'Portal link expired');
 
-        // Read template and replace placeholders using existing helper
-        const templatePath = path.resolve(__dirname, '../templates/thermal-2in5.html');
-        let html = await fs.readFile(templatePath, 'utf-8');
-        html = await replacePlaceholders(html, invoice);
-        // Defensive: remove any unreplaced template tokens like {{something}} to avoid showing 'undefined'
-        const leftoverTokens = html.match(/{{\s*[^}]+\s*}}/g);
-        if (leftoverTokens && leftoverTokens.length) {
-            console.warn('[BILLING] Thermal HTML contains leftover placeholders:', leftoverTokens.slice(0,10));
-            html = html.replace(/{{\s*[^}]+\s*}}/g, '');
+        // Small safe helpers
+        const esc = (s) => {
+            if (s == null) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        };
+        const fmtMoney = (n) => {
+            const v = Number(n || 0);
+            return v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        // Build items rows matching thermal template (index, name, qty, rate, amount)
+        const items = Array.isArray(invoice.items) ? invoice.items : [];
+        let itemsHtml = '';
+        items.forEach((it, idx) => {
+            const src = it.item && typeof it.item === 'object' ? it.item : it;
+            const name = esc(it.name || src?.name || '');
+            const qty = esc(it.quantity || 0);
+            const rate = fmtMoney(it.rate ?? src?.rate ?? 0);
+            const amount = fmtMoney((it.rate ?? src?.rate ?? 0) * (it.quantity || 0));
+            itemsHtml += `<tr><td style="text-align:center">${idx+1}</td><td>${name}</td><td style="text-align:right">${qty}</td><td style="text-align:right">${rate}</td><td style="text-align:right">${amount}</td></tr>`;
+        });
+
+        // UPI QR generation or fallback 1x1 pixel
+        const totalForBalance = (invoice.grandTotal != null ? invoice.grandTotal : invoice.totalAmount) || 0;
+        const balance = Number(invoice.balance ?? totalForBalance) || 0;
+        const amountForQr = balance > 0 ? balance.toFixed(2) : undefined;
+        let upiImg = '';
+        try {
+            const upiId = company?.upi?.id || process.env.UPI_ID;
+            if (upiId) {
+                const qr = await generateUpiQr(upiId, amountForQr);
+                upiImg = qr?.qrCodeImage || '';
+            }
+        } catch (e) {
+            upiImg = '';
         }
-        console.log(`[BILLING] Generated thermal HTML for invoice ${invoice._id} (length: ${html.length})`);
+        const EMPTY_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+        const upiSrc = esc(upiImg) || EMPTY_PIXEL;
 
-        // Inject preview/print script to allow user to choose print or download
-        const script = `<script>
-            function openWindow(url) { window.open(url, '_blank'); }
-            window.addEventListener('load', function(){
-                const printBtn = document.getElementById('printBtn');
-                const downloadPdfBtn = document.getElementById('downloadPdfBtn');
-                const downloadA4Btn = document.getElementById('downloadA4Btn');
-                if (printBtn) printBtn.addEventListener('click', function(){ window.print(); });
-                if (downloadPdfBtn) downloadPdfBtn.addEventListener('click', function(){ openWindow('/api/billing/public/pdf/${invoice._id}?format=thermal'); });
-                if (downloadA4Btn) downloadA4Btn.addEventListener('click', function(){ openWindow('/api/billing/public/pdf/${invoice._id}'); });
-                // attempt to auto-open UPI deep link if present (may be blocked by popup rules)
-                const upiAnchor = document.getElementById('upiAnchor');
-                if (upiAnchor && upiAnchor.href) {
-                    try { window.location.href = upiAnchor.href; } catch(e) { /* ignore */ }
-                }
-            });
-        </script>`;
+        // Company/customer safe values
+        const companyName = esc(company.name || '');
+        const companyAddress = esc(company.address || '');
+        const companyPhone = esc(company.phone || '');
+        const companyGST = esc(company.gstin || '');
 
-        // Serve as HTML for direct preview (do not force download)
+        const customer = invoice.customer || {};
+        const customerName = esc(customer.firmName || customer.name || '');
+        const customerPhone = esc(customer.contact || customer.phone || '');
+        const customerGST = esc(customer.gstNo || customer.gstin || '');
+
+        const invoiceNumber = esc(invoice.invoiceNumber || String(invoice._id || ''));
+        const invoiceDate = esc(new Date(invoice.invoiceDate || Date.now()).toLocaleDateString('en-GB'));
+        const subtotal = fmtMoney(invoice.subTotal ?? invoice.subtotal ?? items.reduce((s, it) => s + ((it.rate ?? it?.item?.rate ?? 0) * (it.quantity || 0)), 0));
+        const totalDiscount = fmtMoney(invoice.totalDiscount || 0);
+        const totalGST = fmtMoney(invoice.totalTax || invoice.totalTax || 0);
+        const totalAmount = fmtMoney(invoice.grandTotal || invoice.totalAmount || 0);
+
+        // Build minimal, self-contained HTML
+        const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Thermal Invoice</title><style>body{font-family:monospace;font-size:12px;margin:0;padding:6px;width:240px}.no-print{display:block}@media print{.no-print{display:none}}.header{text-align:center;font-weight:bold;margin-bottom:6px}.small{font-size:11px}table{width:100%;border-collapse:collapse}td{padding:2px 0}.right{text-align:right}.center{text-align:center}.items td{border-top:1px dashed #000}.totals{border-top:1px dashed #000;margin-top:6px}</style></head><body>
+  <div class="no-print" style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><button id="printBtn" style="padding:6px 10px;margin-right:6px">Print</button><button id="downloadPdfBtn" style="padding:6px 10px;margin-right:6px">Download Thermal PDF</button><button id="downloadA4Btn" style="padding:6px 10px">Download A4 PDF</button></div><div style="font-size:12px;color:#444">Preview</div></div><a id="upiAnchor" href=""></a></div>
+  <div class="header"><div style="font-size:14px;font-weight:700">${companyName}</div><div class="small">${companyAddress}</div><div class="small">Phone: ${companyPhone}</div><div class="small">GSTIN: ${companyGST}</div></div>
+  <div style="display:flex;justify-content:space-between;margin-top:6px"><div><strong>Bill No:</strong> ${invoiceNumber}</div><div style="text-align:right"><strong>Date:</strong> ${invoiceDate}</div></div>
+  <div style="margin-top:6px"><div><strong>Bill To:</strong></div><div class="small">${customerName}</div><div class="small">${customerPhone}</div><div class="small">GSTIN: ${customerGST}</div></div>
+  <table class="items" style="margin-top:6px"><thead><tr><td style="width:6%;text-align:center">#</td><td style="width:48%">Item</td><td style="width:12%;text-align:right">Qty</td><td style="width:17%;text-align:right">Rate</td><td style="width:17%;text-align:right">Amount</td></tr></thead><tbody>${itemsHtml}</tbody></table>
+  <div class="totals small"><div style="display:flex;justify-content:space-between"><div>Subtotal</div><div class="right">${subtotal}</div></div><div style="display:flex;justify-content:space-between"><div>Discount</div><div class="right">${totalDiscount}</div></div><div style="display:flex;justify-content:space-between"><div>Tax</div><div class="right">${totalGST}</div></div><div style="display:flex;justify-content:space-between;font-weight:bold"><div>Total</div><div class="right">${totalAmount}</div></div></div>
+  <div style="margin-top:8px;text-align:center"><div><img src="${upiSrc}" alt="UPI QR" style="max-width:120px;max-height:120px;"/></div><div class="small">Scan to pay via UPI</div></div>
+  <div class="center small" style="margin-top:8px">Thank you for your purchase</div><div class="center xsmall" style="margin-top:6px">Powered by GST Invoice System</div>
+  <script>function openWindow(url){window.open(url,'_blank')}window.addEventListener('load',function(){const p=document.getElementById('printBtn');const d=document.getElementById('downloadPdfBtn');const a=document.getElementById('downloadA4Btn');if(p) p.addEventListener('click',()=>window.print()); if(d) d.addEventListener('click',()=>openWindow('/api/billing/public/pdf/${invoice._id}?format=thermal')); if(a) a.addEventListener('click',()=>openWindow('/api/billing/public/pdf/${invoice._id}'))});</script></body></html>`;
+
         res.setHeader('Content-Type', 'text/html');
-        res.send(html + script);
+        return res.send(html);
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to generate thermal HTML', error);
     }
