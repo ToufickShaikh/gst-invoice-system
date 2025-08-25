@@ -742,20 +742,27 @@ const createInvoicePortalLink = async (req, res) => {
           : `/${process.env.PUBLIC_BASE_PATH}`;
       }
       
-      publicBase = `${protocol}://${host}${subpath}`;
+            publicBase = `${protocol}://${host}${subpath}`;
     }
+        // Final safety: if publicBase is falsy for any reason, fallback to known server IP + subpath
+        if (!publicBase) {
+            const fallbackHost = process.env.FALLBACK_PUBLIC_HOST || '185.52.53.253';
+            const fallbackPath = process.env.PUBLIC_BASE_PATH || '/shaikhcarpets';
+            publicBase = `https://${fallbackHost}${fallbackPath}`;
+        }
 
-    const url = `${publicBase}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
+        publicBase = publicBase.replace(/\/$/, '');
+        const url = `${publicBase}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
     
     console.log(`[INFO] Created portal link for invoice ${invoice.invoiceNumber}: ${url}`);
     
-    res.json({ 
-      success: true,
-      url, 
-      token: invoice.portalToken, 
-      expiresAt: invoice.portalTokenExpires,
-      invoiceNumber: invoice.invoiceNumber
-    });
+        res.json({ 
+            success: true,
+            url: url || '', 
+            token: invoice.portalToken, 
+            expiresAt: invoice.portalTokenExpires,
+            invoiceNumber: invoice.invoiceNumber
+        });
   } catch (error) {
     console.error('[ERROR] Create portal link failed:', error);
     sendErrorResponse(res, 500, 'Failed to create portal link', error);
@@ -785,11 +792,17 @@ const createCustomerPortalLink = async (req, res) => {
                 }
             };
 
-            const publicBase = process.env.PUBLIC_BASE_URL
-                || detectBaseFromReferer2()
-                || (req.protocol + '://' + req.get('host')) + (process.env.PUBLIC_BASE_PATH || '');
-            const url = `${publicBase.replace(/\/$/, '')}/portal/customer/${customer._id}/${customer.portalToken}/statement`;
-    res.json({ url, token: customer.portalToken, expiresAt: customer.portalTokenExpires });
+                        // Determine public base with several fallbacks
+                        let publicBase = process.env.PUBLIC_BASE_URL
+                                || detectBaseFromReferer2()
+                                || ((req.get('x-forwarded-proto') || req.protocol) + '://' + (req.get('x-forwarded-host') || req.get('host') || 'localhost:3000')) + (process.env.PUBLIC_BASE_PATH || '');
+                        if (!publicBase) {
+                            const fallbackHost = process.env.FALLBACK_PUBLIC_HOST || '185.52.53.253';
+                            const fallbackPath = process.env.PUBLIC_BASE_PATH || '/shaikhcarpets';
+                            publicBase = `https://${fallbackHost}${fallbackPath}`;
+                        }
+                        const url = `${publicBase.replace(/\/$/, '')}/portal/customer/${customer._id}/${customer.portalToken}/statement`;
+        res.json({ url: url || '', token: customer.portalToken, expiresAt: customer.portalTokenExpires });
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to create customer portal link', error);
   }
