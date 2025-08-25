@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const company = require('../config/company');
 const crypto = require('crypto');
+const { cacheManager } = require('../utils/cacheManager');
 
 // Helper to safely extract an ObjectId string from either an id string or a populated object
 const extractId = (val) => {
@@ -210,9 +211,9 @@ const createInvoice = async (req, res) => {
             exportInfo: exportInfo || undefined,
         });
 
-        await invoice.save();
+    await invoice.save();
 
-        // Decrement stock quantities after successful save (can go negative) for linked catalog items only
+    // Decrement stock quantities after successful save (can go negative) for linked catalog items only
         for (const invoiceItem of normalizedItems) {
             if (!invoiceItem.item) continue; // skip manual lines
             const itemId = extractId(invoiceItem.item) || invoiceItem.item;
@@ -226,6 +227,15 @@ const createInvoice = async (req, res) => {
         }
 
         // Do NOT generate/store PDF here; PDFs are generated on-demand via public endpoint
+
+        // Invalidate invoices and dashboard caches so frontend shows fresh data
+        try {
+            await cacheManager.invalidatePattern('invoices');
+            await cacheManager.invalidatePattern('dashboard');
+        } catch (e) {
+            console.warn('[CACHE] Failed to invalidate caches after invoice create', e && e.message);
+        }
+
         return res.status(201).json(invoice);
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to create invoice', error);
@@ -337,6 +347,15 @@ const updateInvoice = async (req, res) => {
         }
 
         // Do NOT regenerate/store PDF here; PDFs are generated on-demand via public endpoint
+
+        // Invalidate caches after update
+        try {
+            await cacheManager.invalidatePattern('invoices');
+            await cacheManager.invalidatePattern('dashboard');
+        } catch (e) {
+            console.warn('[CACHE] Failed to invalidate caches after invoice update', e && e.message);
+        }
+
         return res.json(updatedInvoice);
     } catch (error) {
         sendErrorResponse(res, 500, 'Failed to update invoice', error);
@@ -384,6 +403,14 @@ const deleteInvoice = async (req, res) => {
         }
 
         await Invoice.findByIdAndDelete(id);
+
+        // Invalidate caches after delete
+        try {
+            await cacheManager.invalidatePattern('invoices');
+            await cacheManager.invalidatePattern('dashboard');
+        } catch (e) {
+            console.warn('[CACHE] Failed to invalidate caches after invoice delete', e && e.message);
+        }
 
         res.json({ 
             success: true,
@@ -756,6 +783,13 @@ const createInvoicePortalLink = async (req, res) => {
     
     console.log(`[INFO] Created portal link for invoice ${invoice.invoiceNumber}: ${url}`);
     
+        // Invalidate invoice list cache so portal token shows up in subsequent fetches
+        try {
+            await cacheManager.invalidatePattern('invoices');
+        } catch (e) {
+            console.warn('[CACHE] Failed to invalidate invoices cache after portal link creation', e && e.message);
+        }
+
         res.json({ 
             success: true,
             url: url || '', 
@@ -802,6 +836,11 @@ const createCustomerPortalLink = async (req, res) => {
                             publicBase = `https://${fallbackHost}${fallbackPath}`;
                         }
                         const url = `${publicBase.replace(/\/$/, '')}/portal/customer/${customer._id}/${customer.portalToken}/statement`;
+        try {
+            await cacheManager.invalidatePattern('invoices');
+        } catch (e) {
+            console.warn('[CACHE] Failed to invalidate invoices cache after customer portal link creation', e && e.message);
+        }
         res.json({ url: url || '', token: customer.portalToken, expiresAt: customer.portalTokenExpires });
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to create customer portal link', error);

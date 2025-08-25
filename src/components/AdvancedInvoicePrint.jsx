@@ -3,10 +3,13 @@ import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../utils/dateHelpers';
 import { useCompany } from '../context/CompanyContext.jsx';
 import { billingAPI } from '../api/billing';
+import { portalAPI } from '../api/portal';
 
 const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
   const { company } = useCompany();
   const [printFormat, setPrintFormat] = useState('A4'); // A4, A5, Thermal
+  const [iframeSrc, setIframeSrc] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const [printOptions, setPrintOptions] = useState({
     showGST: true,
     showHSN: true,
@@ -34,6 +37,43 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
     loadQr();
     return () => { active = false; };
   }, [isVisible, invoice?._id, company?.upi?.qrImageUrl]);
+
+  // When Thermal format is selected, create portal link and load public thermal preview
+  useEffect(() => {
+    let mounted = true;
+    async function loadThermalPreview() {
+      if (printFormat !== 'Thermal' || !invoice?._id) {
+        setIframeSrc(null);
+        setLoadingPreview(false);
+        return;
+      }
+
+      try {
+        setLoadingPreview(true);
+        // Create a portal link (protected API expects auth; axiosInstance handles headers)
+        const res = await portalAPI.createInvoicePortalLink(invoice._id);
+        const url = res?.url;
+        const token = res?.token;
+        // If backend returned a public URL we can open directly
+        if (url) {
+          // Use the public thermal viewer endpoint with token to ensure server-side token check
+          const previewUrl = url.includes('/portal/invoice/') ? url.replace('/portal/invoice/', '/api/billing/public/print/thermal/') + `?token=${token}` : `/api/billing/public/print/thermal/${invoice._id}?token=${token}`;
+          if (mounted) setIframeSrc(previewUrl);
+        } else {
+          // Fallback: call thermal endpoint directly with token
+          if (token && mounted) setIframeSrc(`/api/billing/public/print/thermal/${invoice._id}?token=${token}`);
+        }
+      } catch (e) {
+        console.error('Failed to load thermal preview:', e);
+        setIframeSrc(null);
+        toast.error(e?.response?.data?.message || 'Failed to load thermal preview');
+      } finally {
+        if (mounted) setLoadingPreview(false);
+      }
+    }
+    loadThermalPreview();
+    return () => { mounted = false; };
+  }, [printFormat, invoice?._id]);
 
   const safeDate = (d) => {
     if (!d) return '';
@@ -139,7 +179,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
     return { rows, totals };
   };
 
-  const buildPreviewHtml = () => {
+  const buildPreviewHtml = (format = 'A4') => {
     if (!invoice) return '';
     const norm = normalize(invoice);
     const { rows, totals } = buildTaxSummary(norm);
@@ -168,10 +208,12 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
           : `<div>${company.terms}</div>`)
       : '';
 
+    const pageSize = (format || 'A4').toUpperCase() === 'A5' ? 'A5' : 'A4';
+
     return `<!DOCTYPE html>
     <html><head><meta charset="utf-8" />
     <style>
-      @page { size: A4; margin: 10mm; }
+      @page { size: ${pageSize}; margin: 10mm; }
       body { font-family: Arial, sans-serif; color:#000; }
       .container { width: 190mm; margin: 0 auto; }
       h1 { font-size: 18px; margin: 4mm 0; text-align:center; }
@@ -300,7 +342,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
 
   const handlePrint = () => {
     try {
-      const html = buildPreviewHtml();
+  const html = buildPreviewHtml(printFormat === 'A5' ? 'A5' : 'A4');
       const win = window.open('', '_blank');
       if (!win) { toast.error('Pop-up blocked. Allow pop-ups to print.'); return; }
       win.document.open();
@@ -325,13 +367,24 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
             <select className="border rounded px-2 py-1 text-sm" value={printFormat} onChange={(e)=>setPrintFormat(e.target.value)}>
               <option value="A4">A4</option>
               <option value="A5">A5</option>
+              <option value="Thermal">Thermal (2.5in)</option>
             </select>
             <button onClick={handlePrint} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Print</button>
             <button onClick={onClose} className="px-3 py-1 border rounded text-sm">Close</button>
           </div>
         </div>
         <div className="flex-1 overflow-auto">
-          <iframe title="invoice-preview" className="w-full h-[70vh]" srcDoc={buildPreviewHtml()} />
+          {printFormat === 'Thermal' ? (
+            <div className="w-full h-[70vh]">
+              {loadingPreview ? (
+                <div className="p-4">Loading thermal preview...</div>
+              ) : (
+                <iframe title="invoice-thermal-preview" className="w-full h-[70vh]" src={iframeSrc || ''} />
+              )}
+            </div>
+          ) : (
+            <iframe title="invoice-preview" className="w-full h-[70vh]" srcDoc={buildPreviewHtml(printFormat === 'A5' ? 'A5' : 'A4')} />
+          )}
         </div>
       </div>
     </div>
