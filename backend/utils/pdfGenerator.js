@@ -103,6 +103,18 @@ async function generateThermalPDF(invoiceData, fileName) {
 }
 
 async function replacePlaceholders(html, invoiceData) {
+    try {
+        // Diagnostic logging to help debug missing fields in templates
+        const id = invoiceData?._id || invoiceData?.id || 'N/A';
+        const invNum = invoiceData?.invoiceNumber || invoiceData?._id || 'N/A';
+        const hasCustomer = invoiceData && typeof invoiceData.customer === 'object' && Object.keys(invoiceData.customer || {}).length > 0;
+        const itemsLen = Array.isArray(invoiceData?.items) ? invoiceData.items.length : 0;
+        console.log(`[PDF] replacePlaceholders called for invoice id=${id}, invoiceNumber=${invNum}, hasCustomer=${hasCustomer}, items=${itemsLen}`);
+        // Log top-level keys present
+        console.log('[PDF] invoiceData keys:', Object.keys(invoiceData || {}).slice(0,40));
+    } catch (dbgErr) {
+        console.warn('[PDF] replacePlaceholders debug log failed:', dbgErr);
+    }
     // Company details
     html = html.replace(/{{companyName}}/g, escapeHtml(company.name));
     html = html.replace(/{{companyAddress}}/g, escapeHtml(company.address));
