@@ -5,89 +5,10 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
 
 // Import enterprise services
-const emailService = require('../services/emailService');
 const whatsappService = require('../services/whatsappService');
 const paymentService = require('../services/paymentService');
 const reportingService = require('../services/reportingService');
 const { cacheManager } = require('../utils/cacheManager');
-
-// Email Management Routes
-router.get('/emails/stats', authenticateToken, async (req, res) => {
-    try {
-        const { period = '24h' } = req.query;
-        const stats = await emailService.getEmailStats(period);
-        res.json({
-            success: true,
-            data: stats,
-            message: 'Email statistics retrieved successfully'
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Failed to get email statistics',
-            error: error.message
-        });
-    }
-});
-
-router.post('/emails/send-test', authenticateToken, async (req, res) => {
-    try {
-        const { to } = req.body;
-        if (!to) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email address is required'
-            });
-        }
-
-        const emailId = await emailService.sendTestEmail(to);
-        res.json({
-            success: true,
-            data: { emailId },
-            message: 'Test email queued successfully'
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Failed to send test email',
-            error: error.message
-        });
-    }
-});
-
-router.post('/emails/send-invoice', authenticateToken, async (req, res) => {
-    try {
-        const { invoiceId, customerEmail, type = 'created' } = req.body;
-        
-        // Here you would fetch the invoice from database
-        // For now, using mock data
-        const invoice = {
-            _id: invoiceId,
-            invoiceNumber: 'INV-2024-001',
-            grandTotal: 15000,
-            dueDate: '2024-02-15',
-            customerDetails: { name: 'John Doe' },
-            companyDetails: { 
-                name: process.env.COMPANY_NAME || 'Your Company',
-                phone: '+91 9876543210',
-                email: 'info@company.com'
-            }
-        };
-
-        const emailId = await emailService.sendInvoiceEmail(invoice, customerEmail, type);
-        res.json({
-            success: true,
-            data: { emailId },
-            message: 'Invoice email queued successfully'
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Failed to send invoice email',
-            error: error.message
-        });
-    }
-});
 
 // WhatsApp Integration Routes
 router.get('/whatsapp/stats', authenticateToken, async (req, res) => {

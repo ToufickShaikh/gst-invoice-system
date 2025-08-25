@@ -655,95 +655,6 @@ const recordCustomerPayment = async (req, res) => {
     }
 };
 
-// @desc    Generate and email a customer statement (returns statement data; email sending optional/configurable)
-// @route   POST /api/billing/customers/:customerId/email-statement
-// @access  Private
-const emailCustomerStatement = async (req, res) => {
-    try {
-        const { customerId } = req.params;
-        const { startDate, endDate } = req.body || {};
-
-        const customer = await Customer.findById(customerId);
-        if (!customer) return sendErrorResponse(res, 404, 'Customer not found');
-
-        const dateQuery = {};
-        if (startDate) dateQuery.$gte = new Date(startDate);
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setUTCHours(23, 59, 59, 999);
-            dateQuery.$lte = end;
-        }
-
-        const match = { customer: customerId };
-        if (Object.keys(dateQuery).length) match.invoiceDate = dateQuery;
-
-        const invoices = await Invoice.find(match).sort({ invoiceDate: 1 });
-
-        const totals = invoices.reduce((acc, inv) => {
-            const total = Number(inv.grandTotal || inv.totalAmount || 0);
-            const paid = Number(inv.paidAmount || 0);
-            const bal = Number(inv.balance != null ? inv.balance : (total - paid));
-            acc.total += total;
-            acc.paid += paid;
-            acc.balance += Math.max(0, bal);
-            return acc;
-        }, { total: 0, paid: 0, balance: 0 });
-
-        // Build a simple HTML statement preview
-        const rows = invoices.map(inv => {
-            const total = Number(inv.grandTotal || inv.totalAmount || 0).toFixed(2);
-            const paid = Number(inv.paidAmount || 0).toFixed(2);
-            const bal = Number(inv.balance != null ? inv.balance : (inv.grandTotal - (inv.paidAmount || 0))).toFixed(2);
-            const dateStr = inv.invoiceDate ? new Date(inv.invoiceDate).toISOString().slice(0,10) : '';
-            return `<tr><td style="padding:6px;border:1px solid #eee;">${inv.invoiceNumber || inv._id}</td><td style="padding:6px;border:1px solid #eee;">${dateStr}</td><td style="padding:6px;border:1px solid #eee;">₹${total}</td><td style="padding:6px;border:1px solid #eee;">₹${paid}</td><td style="padding:6px;border:1px solid #eee;">₹${bal}</td></tr>`;
-        }).join('');
-
-        const html = `
-            <div style="font-family:Arial,sans-serif;">
-              <h2>Account Statement</h2>
-              <p><strong>Customer:</strong> ${customer.firmName || customer.name || ''}</p>
-              ${startDate || endDate ? `<p><strong>Period:</strong> ${startDate || 'Start'} to ${endDate || 'Today'}</p>` : ''}
-              <table style="border-collapse:collapse;min-width:520px;">
-                <thead>
-                  <tr>
-                    <th style="text-align:left;padding:6px;border:1px solid #eee;">Invoice</th>
-                    <th style="text-align:left;padding:6px;border:1px solid #eee;">Date</th>
-                    <th style="text-align:right;padding:6px;border:1px solid #eee;">Total</th>
-                    <th style="text-align:right;padding:6px;border:1px solid #eee;">Paid</th>
-                    <th style="text-align:right;padding:6px;border:1px solid #eee;">Balance</th>
-                  </tr>
-                </thead>
-                <tbody>${rows || '<tr><td colspan="5" style="padding:8px;color:#888;">No invoices found.</td></tr>'}</tbody>
-                <tfoot>
-                  <tr>
-                    <td colspan="2" style="padding:6px;border:1px solid #eee;text-align:right;"><strong>Totals:</strong></td>
-                    <td style="padding:6px;border:1px solid #eee;text-align:right;"><strong>₹${totals.total.toFixed(2)}</strong></td>
-                    <td style="padding:6px;border:1px solid #eee;text-align:right;"><strong>₹${totals.paid.toFixed(2)}</strong></td>
-                    <td style="padding:6px;border:1px solid #eee;text-align:right;"><strong>₹${totals.balance.toFixed(2)}</strong></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-        `;
-
-        const toEmail = customer.email || company.email;
-        const subject = `Account Statement - ${customer.firmName || customer.name || ''}`;
-
-        // If email infrastructure exists, send it here. For now, return payload.
-        res.json({
-            success: true,
-            to: toEmail,
-            subject,
-            html,
-            totals,
-            invoiceCount: invoices.length,
-            note: 'Email sending can be wired with SMTP in a follow-up. This endpoint returns the composed statement for now.'
-        });
-    } catch (error) {
-        sendErrorResponse(res, 500, 'Failed to generate/email statement', error);
-    }
-};
-
 // Create or refresh a portal link for an invoice (protected)
 const createInvoicePortalLink = async (req, res) => {
   try {
@@ -933,7 +844,6 @@ module.exports = {
     deleteInvoice,
     generatePublicPdf,
     recordCustomerPayment,
-    emailCustomerStatement,
     createInvoicePortalLink,
     createCustomerPortalLink,
     getPublicInvoice,

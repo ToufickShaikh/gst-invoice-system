@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createInvoice, getInvoices, getInvoiceById, updateInvoice, reprintInvoice, getDashboardStats, generatePaymentQr, deleteInvoice, generatePublicPdf, generatePublicThermalHtml, recordCustomerPayment, emailCustomerStatement, createInvoicePortalLink, createCustomerPortalLink, getPublicInvoice, getPublicCustomerStatement } = require('../controllers/billingController.js');
+const { createInvoice, getInvoices, getInvoiceById, updateInvoice, reprintInvoice, getDashboardStats, generatePaymentQr, deleteInvoice, generatePublicPdf, generatePublicThermalHtml, recordCustomerPayment, createInvoicePortalLink, createCustomerPortalLink, getPublicInvoice, getPublicCustomerStatement } = require('../controllers/billingController.js');
 const { protect } = require('../middleware/authMiddleware');
 
 // Public routes (no auth)
@@ -20,9 +20,8 @@ router.route('/invoices/:id/reprint').post(reprintInvoice);
 // QR code for invoice payment (protected)
 router.route('/invoices/:id/payment-qr').get(generatePaymentQr);
 
-// Customer-level payment & statement routes (protected)
+// Customer-level payment routes (protected)
 router.route('/customers/:customerId/payments').post(recordCustomerPayment);
-router.route('/customers/:customerId/email-statement').post(emailCustomerStatement);
 
 // Portal link creators (protected)
 router.route('/invoices/:id/portal-link').post(createInvoicePortalLink);
