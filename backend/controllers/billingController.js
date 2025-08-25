@@ -558,68 +558,7 @@ const getDashboardStats = async (req, res) => {
  * @route   GET /api/billing/invoices/:id/payment-qr
  * @access  Private
  */
-const generatePaymentQr = async (req, res) => {
-    try {
-        const invoiceId = req.params.id;
-        const invoice = await Invoice.findById(invoiceId)
-            .populate('customer')
-            .populate('items.item');
-
-        if (!invoice) {
-            return sendErrorResponse(res, 404, 'Invoice not found');
-        }
-
-        let grandTotal = invoice.grandTotal || 0;
-        let paidAmount = invoice.paidAmount || 0;
-        let balance = grandTotal - paidAmount;
-
-        // If grandTotal is 0, it's likely a legacy invoice. Let's recalculate.
-        if (grandTotal <= 0) {
-            if (!invoice.customer) {
-                return sendErrorResponse(res, 400, 'Cannot recalculate: Customer data is missing.');
-            }
-            if (!invoice.items || invoice.items.length === 0 || invoice.items.some(i => !i.item)) {
-                return sendErrorResponse(res, 400, 'Cannot recalculate: Item data is missing or not fully populated.');
-            }
-
-            const populatedItemsForRecalc = invoice.items.map(i => {
-                const itemData = i.item.toObject ? i.item.toObject() : i.item;
-                return { ...itemData, quantity: i.quantity };
-            });
-
-            const { subTotal, taxAmount, totalAmount: newGrandTotal } = calculateTotals(
-                populatedItemsForRecalc,
-                invoice.customer.state
-            );
-            const newTotalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
-            const newBalance = newGrandTotal - paidAmount;
-
-            invoice.subTotal = subTotal;
-            invoice.cgst = taxAmount.cgst;
-            invoice.sgst = taxAmount.sgst;
-            invoice.igst = taxAmount.igst;
-            invoice.totalTax = newTotalTax;
-            invoice.grandTotal = newGrandTotal;
-            invoice.balance = newBalance;
-            invoice.totalAmount = newGrandTotal;
-
-            await invoice.save();
-
-            grandTotal = newGrandTotal;
-            balance = newBalance;
-        }
-
-        const upiId = company.upi.id; // centralized from config/company.js
-        // If balance is > 0, include amount; else generate QR without amount
-        const amountForQr = balance > 0 ? balance.toFixed(2) : undefined;
-        const { qrCodeImage } = await generateUpiQr(upiId, amountForQr);
-
-        res.json({ qrCodeImage, amount: amountForQr || null });
-
-    } catch (error) {
-        sendErrorResponse(res, 500, 'Failed to generate QR code', error);
-    }
-};
+// (duplicate preview function removed; consolidated implementation later in the file)
 
 // @desc    Generate PDF for public sharing (no auth required)
 // @route   GET /api/billing/public/pdf/:invoiceId
@@ -905,53 +844,40 @@ const generatePublicThermalHtml = async (req, res) => {
         if (!invoice.portalToken || token !== invoice.portalToken) return sendErrorResponse(res, 401, 'Invalid token');
         if (invoice.portalTokenExpires && new Date(invoice.portalTokenExpires) < new Date()) return sendErrorResponse(res, 401, 'Portal link expired');
 
-        const esc = (s) => { if (s == null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); };
-        const fmt = (n) => { const v = Number(n||0); return v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+        // Debug: log id and invoiceNumber so we can see what's being rendered
+        console.log('[BILLING][PREVIEW] rendering invoice id=', String(invoice._id), ' invoiceNumber=', invoice.invoiceNumber);
 
-        const viewFormat = (req.query.format || '').toLowerCase(); // 'thermal' or 'a4'
-        const isThermal = viewFormat === 'thermal' || req.query.view === 'thermal';
+        // Precompute payment / UPI QR so templates don't await inline
+        const paymentDetails = {};
+        try {
+            const upiId = company?.upi?.id || process.env.UPI_ID;
+            if (upiId) {
+                const amountForQr = (Number(invoice.balance) || 0) > 0 ? (Number(invoice.balance) || 0).toFixed(2) : undefined;
+                const upi = await generateUpiQr(upiId, amountForQr);
+                if (upi) {
+                    paymentDetails.preRenderedUpiQr = upi.qrCodeImage || null;
+                    paymentDetails.upiLink = upi.upiLink || '';
+                    paymentDetails.upiId = upiId;
+                }
+            }
+        } catch (upiErr) {
+            console.warn('[BILLING][PREVIEW] UPI QR generation failed:', upiErr && upiErr.message ? upiErr.message : upiErr);
+        }
 
-        const companyName = esc(company.name || '');
-        const companyLogo = company.logoUrl || '';
-        const companyAddress = esc(company.address || '');
-        const customer = invoice.customer || {};
-        const invoiceNumber = esc(invoice.invoiceNumber || String(invoice._id || ''));
-        const invoiceDate = esc(new Date(invoice.invoiceDate || Date.now()).toLocaleDateString('en-GB'));
+        // Read thermal template and use centralized placeholder replacement
+        const templatePath = path.resolve(__dirname, '../templates/thermal-2in5.html');
+        const templateHtml = await fs.promises.readFile(templatePath, 'utf-8');
 
-        const items = Array.isArray(invoice.items) ? invoice.items : [];
-        let rows = '';
-        items.forEach((it, i) => {
-            const src = it.item && typeof it.item === 'object' ? it.item : it;
-            const name = esc(it.name || src?.name || `Item ${i+1}`);
-            const qty = Number(it.quantity || 0);
-            const rate = Number(it.rate ?? src?.rate ?? 0);
-            const amt = qty * rate;
-            rows += `<tr><td class="c-idx">${i+1}</td><td class="c-desc">${name}</td><td class="c-qty">${qty}</td><td class="c-rate">${fmt(rate)}</td><td class="c-amt">${fmt(amt)}</td></tr>`;
-        });
+        // Ensure plain object and known invoiceNumber value
+        const invoiceForRender = invoice.toObject ? invoice.toObject() : Object.assign({}, invoice);
+        invoiceForRender.invoiceNumber = invoiceForRender.invoiceNumber || String(invoiceForRender._id || '');
+        invoiceForRender.paymentDetails = Object.assign({}, invoiceForRender.paymentDetails || {}, paymentDetails);
 
-        const subtotal = fmt(invoice.subTotal ?? invoice.subtotal ?? items.reduce((s,it)=>s + ((it.rate ?? it?.item?.rate ?? 0) * (it.quantity||0)),0));
-        const total = fmt(invoice.grandTotal ?? invoice.totalAmount ?? 0);
-
-        const style = isThermal ? `body{font-family:monospace;color:#222;margin:0;padding:8px;width:240px}h1{font-size:14px;margin:4px 0}table{width:100%;border-collapse:collapse;font-size:12px}thead th{border-bottom:1px solid #333;text-align:left;padding:4px 0}td{padding:4px 0}.right{text-align:right}` : `body{font-family:Inter,Arial,Helvetica,sans-serif;color:#222;margin:0;padding:24px;display:flex;justify-content:center} .sheet{width:800px;background:#fff;padding:20px;border-radius:4px;box-shadow:0 0 0 rgba(0,0,0,0)} h1{font-size:20px;margin:0 0 6px} .meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px} .company{display:flex;gap:12px;align-items:center} table{width:100%;border-collapse:collapse;font-size:14px} thead th{border-bottom:2px solid #ddd;padding:8px 6px;text-align:left} td{padding:8px 6px} tfoot td{font-weight:700}`;
-
-        const logoHtml = companyLogo ? `<img src="${esc(companyLogo)}" alt="logo" style="height:48px;object-fit:contain">` : '';
-
-        const downloadA4 = `/api/billing/public/pdf/${invoice._id}?format=a4`;
-        const downloadThermal = `/api/billing/public/pdf/${invoice._id}?format=thermal`;
-
-        const previewHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Invoice Preview</title><style>${style}.actions{margin-bottom:12px}.c-idx{width:40px}.c-desc{padding-left:6px}.c-qty,.c-rate,.c-amt{text-align:right;width:110px}</style></head><body>${isThermal?'<div>':''}<div class="${isThermal?''+'':''}sheet">` +
-            `<div class="actions"><button onclick="window.print()">Print</button> <button onclick="window.open('${downloadA4}','_blank')">Download A4</button> <button onclick="window.open('${downloadThermal}','_blank')">Download Thermal</button></div>` +
-            `<div class="meta"><div class="company">${logoHtml}<div><div style="font-weight:700">${companyName}</div><div style="font-size:12px;color:#555">${companyAddress}</div></div></div><div style="text-align:right"><div style="font-weight:700">Invoice</div><div>NO: ${invoiceNumber}</div><div style="font-size:12px;color:#555">${invoiceDate}</div></div></div>` +
-            `<div style="margin:10px 0"><strong>Bill To:</strong> ${esc(customer.firmName || customer.name || 'Customer')}</div>` +
-            `<table><thead><tr><th>#</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="3"></td><td class="right">Subtotal</td><td class="right">${subtotal}</td></tr><tr><td colspan="3"></td><td class="right">Total</td><td class="right">${total}</td></tr></tfoot></table>` +
-            `${(company?.upi?.id || process.env.UPI_ID) ? `<div style="margin-top:12px"><strong>UPI:</strong> ${esc(company?.upi?.id || process.env.UPI_ID)} <img src="${esc(company?.upi?.id ? (await generateUpiQr(company?.upi?.id, (Number(invoice.balance)||0).toFixed(2))).qrCodeImage : '')}" alt="upi" style="height:48px;vertical-align:middle;margin-left:8px"/></div>` : ''}` +
-            `<div style="margin-top:18px;text-align:center;font-size:12px;color:#666">Powered by GST Invoice System</div>` +
-            `</div>${isThermal?'</div>':''}</body></html>`;
-
-        res.setHeader('Content-Type','text/html');
-        return res.send(previewHtml);
+        const finalHtml = await pdfGenerator.replacePlaceholders(templateHtml, invoiceForRender);
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(finalHtml);
     } catch (error) {
-        console.error('[BILLING] Preview generation failed:', error);
+        console.error('[BILLING] Preview generation failed:', error && error.stack ? error.stack : error);
         sendErrorResponse(res, 500, 'Failed to generate preview', error);
     }
 };
