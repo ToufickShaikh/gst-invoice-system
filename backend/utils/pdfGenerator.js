@@ -6,6 +6,7 @@ const { extractStateCode, COMPANY_STATE_CODE } = require('./taxHelpers');
 const company = require('../config/company');
 
 const EMPTY_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+const logger = require('./logger');
 
 async function generateInvoicePDF(invoiceData, fileName) {
     console.log(`[PDF] Starting PDF generation for invoice: ${invoiceData && invoiceData.invoiceNumber}`);
@@ -27,7 +28,7 @@ async function generateInvoicePDF(invoiceData, fileName) {
         await page.setContent(html, { waitUntil: 'networkidle0' });
         await page.pdf({ path: pdfPath, format: 'A4', printBackground: true, margin: { top: '8mm', right: '8mm', bottom: '8mm', left: '8mm' } });
 
-        console.log(`[PDF] PDF generated successfully: ${pdfPath}`);
+        logger.info(`[PDF] PDF generated successfully: ${pdfPath}`);
         return `/invoices/${path.basename(pdfPath)}`;
     } catch (error) {
         console.error('[PDF] generateInvoicePDF failed:', error && error.stack ? error.stack : error);
@@ -56,7 +57,7 @@ async function generateThermalPDF(invoiceData, fileName) {
 
         try {
             await page.pdf({ path: pdfPath, width: '64mm', printBackground: true, margin: { top: 0, right: 0, bottom: 0, left: 0 } });
-            console.log(`[PDF] Thermal PDF generated successfully: ${pdfPath}`);
+                logger.info(`[PDF] Thermal PDF generated successfully: ${pdfPath}`);
             return `/invoices/${path.basename(pdfPath)}`;
         } catch (pdfErr) {
             console.error('[PDF] Thermal PDF page.pdf() failed:', pdfErr && pdfErr.stack ? pdfErr.stack : pdfErr);
@@ -65,15 +66,15 @@ async function generateThermalPDF(invoiceData, fileName) {
                 await fs.mkdir(debugDir, { recursive: true });
                 const debugFile = path.join(debugDir, `thermal-html-${(invoiceData && (invoiceData._id || invoiceData.invoiceNumber)) || Date.now()}.html`);
                 await fs.writeFile(debugFile, html, 'utf-8');
-                console.log('[PDF] Wrote thermal HTML to debug file:', debugFile);
+                    logger.info('[PDF] Wrote thermal HTML to debug file:', debugFile);
             } catch (writeErr) {
-                console.error('[PDF] Failed to write thermal HTML debug file:', writeErr && writeErr.stack ? writeErr.stack : writeErr);
+                    logger.warn('[PDF] Failed to write thermal HTML debug file:', writeErr && writeErr.stack ? writeErr.stack : writeErr);
             }
             // Fallback to A4
             try {
                 if (browser) await browser.close();
                 const fallbackPath = await generateInvoicePDF(invoiceData, fileName && fileName.toString().trim().length > 0 ? fileName : undefined);
-                console.log('[PDF] Fallback A4 PDF generated:', fallbackPath);
+                    logger.info('[PDF] Fallback A4 PDF generated:', fallbackPath);
                 return fallbackPath;
             } catch (fallbackErr) {
                 console.error('[PDF] Fallback A4 PDF generation also failed:', fallbackErr && fallbackErr.stack ? fallbackErr.stack : fallbackErr);
@@ -94,9 +95,9 @@ async function replacePlaceholders(html, invoiceData) {
         const invNum = invoiceData && (invoiceData.invoiceNumber || invoiceData._id) ? (invoiceData.invoiceNumber || invoiceData._id) : 'N/A';
         const hasCustomer = invoiceData && typeof invoiceData.customer === 'object' && Object.keys(invoiceData.customer || {}).length > 0;
         const itemsLen = invoiceData && Array.isArray(invoiceData.items) ? invoiceData.items.length : 0;
-        console.log(`[PDF] replacePlaceholders called for invoice id=${id}, invoiceNumber=${invNum}, hasCustomer=${hasCustomer}, items=${itemsLen}`);
+        logger.debug(`[PDF] replacePlaceholders called for invoice id=${id}, invoiceNumber=${invNum}, hasCustomer=${hasCustomer}, items=${itemsLen}`);
     } catch (dbgErr) {
-        console.warn('[PDF] replacePlaceholders debug log failed:', dbgErr);
+        logger.warn('[PDF] replacePlaceholders debug log failed:', dbgErr);
     }
 
     // Company

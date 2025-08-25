@@ -20,9 +20,11 @@ const extractId = (val) => {
     return null;
 };
 
+const logger = require('../utils/logger');
+
 // Helper function for consistent error responses
 const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
-    console.error(`[ERROR] ${message}:`, errorDetails);
+    logger.error(`${message}:`, errorDetails);
     res.status(statusCode).json({
         message,
         error: errorDetails ? errorDetails.message || errorDetails.toString() : 'Unknown error',
@@ -62,13 +64,13 @@ async function generateInvoiceNumber(customerType) {
 // @route   GET /api/billing/invoices
 // @access  Private
 const getInvoices = async (req, res) => {
-    console.log('Fetching invoices with query:', req.query);
+    logger.debug('Fetching invoices with query:', req.query);
     try {
         const { billingType } = req.query;
         let query = {};
 
         if (billingType && ['B2B', 'B2C'].includes(billingType.toUpperCase())) {
-            console.log(`Filtering invoices for billing type: ${billingType.toUpperCase()}`);
+            logger.debug(`Filtering invoices for billing type: ${billingType.toUpperCase()}`);
 
             // Find customers with the specified customerType
             const customers = await Customer.find({ customerType: billingType.toUpperCase() });
@@ -77,16 +79,16 @@ const getInvoices = async (req, res) => {
             // Filter invoices by customer IDs
             query.customer = { $in: customerIds };
         } else {
-            console.log('No valid billingType filter applied - returning all invoices.');
+            logger.debug('No valid billingType filter applied - returning all invoices.');
         }
 
         const invoices = await Invoice.find(query).populate('customer').sort({ createdAt: -1 });
-        console.log(`Found ${invoices.length} invoices.`);
+    logger.info(`Found ${invoices.length} invoices.`);
 
         // Log invoices without customers for debugging
         const invoicesWithoutCustomers = invoices.filter(inv => !inv.customer);
         if (invoicesWithoutCustomers.length > 0) {
-            console.log(`⚠ Found ${invoicesWithoutCustomers.length} invoices without customers:`,
+            logger.warn(`⚠ Found ${invoicesWithoutCustomers.length} invoices without customers:`,
                 invoicesWithoutCustomers.map(inv => inv.invoiceNumber));
         }
 
