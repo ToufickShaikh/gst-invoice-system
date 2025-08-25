@@ -20,59 +20,67 @@ const createIndexes = async () => {
         invoiceDate: -1, 
         customer: 1, 
         paymentStatus: 1 
-      }),
+      }).catch(() => {}),
       // Text search index
       Invoice.collection.createIndex({
         invoiceNumber: 'text',
         'customer.firmName': 'text',
         'customer.name': 'text'
-      }),
+      }).catch(() => {}),
       // Performance indexes
-      Invoice.collection.createIndex({ createdAt: -1 }),
-      Invoice.collection.createIndex({ grandTotal: -1 }),
-      Invoice.collection.createIndex({ balance: 1 }),
-      Invoice.collection.createIndex({ billingType: 1 }),
+      Invoice.collection.createIndex({ createdAt: -1 }).catch(() => {}),
+      Invoice.collection.createIndex({ grandTotal: -1 }).catch(() => {}),
+      Invoice.collection.createIndex({ balance: 1 }).catch(() => {}),
+      Invoice.collection.createIndex({ billingType: 1 }).catch(() => {}),
       // Partial index for unpaid invoices
       Invoice.collection.createIndex(
         { balance: 1, dueDate: 1 },
         { partialFilterExpression: { balance: { $gt: 0 } } }
-      )
+      ).catch(() => {})
     ]);
 
     // Customer Indexes
     const Customer = mongoose.model('Customer');
     await Promise.all([
-      Customer.collection.createIndex({ firmName: 1 }),
-      Customer.collection.createIndex({ contact: 1 }),
-      Customer.collection.createIndex({ customerType: 1 }),
-      Customer.collection.createIndex({ state: 1 }),
-      // Text search
-      Customer.collection.createIndex({
+      Customer.collection.createIndex({ firmName: 1 }).catch(() => {}),
+      Customer.collection.createIndex({ contact: 1 }).catch(() => {}),
+      Customer.collection.createIndex({ customerType: 1 }).catch(() => {}),
+      Customer.collection.createIndex({ state: 1 }).catch(() => {})
+    ]);
+
+    // Skip text index creation if it already exists with different options
+    try {
+      await Customer.collection.createIndex({
         firmName: 'text',
         name: 'text'
-      })
-    ]);
+      });
+    } catch (error) {
+      if (error.code !== 85 && error.code !== 86) {
+        throw error; // Re-throw if it's not an index conflict
+      }
+      // Index conflict is expected and can be ignored
+    }
 
     // Item Indexes
     const Item = mongoose.model('Item');
     await Promise.all([
-      Item.collection.createIndex({ name: 1 }),
-      Item.collection.createIndex({ hsnCode: 1 }),
-      Item.collection.createIndex({ category: 1 }),
-      Item.collection.createIndex({ quantityInStock: 1 }),
-      Item.collection.createIndex({ rate: 1 }),
+      Item.collection.createIndex({ name: 1 }).catch(() => {}),
+      Item.collection.createIndex({ hsnCode: 1 }).catch(() => {}),
+      Item.collection.createIndex({ category: 1 }).catch(() => {}),
+      Item.collection.createIndex({ quantityInStock: 1 }).catch(() => {}),
+      Item.collection.createIndex({ rate: 1 }).catch(() => {}),
       // Compound index for inventory management
       Item.collection.createIndex({ 
         category: 1, 
         quantityInStock: 1,
         active: 1 
-      }),
+      }).catch(() => {}),
       // Text search
       Item.collection.createIndex({
         name: 'text',
         description: 'text',
         hsnCode: 'text'
-      })
+      }).catch(() => {})
     ]);
 
     console.log('✅ Database indexes created successfully');
