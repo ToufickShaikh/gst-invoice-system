@@ -1,12 +1,12 @@
 module.exports = {
   apps: [{
-    name: 'gst-invoice-enhanced',
+    name: 'shaikh-backend',
     script: 'server.js',
-    instances: 'max',
-    exec_mode: 'cluster',
+    instances: 1,
+    exec_mode: 'fork',
     env: {
       NODE_ENV: 'production',
-      PORT: 5000
+      PORT: 3000
     },
     error_file: './logs/err.log',
     out_file: './logs/out.log',
