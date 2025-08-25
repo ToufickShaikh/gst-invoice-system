@@ -2,7 +2,7 @@ const rateLimit = require('express-rate-limit');
 const slowDown = require('express-slow-down');
 const helmet = require('helmet');
 const compression = require('compression');
-const { cacheManager, cacheMiddleware, cacheConfig } = require('./cacheManager');
+const { cacheManager, cacheMiddleware, cacheConfig } = require('../utils/cacheManager');
 
 /**
  * Advanced Performance Middleware Suite
