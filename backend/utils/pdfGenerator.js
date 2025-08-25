@@ -222,9 +222,7 @@ async function replacePlaceholders(html, invoiceData) {
     // Round off to avoid floating point issues
     const roundOff = Math.round((totalGST + Number.EPSILON) * 100) / 100;
 
-    // Support multiple template variants: some templates use {{items}} while others use {{itemsTable}}
     html = html.replace(/{{items}}/g, itemsHtml);
-    html = html.replace(/{{itemsTable}}/g, itemsHtml);
     html = html.replace(/{{totalQuantity}}/g, escapeHtml(String(totalQuantity)));
     html = html.replace(/{{totalDiscount}}/g, escapeHtml(formatCurrency(totalDiscount)));
     html = html.replace(/{{totalGST}}/g, escapeHtml(formatCurrency(roundOff)));
@@ -250,23 +248,7 @@ async function replacePlaceholders(html, invoiceData) {
         `;
     });
 
-    // Populate tax summary table for templates that expect either {{taxSummary}} or {{taxSummaryTable}}
     html = html.replace(/{{taxSummary}}/g, taxSummaryHtml);
-    html = html.replace(/{{taxSummaryTable}}/g, taxSummaryHtml);
-
-    // Provide aggregated tax summary totals for templates that reference nested keys like {{taxSummaryTotal.taxableAmount}}
-    const taxSummaryTotal = {
-        taxableAmount: totalTaxableAmount || 0,
-        igstAmount: totalIgstAmount || 0,
-        cgstAmount: totalCgstAmount || 0,
-        sgstAmount: totalSgstAmount || 0,
-        totalTax: roundOff || 0,
-    };
-    html = html.replace(/{{taxSummaryTotal\.taxableAmount}}/g, escapeHtml(formatCurrency(taxSummaryTotal.taxableAmount)));
-    html = html.replace(/{{taxSummaryTotal\.igstAmount}}/g, escapeHtml(formatCurrency(taxSummaryTotal.igstAmount)));
-    html = html.replace(/{{taxSummaryTotal\.cgstAmount}}/g, escapeHtml(formatCurrency(taxSummaryTotal.cgstAmount)));
-    html = html.replace(/{{taxSummaryTotal\.sgstAmount}}/g, escapeHtml(formatCurrency(taxSummaryTotal.sgstAmount)));
-    html = html.replace(/{{taxSummaryTotal\.totalTax}}/g, escapeHtml(formatCurrency(taxSummaryTotal.totalTax)));
 
     // Payment details
     const paymentDetails = invoiceData.paymentDetails || {};
