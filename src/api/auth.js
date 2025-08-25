@@ -1,23 +1,16 @@
-import axiosInstance from './axiosInstance';
-
+// Authentication has been removed in this build. Expose a client-side API
+// that consistently rejects so callers don't perform network requests.
 export const authAPI = {
-  login: async (credentials) => {
-    const payload = credentials.username ? { username: credentials.username, password: credentials.password } : credentials;
-    const res = await axiosInstance.post(`/auth/login`, payload);
-    return res.data;
+  login: async (_credentials) => {
+    return Promise.reject(new Error('Authentication removed from this build'));
   },
-  register: async (data) => {
-    const res = await axiosInstance.post(`/auth/register`, data);
-    return res.data;
+  register: async (_data) => {
+    return Promise.reject(new Error('Authentication removed from this build'));
   },
-  // Logout and getProfile might not need the token for their initial call,
-  // but subsequent calls from the frontend will use the interceptor.
   logout: async () => {
-    const res = await axiosInstance.post(`/auth/logout`); // Assuming a backend logout endpoint
-    return res.data;
+    return Promise.reject(new Error('Authentication removed from this build'));
   },
   getProfile: async () => {
-    const res = await axiosInstance.get(`/auth/profile`); // Assuming a backend profile endpoint
-    return res.data;
-  },
+    return Promise.reject(new Error('Authentication removed from this build'));
+  }
 };

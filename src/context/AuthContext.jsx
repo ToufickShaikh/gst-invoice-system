@@ -16,8 +16,10 @@ const AuthContext = createContext({
 export const useAuth = () => useContext(AuthContext)
 
 export const AuthProvider = ({ children }) => {
+  const login = async () => { throw new Error('Authentication removed from this build') }
+  const register = async () => { throw new Error('Authentication removed from this build') }
   return (
-    <AuthContext.Provider value={{ user: null, userProfile: {}, loading: false, login: async () => {}, register: async () => {}, logout: () => {}, updateProfile: () => {}, updatePreferences: () => {} }}>
+    <AuthContext.Provider value={{ user: null, userProfile: {}, loading: false, login, register, logout: () => {}, updateProfile: () => {}, updatePreferences: () => {} }}>
       {children}
     </AuthContext.Provider>
   )
