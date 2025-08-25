@@ -266,6 +266,9 @@ async function replacePlaceholders(html, invoiceData) {
     // Remove leftover tokens
     html = html.replace(/\{\{\s*[^}]+\s*\}\}/g, '');
 
+    // Remove any literal 'undefined' that accidentally made it into templates
+    html = html.replace(/\bundefined\b/g, '');
+
     return html;
 }
 
