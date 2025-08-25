@@ -119,6 +119,8 @@ const getInvoiceById = async (req, res) => {
 // @route   POST /api/billing/invoices
 // @access  Private
 const createInvoice = async (req, res) => {
+    console.log('--- ROUTE ARRIVAL: POST /api/billing/invoices ---');
+    console.log('Params:', req.params, 'Query:', req.query, 'BodyKeys:', Object.keys(req.body || {}));
     console.log('--- Starting Invoice Creation ---');
     const { customer, customerName, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '', exportInfo } = req.body;
 
@@ -246,6 +248,8 @@ const createInvoice = async (req, res) => {
 // @route   PUT /api/billing/invoices/:id
 // @access  Private
 const updateInvoice = async (req, res) => {
+    console.log('--- ROUTE ARRIVAL: PUT /api/billing/invoices/:id ---');
+    console.log('Params:', req.params, 'Query:', req.query, 'BodyKeys:', Object.keys(req.body || {}));
     const { id } = req.params;
     const { customer, items, discount = 0, shippingCharges = 0, paidAmount = 0, paymentMethod = '', billingType = '', exportInfo } = req.body;
 
@@ -367,6 +371,8 @@ const updateInvoice = async (req, res) => {
 // @access  Private
 const deleteInvoice = async (req, res) => {
     try {
+        console.log('--- ROUTE ARRIVAL: DELETE /api/billing/invoices/:id ---');
+        console.log('Params:', req.params, 'Query:', req.query);
         const { id } = req.params;
         
         if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {

@@ -21,17 +21,29 @@ exports.get = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
-  try { const inv = await service.createInvoice(req.body); res.status(201).json(inv); }
+  try {
+    console.log('--- ROUTE ARRIVAL: POST /api/invoices ---', 'BodyKeys:', Object.keys(req.body || {}));
+    const inv = await service.createInvoice(req.body);
+    res.status(201).json(inv);
+  }
   catch (e) { handleError(res, e, 400); }
 };
 
 exports.update = async (req, res) => {
-  try { const inv = await service.updateInvoice(req.params.id, req.body); res.json(inv); }
+  try {
+    console.log('--- ROUTE ARRIVAL: PUT /api/invoices/:id ---', 'Params:', req.params, 'BodyKeys:', Object.keys(req.body || {}));
+    const inv = await service.updateInvoice(req.params.id, req.body);
+    res.json(inv);
+  }
   catch (e) { handleError(res, e, 400); }
 };
 
 exports.remove = async (req, res) => {
-  try { const out = await service.deleteInvoice(req.params.id); res.json({ success: true, ...out }); }
+  try {
+    console.log('--- ROUTE ARRIVAL: DELETE /api/invoices/:id ---', 'Params:', req.params);
+    const out = await service.deleteInvoice(req.params.id);
+    res.json({ success: true, ...out });
+  }
   catch (e) { handleError(res, e, 400); }
 };
 

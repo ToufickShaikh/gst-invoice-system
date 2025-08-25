@@ -204,7 +204,14 @@ const cacheManager = new CacheManager();
  */
 const cacheMiddleware = (ttl = 300, keyGenerator) => {
   return async (req, res, next) => {
-    // Generate cache key
+    // Only cache GET responses. For non-GET (POST/PUT/DELETE) we must bypass
+    // the cache so write operations reach the controller.
+    if (String(req.method || '').toUpperCase() !== 'GET') {
+      res.setHeader('X-Cache', 'BYPASS');
+      return next();
+    }
+
+    // Generate cache key for GET requests
     const cacheKey = keyGenerator ? 
       keyGenerator(req) : 
       `route:${req.method}:${req.originalUrl}:${JSON.stringify(req.query)}`;
@@ -218,15 +225,15 @@ const cacheMiddleware = (ttl = 300, keyGenerator) => {
 
       res.setHeader('X-Cache', 'MISS');
 
-      // Override res.json to cache the response
+      // Override res.json to cache the response only for successful GET responses
       const originalJson = res.json.bind(res);
       res.json = (data) => {
-        // Don't cache error responses
+        // Only cache successful GET responses
         if (res.statusCode >= 400) {
           return originalJson(data);
         }
 
-        // Cache successful responses
+        // Cache successful GET responses
         cacheManager.set(cacheKey, data, ttl);
         return originalJson(data);
       };
