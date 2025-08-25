@@ -44,72 +44,20 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-  <div className="max-w-md w-full">
+      <div className="max-w-md w-full">
         <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-gray-800">GST Billing System</h2>
-            <div className="mt-2 bg-gradient-to-r from-yellow-600 to-yellow-800 text-white py-2 px-4 rounded-lg">
+            <div className="mt-2 bg-gradient-to-r from-yellow-600 to-yellow-800 text-white py-2 px-4 rounded-lg inline-block">
               <p className="text-sm font-medium">Shaikh Carpets and Mats</p>
-              <p className="text-xs opacity-75">Professional Invoice Management</p>
             </div>
           </div>
-          <form onSubmit={(e) => { e.preventDefault(); toast('Authentication removed from this build'); }}>
-            <InputField
-              label="Username"
-              name="username"
-              type="text"
-              value={formData.username}
-              onChange={handleChange}
-              placeholder="Enter username"
-              required
-            />
-            {isRegisterMode && (
-              <InputField
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter email address"
-                required
-              />
-            )}
-            <InputField
-              label="Password"
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Enter password"
-              required
-            />
-            <Button type="button" variant="primary" className="w-full" onClick={() => toast('Authentication removed')}>Sign In Disabled</Button>
-          </form>
-          <p className="text-sm text-gray-600 text-center mt-4">
-            {isRegisterMode ? (
-              <>
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setIsRegisterMode(false)}
-                  className="text-yellow-600 hover:text-yellow-800 font-medium focus:outline-none"
-                >
-                  Login
-                </button>
-              </>
-            ) : (
-              <>
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setIsRegisterMode(true)}
-                  className="text-yellow-600 hover:text-yellow-800 font-medium focus:outline-none"
-                >
-                  Register
-                </button>
-              </>
-            )}
-          </p>
+
+          <div className="p-6 border rounded-md bg-yellow-50">
+            <h3 className="text-lg font-semibold text-yellow-800">Authentication removed</h3>
+            <p className="mt-2 text-sm text-yellow-700">Authentication and login have been removed from this build. All user-facing features are available without signing in.</p>
+            <p className="mt-3 text-xs text-gray-600">If you expected a private account, contact the system administrator.</p>
+          </div>
 
           {/* Developer Credit */}
           <div className="mt-6 text-center">
