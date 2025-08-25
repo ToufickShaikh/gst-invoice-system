@@ -61,3 +61,18 @@ exports.publicPdf = async (req, res) => {
     return res.sendFile(fullPath, (err) => { if (err) console.error('Send PDF error', err); setTimeout(() => { try { fs.unlinkSync(fullPath); } catch (_) {} }, 30000); });
   } catch (e) { handleError(res, e, 400); }
 };
+
+exports.generatePaymentQr = async (req, res) => {
+  try {
+    const out = await service.generatePaymentQrForInvoice(req.params.id);
+    res.json({ success: true, ...out });
+  } catch (e) { handleError(res, e, 400); }
+};
+
+exports.recordCustomerPayment = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const out = await service.recordCustomerPayment(customerId, req.body);
+    res.json(out);
+  } catch (e) { handleError(res, e, 400); }
+};

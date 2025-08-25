@@ -26,7 +26,7 @@ export const billingAPI = {
   // Generate payment QR code
   // Payment QR remains on legacy endpoint for now (no v2 equivalent yet)
   generatePaymentQr: async (id) => {
-    const res = await axiosInstance.get(`/billing/invoices/${id}/payment-qr`);
+  const res = await axiosInstance.get(`/invoices/${id}/payment-qr`);
     return res.data;
   },
   // Delete an invoice by ID
@@ -65,8 +65,9 @@ export const billingAPI = {
   },
   // --- Payments & Statements ---
   recordCustomerPayment: async (customerId, payload) => {
-    const res = await axiosInstance.post(`/billing/customers/${customerId}/payments`, payload);
-    return res.data;
+  // routed to v2 invoices service
+  const res = await axiosInstance.post(`/invoices/customers/${customerId}/payments`, payload);
+  return res.data;
   },
   emailCustomerStatement: async (customerId, payload) => {
     const res = await axiosInstance.post(`/billing/customers/${customerId}/email-statement`, payload);

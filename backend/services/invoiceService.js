@@ -16,6 +16,7 @@ const company = require('../config/company');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const { cacheManager } = require('../utils/cacheManager');
 
 // ---------- Helpers ----------
 const extractId = (v) => {
@@ -118,6 +119,8 @@ async function createInvoice(data) {
   });
 
   await adjustStock(normalized, -1);
+  // invalidate caches
+  try { await cacheManager.invalidatePattern('invoices'); await cacheManager.invalidatePattern('dashboard'); } catch(_){}
   return invoice;
 }
 
@@ -161,6 +164,7 @@ async function updateInvoice(id, data) {
 
   await existing.save();
   await adjustStock(normalized, -1);
+  try { await cacheManager.invalidatePattern('invoices'); await cacheManager.invalidatePattern('dashboard'); } catch(_){}
   return existing.populate('customer').populate('items.item');
 }
 
@@ -173,6 +177,7 @@ async function deleteInvoice(id) {
     if (fs.existsSync(file)) { try { fs.unlinkSync(file); } catch (_) { /* ignore */ } }
   }
   await invoice.deleteOne();
+  try { await cacheManager.invalidatePattern('invoices'); await cacheManager.invalidatePattern('dashboard'); } catch(_){}
   return { deletedId: id };
 }
 
@@ -183,6 +188,7 @@ async function reprintInvoice(id, { format = 'a4' } = {}) {
   if (format === 'thermal') pdfPath = await pdfGenerator.generateThermalPDF(invoice);
   else pdfPath = await pdfGenerator.generateInvoicePDF(invoice, format);
   invoice.pdfPath = pdfPath; await invoice.save();
+  try { await cacheManager.invalidatePattern('invoices'); } catch(_){}
   return { pdfPath, format };
 }
 
@@ -192,6 +198,7 @@ async function createPortalLink(id, baseUrl) {
   invoice.portalToken = crypto.randomBytes(16).toString('hex');
   invoice.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await invoice.save();
+  try { await cacheManager.invalidatePattern('invoices'); } catch(_){}
   const url = `${baseUrl.replace(/\/$/, '')}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
   return { url, token: invoice.portalToken, expiresAt: invoice.portalTokenExpires, invoiceNumber: invoice.invoiceNumber };
 }
@@ -238,4 +245,48 @@ module.exports = {
   createPortalLink,
   getPublicInvoice,
   generatePublicPdf,
+  // new v2 additions
+  generatePaymentQrForInvoice: async (id) => {
+    const invoice = await Invoice.findById(id).populate('customer').populate('items.item');
+    if (!invoice) throw new Error('Invoice not found');
+    let grandTotal = invoice.grandTotal || 0;
+    let paidAmount = invoice.paidAmount || 0;
+    let balance = grandTotal - paidAmount;
+    if (grandTotal <= 0) {
+      if (!invoice.customer) throw new Error('Cannot recalculate: Customer data is missing.');
+      if (!invoice.items || invoice.items.length === 0) throw new Error('Cannot recalculate: Item data is missing.');
+      const populatedItemsForRecalc = invoice.items.map(i => ({ ...(i.item.toObject ? i.item.toObject() : i.item), quantity: i.quantity }));
+      const { subTotal, taxAmount, totalAmount: newGrandTotal } = calculateTotals(populatedItemsForRecalc, invoice.customer.state);
+      grandTotal = newGrandTotal; balance = newGrandTotal - paidAmount;
+      invoice.subTotal = subTotal; invoice.cgst = taxAmount.cgst; invoice.sgst = taxAmount.sgst; invoice.igst = taxAmount.igst; invoice.totalTax = (taxAmount.cgst||0)+(taxAmount.sgst||0)+(taxAmount.igst||0); invoice.grandTotal = newGrandTotal; invoice.balance = balance; invoice.totalAmount = newGrandTotal;
+      await invoice.save();
+    }
+    const upiId = company.upi?.id || process.env.UPI_ID || '';
+    const amountForQr = balance > 0 ? balance.toFixed(2) : undefined;
+    const { qrCodeImage } = await generateUpiQr(upiId, amountForQr);
+    return { qrCodeImage, amount: amountForQr || null };
+  },
+  recordCustomerPayment: async (customerId, { amount, method = 'Cash', date = new Date(), notes = '' } = {}) => {
+    amount = Number(amount);
+    if (!customerId) throw new Error('Customer ID required');
+    if (!amount || amount <= 0) throw new Error('Valid amount required');
+    const customer = await Customer.findById(customerId);
+    if (!customer) throw new Error('Customer not found');
+    const invoices = await Invoice.find({ customer: customerId }).sort({ invoiceDate: 1 }).select('_id invoiceNumber grandTotal paidAmount balance');
+    let remaining = amount; const allocations = [];
+    for (const inv of invoices) {
+      const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+      const paidAmount = Number(inv.paidAmount || 0);
+      let balance = Number(inv.balance != null ? inv.balance : (grandTotal - paidAmount));
+      if (balance <= 0) continue;
+      if (remaining <= 0) break;
+      const alloc = Math.min(balance, remaining);
+      inv.paidAmount = paidAmount + alloc; inv.balance = Math.max(0, grandTotal - inv.paidAmount);
+      await inv.save();
+      allocations.push({ invoiceId: inv._id, invoiceNumber: inv.invoiceNumber, allocated: alloc, remainingBalance: inv.balance });
+      remaining -= alloc;
+    }
+    try { await cacheManager.invalidatePattern('invoices'); await cacheManager.invalidatePattern('dashboard'); } catch(_){}
+    return { success: true, customerId, totalPaid: amount, unallocated: remaining, allocations };
+  }
 };

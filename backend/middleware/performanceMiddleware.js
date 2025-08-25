@@ -48,7 +48,11 @@ const buildExemptPaths = () => {
     return [
       '/api/billing/invoices/.+/portal-link',
       '/api/billing/invoices/.+',
-      '/api/billing/dashboard-stats'
+      '/api/billing/dashboard-stats',
+      // v2 equivalents
+      '/api/invoices/.+/portal-link',
+      '/api/invoices/.+',
+      '/api/invoices/customers/.+/payments'
     ];
   }
   return raw.split(',').map(s => s.trim()).filter(Boolean);

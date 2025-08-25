@@ -14,6 +14,12 @@ router.post('/', /*protect,*/ ctrl.create);
 router.get('/public/:id/pdf', ctrl.publicPdf); // ?token=...&format=thermal|a4
 router.get('/public/:id', ctrl.publicInvoice); // ?token=...
 
+// Payment QR (private)
+router.get('/:id/payment-qr', /*protect,*/ ctrl.generatePaymentQr);
+
+// Customer payment allocation
+router.post('/customers/:customerId/payments', /*protect,*/ ctrl.recordCustomerPayment);
+
 // Private detail routes
 router.get('/:id', /*protect,*/ ctrl.get);
 router.put('/:id', /*protect,*/ ctrl.update);
