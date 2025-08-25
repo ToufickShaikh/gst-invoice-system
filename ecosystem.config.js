@@ -1,3 +1,7 @@
+// Load production .env for PM2 so environment variables like JWT_SECRET are available
+require('path');
+try { require('dotenv').config({ path: require('path').resolve(__dirname, '.env.production') }); } catch (e) { /* ignore if dotenv not present */ }
+
 module.exports = {
   apps: [
     {
@@ -26,6 +30,10 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3000,
+        // Use values loaded from .env.production when available
+        JWT_SECRET: process.env.JWT_SECRET || 'replace_me_with_secure_jwt_secret',
+        PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL || 'https://185.52.53.253/shaikhcarpets',
+        MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/gst_invoice_system'
       },
     },
   ],

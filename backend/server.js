@@ -9,6 +9,11 @@ dotenv.config(); // Load environment variables from .env file
 console.log('Starting GST Invoice Backend...');
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('MongoDB URI:', process.env.MONGODB_URI ? 'Set' : 'Using default localhost');
+if (!process.env.JWT_SECRET) {
+    console.warn('⚠️ JWT_SECRET is not set. Authentication tokens will fail verification. Set JWT_SECRET in your environment or .env.production for PM2.');
+} else {
+    console.log('JWT_SECRET is set (length:', String(process.env.JWT_SECRET).length, 'characters)');
+}
 
 // Connect to MongoDB with error handling
 connectDB().catch(err => {
