@@ -56,10 +56,13 @@ class PaymentService {
 
     // Setup webhook handlers for different gateways
     setupWebhookHandlers() {
+        // Only bind handlers that are actually implemented
         this.webhookHandlers.set('razorpay', this.handleRazorpayWebhook.bind(this));
-        this.webhookHandlers.set('stripe', this.handleStripeWebhook.bind(this));
-        this.webhookHandlers.set('cashfree', this.handleCashfreeWebhook.bind(this));
-        this.webhookHandlers.set('phonepe', this.handlePhonepeWebhook.bind(this));
+        
+        // TODO: Implement these webhook handlers when needed
+        // this.webhookHandlers.set('stripe', this.handleStripeWebhook.bind(this));
+        // this.webhookHandlers.set('cashfree', this.handleCashfreeWebhook.bind(this));
+        // this.webhookHandlers.set('phonepe', this.handlePhonepeWebhook.bind(this));
     }
 
     // Create payment intent/order
