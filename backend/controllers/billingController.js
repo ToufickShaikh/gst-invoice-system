@@ -757,40 +757,13 @@ const createInvoicePortalLink = async (req, res) => {
     invoice.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await invoice.save();
 
-    // Improved base URL detection
-    let publicBase;
-    
-    // Priority 1: Environment variable
-    if (process.env.PUBLIC_BASE_URL) {
-      publicBase = process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
-    } else {
-      // Priority 2: Detect from request headers
-      const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-      const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3000';
-      
-      // Check if we're running under a subpath (like /shaikhcarpets)
-      const referer = req.get('referer');
-      let subpath = '';
-      
-      if (referer && referer.includes('/shaikhcarpets')) {
-        subpath = '/shaikhcarpets';
-      } else if (process.env.PUBLIC_BASE_PATH) {
-        subpath = process.env.PUBLIC_BASE_PATH.startsWith('/') 
-          ? process.env.PUBLIC_BASE_PATH 
-          : `/${process.env.PUBLIC_BASE_PATH}`;
-      }
-      
-            publicBase = `${protocol}://${host}${subpath}`;
+    const publicBase = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+    if (!publicBase) {
+      console.error('[FATAL] PUBLIC_BASE_URL is not set. Cannot generate portal link.');
+      return sendErrorResponse(res, 500, 'Server configuration error: PUBLIC_BASE_URL is not set.');
     }
-        // Final safety: if publicBase is falsy for any reason, fallback to known server IP + subpath
-        if (!publicBase) {
-            const fallbackHost = process.env.FALLBACK_PUBLIC_HOST || '185.52.53.253';
-            const fallbackPath = process.env.PUBLIC_BASE_PATH || '/shaikhcarpets';
-            publicBase = `https://${fallbackHost}${fallbackPath}`;
-        }
-
-        publicBase = publicBase.replace(/\/$/, '');
-        const url = `${publicBase}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
+    
+    const url = `${publicBase}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
     
     console.log(`[INFO] Created portal link for invoice ${invoice.invoiceNumber}: ${url}`);
     
@@ -803,7 +776,7 @@ const createInvoicePortalLink = async (req, res) => {
 
         res.json({ 
             success: true,
-            url: url || '', 
+            url: url, 
             token: invoice.portalToken, 
             expiresAt: invoice.portalTokenExpires,
             invoiceNumber: invoice.invoiceNumber
