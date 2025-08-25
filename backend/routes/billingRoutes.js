@@ -6,7 +6,8 @@ const { createInvoice, getInvoices, getInvoiceById, updateInvoice, reprintInvoic
 // Auth removed — public routes and protected behavior disabled
 // Public routes (no auth)
 router.route('/public/pdf/:invoiceId').get(generatePublicPdf);
-router.route('/public/print/thermal/:invoiceId').get(generatePublicThermalHtml);
+// Accept optional token segment so links like /public/print/thermal/:invoiceId/:token also work
+router.route('/public/print/thermal/:invoiceId/:token?').get(generatePublicThermalHtml);
 router.route('/public/invoices/:id').get(getPublicInvoice);
 router.route('/public/customers/:customerId/statement').get(getPublicCustomerStatement);
 

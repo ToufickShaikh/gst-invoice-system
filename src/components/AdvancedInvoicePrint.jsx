@@ -55,8 +55,24 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
         const url = res?.url;
         // If backend returned a public URL we can open directly
         if (url) {
-          const previewUrl = url.includes('/portal/invoice/') ? url.replace('/portal/invoice/', '/api/billing/public/print/thermal/') : `/api/billing/public/print/thermal/${invoice._id}`;
-          if (mounted) setIframeSrc(previewUrl);
+          // expected portal URL: <base>/portal/invoice/:id/:token
+          try {
+            if (url.includes('/portal/invoice/')) {
+              const tail = url.split('/portal/invoice/')[1] || '';
+              const parts = tail.split('/').filter(Boolean);
+              const pid = parts[0] || invoice._id;
+              const ptoken = parts[1] || null;
+              const previewUrl = `/api/billing/public/print/thermal/${pid}` + (ptoken ? `?token=${ptoken}` : '');
+              if (mounted) setIframeSrc(previewUrl);
+            } else {
+              // If backend returned some other public URL, try to map to thermal endpoint
+              const previewUrl = `/api/billing/public/print/thermal/${invoice._id}`;
+              if (mounted) setIframeSrc(previewUrl);
+            }
+          } catch (e) {
+            console.warn('Failed to parse portal URL, falling back to direct thermal endpoint', e);
+            if (mounted) setIframeSrc(`/api/billing/public/print/thermal/${invoice._id}`);
+          }
         } else {
           // Fallback: call thermal endpoint directly
           if (mounted) setIframeSrc(`/api/billing/public/print/thermal/${invoice._id}`);

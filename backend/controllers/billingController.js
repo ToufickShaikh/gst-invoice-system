@@ -763,13 +763,19 @@ const createInvoicePortalLink = async (req, res) => {
     invoice.portalTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await invoice.save();
 
-    const publicBase = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
-    if (!publicBase) {
-      console.error('[FATAL] PUBLIC_BASE_URL is not set. Cannot generate portal link.');
-      return sendErrorResponse(res, 500, 'Server configuration error: PUBLIC_BASE_URL is not set.');
-    }
-    
-    const url = `${publicBase}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
+        // Resolve a public base URL for portal links. Prefer explicit PUBLIC_BASE_URL.
+        // If not set, fall back to host + PUBLIC_PATH (defaults to '/shaikhcarpets') so links
+        // generated behind a reverse-proxy still include the application's subpath.
+        const resolvePublicBase = (req) => {
+            const envBase = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+            if (envBase) return envBase;
+            const publicPath = (process.env.PUBLIC_PATH || '/shaikhcarpets');
+            const host = `${req.protocol}://${req.get('host')}`;
+            return (host + (publicPath.startsWith('/') ? '' : '/') + publicPath).replace(/\/$/, '');
+        };
+
+        const publicBase = resolvePublicBase(req);
+        const url = `${publicBase}/portal/invoice/${invoice._id}/${invoice.portalToken}`;
     
     console.log(`[INFO] Created portal link for invoice ${invoice.invoiceNumber}: ${url}`);
     
@@ -878,7 +884,8 @@ const getPublicInvoice = async (req, res) => {
 const generatePublicThermalHtml = async (req, res) => {
     try {
         const { invoiceId } = req.params;
-        const { token } = req.query;
+        // Token may be passed as a query param (?token=...) or as an optional path segment (/.../:token)
+        const token = req.params.token || req.query.token;
         const invoice = await Invoice.findById(invoiceId).populate('customer').populate('items.item');
         if (!invoice) return sendErrorResponse(res, 404, 'Invoice not found');
         if (!invoice.portalToken || token !== invoice.portalToken) return sendErrorResponse(res, 401, 'Invalid token');

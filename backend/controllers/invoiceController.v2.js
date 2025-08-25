@@ -54,7 +54,15 @@ exports.reprint = async (req, res) => {
 
 exports.portalLink = async (req, res) => {
   try {
-    const base = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '') || ((req.protocol + '://' + req.get('host')));
+    const resolvePublicBase = (req) => {
+      const envBase = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+      if (envBase) return envBase;
+      const publicPath = (process.env.PUBLIC_PATH || '/shaikhcarpets');
+      const host = `${req.protocol}://${req.get('host')}`;
+      return (host + (publicPath.startsWith('/') ? '' : '/') + publicPath).replace(/\/$/, '');
+    };
+
+    const base = resolvePublicBase(req);
     const out = await service.createPortalLink(req.params.id, base);
     res.json({ success: true, ...out });
   } catch (e) { handleError(res, e, 400); }
