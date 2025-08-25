@@ -10,6 +10,8 @@ const path = require('path');
 const company = require('../config/company');
 const crypto = require('crypto');
 const { cacheManager } = require('../utils/cacheManager');
+// Reuse payment QR generator from the v2 invoice controller if available
+const { generatePaymentQr: generatePaymentQrV2 } = require('./invoiceController.v2');
 
 // Helper to safely extract an ObjectId string from either an id string or a populated object
 const extractId = (val) => {
@@ -879,8 +881,8 @@ const generatePublicThermalHtml = async (req, res) => {
         res.setHeader('Content-Type', 'text/html');
         return res.send(finalHtml);
     } catch (error) {
-        console.error('[BILLING] Preview generation failed:', error && error.stack ? error.stack : error);
-        sendErrorResponse(res, 500, 'Failed to generate preview', error);
+    logger.error('[BILLING] Preview generation failed:', error && error.stack ? error.stack : error);
+    sendErrorResponse(res, 500, 'Failed to generate preview', error);
     }
 };
 
@@ -917,7 +919,7 @@ module.exports = {
     updateInvoice,
     reprintInvoice,
     getDashboardStats,
-    generatePaymentQr,
+    generatePaymentQr: generatePaymentQrV2,
     getInvoices,
     getInvoiceById,
     deleteInvoice,
