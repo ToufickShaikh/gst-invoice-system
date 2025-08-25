@@ -213,9 +213,9 @@ const createInvoice = async (req, res) => {
             exportInfo: exportInfo || undefined,
         });
 
-    await invoice.save();
+        await invoice.save();
 
-    // Decrement stock quantities after successful save (can go negative) for linked catalog items only
+        // Decrement stock quantities after successful save (can go negative) for linked catalog items only
         for (const invoiceItem of normalizedItems) {
             if (!invoiceItem.item) continue; // skip manual lines
             const itemId = extractId(invoiceItem.item) || invoiceItem.item;
@@ -902,14 +902,8 @@ const generatePublicThermalHtml = async (req, res) => {
 
         const invoice = await Invoice.findById(invoiceId).populate('customer').populate('items.item');
         if (!invoice) return sendErrorResponse(res, 404, 'Invoice not found');
-
-        const isPOS = String(invoice.billingType || '').toUpperCase() === 'POS';
-        if (!isPOS) {
-            if (!invoice.portalToken || token !== invoice.portalToken) return sendErrorResponse(res, 401, 'Invalid token');
-            if (invoice.portalTokenExpires && new Date(invoice.portalTokenExpires) < new Date()) return sendErrorResponse(res, 401, 'Portal link expired');
-        } else {
-            console.log(`[BILLING] POS invoice preview allowed without token for invoice id=${invoiceId}`);
-        }
+        if (!invoice.portalToken || token !== invoice.portalToken) return sendErrorResponse(res, 401, 'Invalid token');
+        if (invoice.portalTokenExpires && new Date(invoice.portalTokenExpires) < new Date()) return sendErrorResponse(res, 401, 'Portal link expired');
 
         const esc = (s) => { if (s == null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); };
         const fmt = (n) => { const v = Number(n||0); return v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); };
@@ -945,16 +939,12 @@ const generatePublicThermalHtml = async (req, res) => {
         const downloadA4 = `/api/billing/public/pdf/${invoice._id}?format=a4`;
         const downloadThermal = `/api/billing/public/pdf/${invoice._id}?format=thermal`;
 
-        // For POS invoices, hide payment/QR actions and assume payment completed
-        const showPaymentActions = !isPOS;
-
         const previewHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Invoice Preview</title><style>${style}.actions{margin-bottom:12px}.c-idx{width:40px}.c-desc{padding-left:6px}.c-qty,.c-rate,.c-amt{text-align:right;width:110px}</style></head><body>${isThermal?'<div>':''}<div class="${isThermal?''+'':''}sheet">` +
-            `<div class="actions"><button onclick="window.print()">Print</button> <button onclick="window.open('${downloadA4}','_blank')">Download A4</button> <button onclick="window.open('${downloadThermal}','_blank')">Download Thermal</button>` +
-            `${showPaymentActions ? ' <button id="payBtn">Pay/Collect</button>' : ''}</div>` +
+            `<div class="actions"><button onclick="window.print()">Print</button> <button onclick="window.open('${downloadA4}','_blank')">Download A4</button> <button onclick="window.open('${downloadThermal}','_blank')">Download Thermal</button></div>` +
             `<div class="meta"><div class="company">${logoHtml}<div><div style="font-weight:700">${companyName}</div><div style="font-size:12px;color:#555">${companyAddress}</div></div></div><div style="text-align:right"><div style="font-weight:700">Invoice</div><div>NO: ${invoiceNumber}</div><div style="font-size:12px;color:#555">${invoiceDate}</div></div></div>` +
             `<div style="margin:10px 0"><strong>Bill To:</strong> ${esc(customer.firmName || customer.name || 'Customer')}</div>` +
             `<table><thead><tr><th>#</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="3"></td><td class="right">Subtotal</td><td class="right">${subtotal}</td></tr><tr><td colspan="3"></td><td class="right">Total</td><td class="right">${total}</td></tr></tfoot></table>` +
-            `${showPaymentActions && (company?.upi?.id || process.env.UPI_ID) ? `<div style="margin-top:12px"><strong>UPI:</strong> ${esc(company?.upi?.id || process.env.UPI_ID)} <img src="${esc(company?.upi?.id ? (await generateUpiQr(company?.upi?.id, (Number(invoice.balance)||0).toFixed(2))).qrCodeImage : '')}" alt="upi" style="height:48px;vertical-align:middle;margin-left:8px"/></div>` : ''}` +
+            `${(company?.upi?.id || process.env.UPI_ID) ? `<div style="margin-top:12px"><strong>UPI:</strong> ${esc(company?.upi?.id || process.env.UPI_ID)} <img src="${esc(company?.upi?.id ? (await generateUpiQr(company?.upi?.id, (Number(invoice.balance)||0).toFixed(2))).qrCodeImage : '')}" alt="upi" style="height:48px;vertical-align:middle;margin-left:8px"/></div>` : ''}` +
             `<div style="margin-top:18px;text-align:center;font-size:12px;color:#666">Powered by GST Invoice System</div>` +
             `</div>${isThermal?'</div>':''}</body></html>`;
 

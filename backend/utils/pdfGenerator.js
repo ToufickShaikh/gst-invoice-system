@@ -199,7 +199,6 @@ async function replacePlaceholders(html, invoiceData) {
     const roundOff = Math.round((totalGST + Number.EPSILON) * 100) / 100;
 
     html = html.replace(/{{items}}/g, itemsHtml);
-    html = html.replace(/{{itemsTable}}/g, itemsHtml);
     html = html.replace(/{{totalQuantity}}/g, escapeHtml(String(totalQuantity)));
     html = html.replace(/{{totalDiscount}}/g, escapeHtml(formatCurrency(totalDiscount)));
     html = html.replace(/{{totalGST}}/g, escapeHtml(formatCurrency(roundOff)));
@@ -215,20 +214,7 @@ async function replacePlaceholders(html, invoiceData) {
     });
 
     html = html.replace(/{{taxSummary}}/g, taxSummaryHtml);
-    html = html.replace(/{{taxSummaryTable}}/g, taxSummaryHtml);
 
-    const taxSummaryTotal = {
-        taxableAmount: totalTaxableAmount || 0,
-        igstAmount: totalIgstAmount || 0,
-        cgstAmount: totalCgstAmount || 0,
-        sgstAmount: totalSgstAmount || 0,
-        totalTax: roundOff || 0,
-    };
-    html = html.replace(/{{taxSummaryTotal\.taxableAmount}}/g, escapeHtml(formatCurrency(taxSummaryTotal.taxableAmount)));
-    html = html.replace(/{{taxSummaryTotal\.igstAmount}}/g, escapeHtml(formatCurrency(taxSummaryTotal.igstAmount)));
-    html = html.replace(/{{taxSummaryTotal\.cgstAmount}}/g, escapeHtml(formatCurrency(taxSummaryTotal.cgstAmount)));
-    html = html.replace(/{{taxSummaryTotal\.sgstAmount}}/g, escapeHtml(formatCurrency(taxSummaryTotal.sgstAmount)));
-    html = html.replace(/{{taxSummaryTotal\.totalTax}}/g, escapeHtml(formatCurrency(taxSummaryTotal.totalTax)));
 
     const paymentDetails = invoiceData && invoiceData.paymentDetails ? invoiceData.paymentDetails : {};
     const totalForBalance = (invoiceData && invoiceData.grandTotal != null ? invoiceData.grandTotal : (invoiceData && invoiceData.totalAmount)) || 0;
