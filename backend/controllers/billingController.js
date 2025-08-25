@@ -884,7 +884,11 @@ const getPublicInvoice = async (req, res) => {
 const generatePublicThermalHtml = async (req, res) => {
     try {
         const { invoiceId } = req.params;
+        // Accept token either from path segment or query parameter (?token=...)
         const token = req.params.token || req.query.token;
+
+        // Debug logs to help diagnose preview 404s and undefined fields
+        console.log(`[BILLING][PREVIEW] Request from host=${req.get('host')} originalUrl=${req.originalUrl} method=${req.method} tokenProvided=${!!token}`);
 
         // Ensure invoice is populated with customer and items
         const invoice = await Invoice.findById(invoiceId).populate('customer').populate('items.item');
