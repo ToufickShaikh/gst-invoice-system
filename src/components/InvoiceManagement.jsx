@@ -265,12 +265,26 @@ const InvoiceManagement = () => {
   const handleDeleteInvoice = async (invoice) => {
     if (window.confirm(`Are you sure you want to delete invoice ${invoice.invoiceNumber}?`)) {
       try {
-        await billingAPI.deleteInvoice(invoice._id);
+        // Optimistic UI update: remove immediately
+        setInvoices(prev => prev.filter(inv => inv._id !== invoice._id));
+        const res = await billingAPI.deleteInvoice(invoice._id);
+        if (!res?.success) {
+          // Re-fetch if backend did not confirm
+            await fetchInvoices();
+        }
         toast.success(`Invoice ${invoice.invoiceNumber} deleted`);
-        fetchInvoices();
       } catch (error) {
         console.error('Error deleting invoice:', error);
-        toast.error('Failed to delete invoice');
+        if (error?.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+        } else if (error?.response?.status === 404) {
+          toast('Invoice already removed');
+          fetchInvoices();
+        } else {
+          toast.error(error?.response?.data?.message || 'Failed to delete invoice');
+          // Rollback optimistic removal on hard failure
+          fetchInvoices();
+        }
       }
     }
   };

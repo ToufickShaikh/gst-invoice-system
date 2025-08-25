@@ -373,11 +373,16 @@ const deleteInvoice = async (req, res) => {
             return sendErrorResponse(res, 400, 'Invalid invoice ID format');
         }
 
+        console.log(`[BILLING] Delete request received for invoice id=${id}`);
+
         const invoice = await Invoice.findById(id);
 
         if (!invoice) {
+            console.warn(`[BILLING] Delete aborted: invoice not found id=${id}`);
             return sendErrorResponse(res, 404, 'Invoice not found');
         }
+
+        console.log(`[BILLING] Found invoice ${invoice.invoiceNumber || invoice._id} with ${invoice.items?.length || 0} items. Reverting stock...`);
 
         // Revert stock changes
         for (const invoiceItem of invoice.items) {
@@ -387,6 +392,8 @@ const deleteInvoice = async (req, res) => {
                 $inc: { quantityInStock: invoiceItem.quantity },
             });
         }
+
+        console.log(`[BILLING] Stock revert complete for invoice ${invoice.invoiceNumber || invoice._id}`);
 
         // Delete associated PDF file if it exists and looks like a local path
         if (invoice.pdfPath && typeof invoice.pdfPath === 'string') {
@@ -404,10 +411,13 @@ const deleteInvoice = async (req, res) => {
 
         await Invoice.findByIdAndDelete(id);
 
+        console.log(`[BILLING] Invoice document removed id=${id}. Invalidating caches...`);
+
         // Invalidate caches after delete
         try {
             await cacheManager.invalidatePattern('invoices');
             await cacheManager.invalidatePattern('dashboard');
+            console.log('[CACHE] Invalidated invoices & dashboard patterns after deletion');
         } catch (e) {
             console.warn('[CACHE] Failed to invalidate caches after invoice delete', e && e.message);
         }
@@ -417,6 +427,7 @@ const deleteInvoice = async (req, res) => {
             message: 'Invoice deleted successfully',
             deletedId: id 
         });
+        console.log(`[BILLING] Delete response sent for invoice id=${id}`);
     } catch (error) {
         console.error('[ERROR] Delete invoice failed:', error);
         sendErrorResponse(res, 500, 'Failed to delete invoice', error);
