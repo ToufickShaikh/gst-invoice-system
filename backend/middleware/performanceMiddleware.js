@@ -239,8 +239,7 @@ const performanceMonitoring = (req, res, next) => {
       console.log('Request Metrics:', metrics);
     }
 
-    // Add performance headers
-    res.setHeader('X-Response-Time', `${Math.round(duration)}ms`);
+    // Headers are already set in the main middleware, don't set them again here
   });
 
   next();
