@@ -558,68 +558,7 @@ const getDashboardStats = async (req, res) => {
  * @route   GET /api/billing/invoices/:id/payment-qr
  * @access  Private
  */
-const generatePaymentQr = async (req, res) => {
-    try {
-        const invoiceId = req.params.id;
-        const invoice = await Invoice.findById(invoiceId)
-            .populate('customer')
-            .populate('items.item');
-
-        if (!invoice) {
-            return sendErrorResponse(res, 404, 'Invoice not found');
-        }
-
-        let grandTotal = invoice.grandTotal || 0;
-        let paidAmount = invoice.paidAmount || 0;
-        let balance = grandTotal - paidAmount;
-
-        // If grandTotal is 0, it's likely a legacy invoice. Let's recalculate.
-        if (grandTotal <= 0) {
-            if (!invoice.customer) {
-                return sendErrorResponse(res, 400, 'Cannot recalculate: Customer data is missing.');
-            }
-            if (!invoice.items || invoice.items.length === 0 || invoice.items.some(i => !i.item)) {
-                return sendErrorResponse(res, 400, 'Cannot recalculate: Item data is missing or not fully populated.');
-            }
-
-            const populatedItemsForRecalc = invoice.items.map(i => {
-                const itemData = i.item.toObject ? i.item.toObject() : i.item;
-                return { ...itemData, quantity: i.quantity };
-            });
-
-            const { subTotal, taxAmount, totalAmount: newGrandTotal } = calculateTotals(
-                populatedItemsForRecalc,
-                invoice.customer.state
-            );
-            const newTotalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
-            const newBalance = newGrandTotal - paidAmount;
-
-            invoice.subTotal = subTotal;
-            invoice.cgst = taxAmount.cgst;
-            invoice.sgst = taxAmount.sgst;
-            invoice.igst = taxAmount.igst;
-            invoice.totalTax = newTotalTax;
-            invoice.grandTotal = newGrandTotal;
-            invoice.balance = newBalance;
-            invoice.totalAmount = newGrandTotal;
-
-            await invoice.save();
-
-            grandTotal = newGrandTotal;
-            balance = newBalance;
-        }
-
-        const upiId = company.upi.id; // centralized from config/company.js
-        // If balance is > 0, include amount; else generate QR without amount
-        const amountForQr = balance > 0 ? balance.toFixed(2) : undefined;
-        const { qrCodeImage } = await generateUpiQr(upiId, amountForQr);
-
-        res.json({ qrCodeImage, amount: amountForQr || null });
-
-    } catch (error) {
-        sendErrorResponse(res, 500, 'Failed to generate QR code', error);
-    }
-};
+// (duplicate preview function removed; consolidated implementation later in the file)
 
 // @desc    Generate PDF for public sharing (no auth required)
 // @route   GET /api/billing/public/pdf/:invoiceId

@@ -221,19 +221,29 @@ async function replacePlaceholders(html, invoiceData) {
     const balance = Number(invoiceData && (invoiceData.balance ?? totalForBalance)) || 0;
     const amountForQr = balance > 0 ? balance.toFixed(2) : undefined;
 
-    let upiQr = null;
-    try {
-        if (paymentDetails && paymentDetails.upiId) {
-            upiQr = await generateUpiQr(paymentDetails.upiId, amountForQr);
+    // Prefer precomputed QR image/link if present on paymentDetails (set by caller).
+    let upiQrCode = EMPTY_PIXEL;
+    let upiQrImage = EMPTY_PIXEL;
+    let upiLink = '';
+    if (paymentDetails) {
+        if (paymentDetails.preRenderedUpiQr || paymentDetails.upiQrImage) {
+            upiQrImage = paymentDetails.preRenderedUpiQr || paymentDetails.upiQrImage;
+            upiQrCode = upiQrImage;
+            upiLink = paymentDetails.upiLink || '';
+        } else {
+            // Fallback: attempt to generate QR from upiId if provided
+            try {
+                if (paymentDetails.upiId) {
+                    const upi = await generateUpiQr(paymentDetails.upiId, amountForQr);
+                    upiQrCode = upi && upi.qrCodeImage ? upi.qrCodeImage : EMPTY_PIXEL;
+                    upiQrImage = upiQrCode;
+                    upiLink = upi && upi.upiLink ? upi.upiLink : '';
+                }
+            } catch (upiErr) {
+                console.warn('[PDF] generateUpiQr failed, continuing without QR:', upiErr && upiErr.stack ? upiErr.stack : upiErr);
+            }
         }
-    } catch (upiErr) {
-        console.warn('[PDF] generateUpiQr failed, continuing without QR:', upiErr && upiErr.stack ? upiErr.stack : upiErr);
-        upiQr = null;
     }
-
-    const upiQrCode = upiQr && upiQr.qrCodeImage ? upiQr.qrCodeImage : EMPTY_PIXEL;
-    const upiQrImage = upiQr && upiQr.qrCodeImage ? upiQr.qrCodeImage : EMPTY_PIXEL;
-    const upiLink = upiQr && upiQr.upiLink ? upiQr.upiLink : '';
 
     const paymentMode = paymentDetails && paymentDetails.mode ? paymentDetails.mode : 'Not specified';
     const transactionId = paymentDetails && (paymentDetails.transactionId || paymentDetails.txnId) ? (paymentDetails.transactionId || paymentDetails.txnId) : 'N/A';
@@ -282,5 +292,5 @@ function formatCurrency(amount) {
     }).replace('₹', '').trim();
 }
 
-module.exports = { generateInvoicePDF, generateThermalPDF };
+module.exports = { generateInvoicePDF, generateThermalPDF, replacePlaceholders };
     html = html.replace(/{{signatureImage}}/g, '');
