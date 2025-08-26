@@ -79,7 +79,13 @@ const getTaxType = async (req, res) => {
 const parsePeriod = (req) => {
   const { from, to } = req.query;
   const start = from ? new Date(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const end = to ? new Date(to) : new Date();
+  let end = to ? new Date(to) : new Date();
+  
+  // If end date is provided, set it to end of day (23:59:59.999)
+  if (to) {
+    end.setHours(23, 59, 59, 999);
+  }
+  
   return { start, end };
 };
 
