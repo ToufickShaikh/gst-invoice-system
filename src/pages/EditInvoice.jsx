@@ -32,7 +32,7 @@ const EditInvoice = () => {
         fetchInitialData();
     }, [id]);
 
-    // Recalculate summary whenever invoice data changes
+    // Recalculate summary whenever inv data changes
     useEffect(() => {
         if (!invoiceData || !customers.length) return;
 
