@@ -441,6 +441,8 @@ router.get('/returns/debug', async (req, res) => {
       subTotal: inv.subTotal,
       cgst: inv.cgst, sgst: inv.sgst, igst: inv.igst,
       grandTotal: inv.grandTotal,
+      customerRef: inv.customer, // Raw customer reference
+      customerPopulated: !!inv.customer, // Whether customer exists
       customer: {
         _id: inv.customer?._id,
         name: inv.customer?.firmName || inv.customer?.name,
