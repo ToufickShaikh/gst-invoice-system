@@ -467,13 +467,6 @@ router.get('/validate/:gstin', quickValidateGSTIN);
 router.get('/tax-type', getTaxType);
 
 module.exports = router;
-// GST Verification and Filing Routes - Clean Version
-const express = require('express');
-const router = express.Router();
-const { verifyAndAutoFillGST, validateGSTIN, determineTaxType } = require('../utils/gstVerification');
-const Invoice = require('../models/Invoice');
-const Customer = require('../models/Customer');
-const company = require('../config/company');
 
 // GST Verification functions
 const verifyGSTIN = async (req, res) => {
