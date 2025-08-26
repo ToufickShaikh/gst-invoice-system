@@ -337,6 +337,25 @@ const InvoiceManagement = () => {
     return invoices.reduce((sum, invoice) => sum + (Number(invoice.paidAmount) || 0), 0);
   };
 
+  const getDiscountGiven = () => {
+    return invoices.reduce((sum, invoice) => {
+      // prefer explicit invoice-level discount (absolute)
+      if (invoice.discount != null && invoice.discount !== '') return sum + Number(invoice.discount || 0);
+      // fallback: sum per-item discounts if present (items may have discountPct or discountAmount)
+      if (Array.isArray(invoice.items) && invoice.items.length) {
+        const lineDiscount = invoice.items.reduce((ls, it) => {
+          // if stored as amount
+          if (it.discountAmount != null) return ls + Number(it.discountAmount || 0);
+          // if stored as percent, compute approx using rate*qty
+          const rate = Number(it.rate || 0); const qty = Number(it.quantity || 0); const pct = Number(it.discount || 0);
+          return ls + ((rate * qty) * (pct || 0) / 100);
+        }, 0);
+        return sum + lineDiscount;
+      }
+      return sum;
+    }, 0);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -369,7 +388,7 @@ const InvoiceManagement = () => {
       </div>
 
       {/* Summary Cards */}
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+  <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <div className="bg-blue-50 p-6 rounded-lg">
           <h3 className="text-sm font-medium text-blue-600">Total Invoices</h3>
       <p className="text-2xl font-bold text-blue-900">{totalCount}</p>
@@ -381,6 +400,10 @@ const InvoiceManagement = () => {
         <div className="bg-yellow-50 p-6 rounded-lg">
           <h3 className="text-sm font-medium text-yellow-600">Paid Amount</h3>
           <p className="text-2xl font-bold text-yellow-900">{formatCurrency(getPaidAmount())}</p>
+        </div>
+        <div className="bg-purple-50 p-6 rounded-lg">
+          <h3 className="text-sm font-medium text-purple-600">Discount Given</h3>
+          <p className="text-2xl font-bold text-purple-900">{formatCurrency(getDiscountGiven())}</p>
         </div>
         <div className="bg-red-50 p-6 rounded-lg">
           <h3 className="text-sm font-medium text-red-600">Overdue Amount</h3>

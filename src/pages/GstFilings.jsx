@@ -54,21 +54,23 @@ const GstFilings = () => {
   useEffect(() => { fetchAll(); }, []);
 
   const dl = (path, name, extraParams = {}) => {
-  const apiBase = axiosInstance.defaults?.baseURL || (typeof window !== 'undefined' ? (window.__apiBase || '') : '');
-  const prefix = apiBase ? apiBase.replace(/\/$/, '') : ((typeof window !== 'undefined') ? (window.__basename || import.meta.env.BASE_URL || '') : '');
-  // prefer relative path under app base so BrowserRouter and frontend can request via same origin
-  const basePath = (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
-  const urlPath = (basePath + '/' + path).replace(/\/\//g, '/');
-  const url = urlPath;
-  url.searchParams.set('from', from);
-  url.searchParams.set('to', to);
-  Object.entries(extraParams).forEach(([k,v]) => url.searchParams.set(k, v));
-  const a = document.createElement('a');
-  a.href = url.toString();
-  a.download = name;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  a.click();
+  try {
+    const apiBase = axiosInstance.defaults?.baseURL || '';
+    const base = (apiBase || (typeof window !== 'undefined' ? (window.__basename || import.meta.env.BASE_URL || '') : '')).replace(/\/$/, '');
+    const url = new URL((base + path).replace(/\/\//g, '/'), window.location.origin);
+    url.searchParams.set('from', from);
+    url.searchParams.set('to', to);
+    Object.entries(extraParams).forEach(([k,v]) => url.searchParams.set(k, v));
+    const a = document.createElement('a');
+    a.href = url.toString();
+    a.download = name;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.click();
+  } catch (err) {
+    console.error('Failed to build download URL', err);
+    toast.error('Failed to build download URL');
+  }
   };
 
   const Sum = ({ label, value, className='' }) => (
