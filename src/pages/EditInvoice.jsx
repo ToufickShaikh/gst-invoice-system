@@ -271,6 +271,20 @@ const EditInvoice = () => {
       }));
     };
 
+    // If still loading or invoice data not yet available, show a loading state to avoid null access
+    if (loading || !invoiceData) {
+        return (
+            <Layout>
+                <div className="max-w-2xl mx-auto px-3 sm:px-0">
+                    <div className="card-enhanced p-6 text-center">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading invoice details...</p>
+                    </div>
+                </div>
+            </Layout>
+        );
+    }
+
     // Render a form similar to Billing.jsx but for editing
     return (
         <Layout>

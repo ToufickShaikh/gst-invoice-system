@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../utils/dateHelpers';
 import { useCompany } from '../context/CompanyContext.jsx';
 import { billingAPI } from '../api/billing';
+import { invoicesAPI } from '../api/invoices';
 import axiosInstance from '../api/axiosInstance';
 import { portalAPI } from '../api/portal';
 
@@ -367,9 +368,26 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
     </div></body></html>`;
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     try {
-  const html = buildPreviewHtml(printFormat === 'A5' ? 'A5' : 'A4');
+      // Prefer server-rendered PDF for consistent preview and print across deployments.
+      const formatParam = printFormat === 'Thermal' ? 'thermal' : (printFormat === 'A5' ? 'a5' : 'a4');
+      if (invoice?._id) {
+        try {
+          const pdfUrl = invoicesAPI.publicPdfUrl(invoice._id, null, formatParam);
+          const w = window.open(pdfUrl, '_blank');
+          if (!w) {
+            toast.error('Pop-up blocked. Allow pop-ups to print.');
+          }
+          return;
+        } catch (err) {
+          console.warn('Server PDF preview failed, falling back to client-side preview', err);
+          // fallthrough to client-side printing
+        }
+      }
+
+      // Fallback: client-side HTML print (keeps previous behaviour)
+      const html = buildPreviewHtml(printFormat === 'A5' ? 'A5' : 'A4');
       const win = window.open('', '_blank');
       if (!win) { toast.error('Pop-up blocked. Allow pop-ups to print.'); return; }
       win.document.open();
