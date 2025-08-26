@@ -98,13 +98,16 @@ const PosQuickBilling = () => {
         const getAppBase = () => {
           const apiBase = import.meta.env.VITE_API_BASE_URL || '';
           if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
-          return window.location.origin + (window.__basename || import.meta.env.BASE_URL || '');
+          // return app base path (no origin) so routes resolve with BrowserRouter basename
+          return (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
         };
-        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-        const baseUrl = getAppBase();
-        // prefer calling API directly if apiBase available
-        const openUrl = apiBase ? `${apiBase.replace(/\/$/, '')}/invoices/public/${id}/pdf?format=thermal` : `${baseUrl}/invoices/public/${id}/pdf?format=thermal`;
-        window.open(openUrl, '_blank');
+        try {
+          const pdfUrl = invoicesAPI.publicPdfUrl(id, null, 'thermal');
+          window.open(pdfUrl, '_blank');
+        } catch (e) {
+          const openUrl = `${getAppBase()}/invoices/public/${id}/pdf?format=thermal`;
+          window.open(openUrl, '_blank');
+        }
       }
       // reset
   setSaleItems([]); setPaidAmount(0); setDiscount(0); setCustomerName('');

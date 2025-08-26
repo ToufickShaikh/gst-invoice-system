@@ -118,10 +118,17 @@ const EnhancedSalesOrderManagement = () => {
       toast.success('Converted to invoice');
       // Optionally open invoice in new tab
       if (invoice?._id) {
-  const appBase = import.meta.env.BASE_URL || '/';
-  const base = window.location.origin.replace(/\/$/, '') + appBase.replace(/\/$/, '');
-  const url = `${base}/edit-invoice/${invoice._id}`;
-        window.open(url, '_blank');
+        // Prefer opening relative path so BrowserRouter basename is respected by the app
+        const relative = `/edit-invoice/${invoice._id}`;
+        try {
+          // open in new tab within the same origin
+          // open relative path under app basename so BrowserRouter handles origin and base
+          const base = (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
+          const full = base + relative;
+          window.open(full, '_blank');
+        } catch (e) {
+          window.open(relative, '_blank');
+        }
       }
       fetchAll();
     } catch (e) {

@@ -88,7 +88,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
           // Fallback: call thermal endpoint directly. Use axiosInstance baseURL when available
           const apiBase = (axiosInstance && axiosInstance.defaults && axiosInstance.defaults.baseURL)
             ? axiosInstance.defaults.baseURL.replace(/\/$/, '')
-            : (window.location.origin + (window.__basename || ''));
+            : ((window.__basename || '').replace(/\/$/, '') || '');
           if (mounted) setIframeSrc(`${apiBase}/billing/public/print/thermal/${invoice._id}`);
         }
       } catch (e) {

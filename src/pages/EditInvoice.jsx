@@ -240,7 +240,13 @@ const EditInvoice = () => {
                                 <button
                                     className="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
                                     onClick={() => {
-                                        const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+                                        const getAppBase = () => {
+                                            const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+                                            if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
+                                            // return app base path (no origin) so relative paths resolve with BrowserRouter basename
+                                            return (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
+                                        };
+                                        const baseUrl = getAppBase();
                                         const url = `${baseUrl}/api/billing/public/pdf/${id}`;
                                         window.open(url, '_blank');
                                     }}
@@ -601,7 +607,7 @@ const EditInvoice = () => {
                                                     const getAppBase = () => {
                                                         const apiBase = import.meta.env.VITE_API_BASE_URL || '';
                                                         if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
-                                                        return window.location.origin + (window.__basename || import.meta.env.BASE_URL || '');
+                                                        return (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
                                                     };
                                                     const baseUrl = getAppBase();
                                                     const url = `${baseUrl}/api/billing/public/pdf/${id}`;
@@ -617,7 +623,7 @@ const EditInvoice = () => {
                                                     const getAppBase = () => {
                                                         const apiBase = import.meta.env.VITE_API_BASE_URL || '';
                                                         if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
-                                                        return window.location.origin + (window.__basename || import.meta.env.BASE_URL || '');
+                                                        return (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
                                                     };
                                                     const baseUrl = getAppBase();
                                                     const url = `${baseUrl}/api/billing/public/pdf/${id}?format=thermal`;

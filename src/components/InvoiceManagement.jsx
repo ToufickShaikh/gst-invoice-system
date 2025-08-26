@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../utils/dateHelpers';
 import { billingAPI } from '../api/billing'; // retains legacy (GST, payment QR)
@@ -188,9 +189,10 @@ const InvoiceManagement = () => {
   };
 
   const handleWhatsAppInvoice = (invoice) => {
-  const appBase = import.meta.env.BASE_URL || '/';
-  const invoiceUrl = `${window.location.origin.replace(/\/$/, '')}${appBase.replace(/\/$/, '')}/invoice/${invoice._id}`;
-  const message = `Hi ${invoice.customer?.name}, your invoice ${invoice.invoiceNumber} for ${formatCurrency(invoice.total)} is ready. You can view it here: ${invoiceUrl}`;
+    const appBase = (typeof window !== 'undefined') ? (window.__basename || import.meta.env.BASE_URL || '') : '';
+    const prefix = appBase.replace(/\/$/, '');
+    const invoiceUrl = `${prefix}/invoice/${invoice._id}`;
+    const message = `Hi ${invoice.customer?.name}, your invoice ${invoice.invoiceNumber} for ${formatCurrency(invoice.total)} is ready. You can view it here: ${invoiceUrl}`;
     const whatsappUrl = `https://wa.me/${invoice.customer?.phone?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -615,15 +617,15 @@ const InvoiceManagement = () => {
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
                       {/* Edit */}
-                      <a
-                        href={`${window.location.origin.replace(/\/$/, '')}${(import.meta.env.BASE_URL || '/').replace(/\/$/, '')}/edit-invoice/${invoice._id}`}
+                      <Link
+                        to={`/edit-invoice/${invoice._id}`}
                         className="text-gray-700 hover:text-gray-900"
                         title="Edit Invoice"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5h2m2 0h2m-4 4h2m2 0h2M7 3h2m-2 0H5m2 4H5m0 0H3m9 4l6-6a2.121 2.121 0 013 3l-6 6M7 17l4 0 8-8" />
                         </svg>
-                      </a>
+                      </Link>
 
                       {/* Print */}
                       <button

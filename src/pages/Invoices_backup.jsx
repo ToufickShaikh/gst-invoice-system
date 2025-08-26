@@ -255,7 +255,7 @@ const Invoices = () => {
 
                 // Use the Nginx proxy URL for PDF serving
                 const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-                const baseUrl = apiBase ? apiBase.replace('/api', '') : window.location.origin;
+                const baseUrl = apiBase ? apiBase.replace('/api', '') : (window.__basename || import.meta.env.BASE_URL || '');
                 console.log('🌐 Using base URL:', baseUrl);
 
                 // Construct the PDF URL through Nginx proxy

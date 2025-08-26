@@ -416,9 +416,10 @@ const Customers = () => {
                           {
                             (() => {
                               const appBase = import.meta.env.BASE_URL || '/';
-                              const base = window.location.origin.replace(/\/$/, '') + appBase.replace(/\/$/, '');
+                              // use relative app base path so internal links stay within SPA basename
+                              const base = (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
                               const url = `${base}/edit-invoice/${inv._id}`;
-                              return <a href={url} className="text-blue-600 text-xs hover:underline">Open</a>;
+                              return <a href={`/edit-invoice/${inv._id}`} className="text-blue-600 text-xs hover:underline">Open</a>;
                             })()
                           }
                         </div>
