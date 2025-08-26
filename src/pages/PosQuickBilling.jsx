@@ -6,6 +6,7 @@ import { itemsAPI } from '../api/items';
 import { billingAPI } from '../api/billing';
 import { invoicesAPI } from '../api/invoices';
 import { formatCurrency } from '../utils/dateHelpers';
+import { getApiBaseUrl, getAppBasePath } from '../utils/appBase';
 import { toast } from 'react-hot-toast';
 
 const PosQuickBilling = () => {
@@ -95,14 +96,14 @@ const PosQuickBilling = () => {
       // open thermal print if ID available
       const id = res?._id || res?.invoiceId || res?.id;
       if (id) {
-        const apiBase = import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '');
-        const baseUrl = apiBase.replace(/\/api$/, '');
         try {
-          // Create portal token via v2 endpoint
-          // Portal link creation is now public; open the public PDF directly
-          window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal`, '_blank');
+          const pdfUrl = invoicesAPI.publicPdfUrl(id, null, 'thermal');
+          window.open(pdfUrl, '_blank');
         } catch (e) {
-          window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal`, '_blank');
+          const apiBase = getApiBaseUrl() || '';
+          const prefix = apiBase ? apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '') : (getAppBasePath() || '').replace(/\/$/, '');
+          const openUrl = `${prefix}/invoices/public/${id}/pdf?format=thermal`;
+          window.open(openUrl, '_blank');
         }
       }
       // reset

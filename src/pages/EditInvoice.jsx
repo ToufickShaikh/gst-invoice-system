@@ -1,4 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getApiBaseUrl, getAppBasePath } from '../utils/appBase';
+import { calculateTax } from '../utils/taxCalculations';
+import { formatCurrency } from '../utils/dateHelpers';
+import { customersAPI } from '../api/customers';
+import { itemsAPI } from '../api/items';
+import { billingAPI } from '../api/billing';
+import Layout from '../components/Layout';
+import InputField from '../components/InputField';
+import Button from '../components/Button';
+import { toast } from 'react-hot-toast';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
@@ -94,7 +105,6 @@ const EditInvoice = () => {
             const itemsList = itemsRes || [];
             const fetchedInvoice = invoiceRes;
 
-            // The only truly critical data is the invoice itself.
             if (!fetchedInvoice) {
                 throw new Error('Could not load the invoice. It might have been deleted.');
             }
@@ -240,8 +250,9 @@ const EditInvoice = () => {
                                 <button
                                     className="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
                                     onClick={() => {
-                                        const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-                                        const url = `${baseUrl}/api/billing/public/pdf/${id}`;
+                                        const apiBase = getApiBaseUrl() || '';
+                                        const prefix = apiBase ? apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '') : (getAppBasePath() || '').replace(/\/$/, '');
+                                        const url = `${prefix}/api/billing/public/pdf/${id}`;
                                         window.open(url, '_blank');
                                     }}
                                 >
@@ -270,6 +281,20 @@ const EditInvoice = () => {
         }
       }));
     };
+
+    // If still loading or invoice data not yet available, show a loading state to avoid null access
+    if (loading || !invoiceData) {
+        return (
+            <Layout>
+                <div className="max-w-2xl mx-auto px-3 sm:px-0">
+                    <div className="card-enhanced p-6 text-center">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading invoice details...</p>
+                    </div>
+                </div>
+            </Layout>
+        );
+    }
 
     // Render a form similar to Billing.jsx but for editing
     return (
@@ -584,8 +609,9 @@ const EditInvoice = () => {
                         <div className="flex gap-2">
                             <Button
                                 onClick={() => {
-                                    const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-                                    const url = `${baseUrl}/api/billing/public/pdf/${id}`;
+                                    const apiBase = getApiBaseUrl() || '';
+                                    const prefix = apiBase ? apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '') : (getAppBasePath() || '').replace(/\/$/, '');
+                                    const url = `${prefix}/api/billing/public/pdf/${id}`;
                                     window.open(url, '_blank');
                                 }}
                                 variant="secondary"
@@ -595,8 +621,9 @@ const EditInvoice = () => {
                             </Button>
                             <Button
                                 onClick={() => {
-                                    const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-                                    const url = `${baseUrl}/api/billing/public/pdf/${id}?format=thermal`;
+                                    const apiBase = getApiBaseUrl() || '';
+                                    const prefix = apiBase ? apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '') : (getAppBasePath() || '').replace(/\/$/, '');
+                                    const url = `${prefix}/api/billing/public/pdf/${id}?format=thermal`;
                                     window.open(url, '_blank');
                                 }}
                                 variant="secondary"

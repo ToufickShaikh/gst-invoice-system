@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { billingAPI } from '../api/billing';
+import { getApiBaseUrl, getAppBasePath } from '../utils/appBase';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
@@ -254,8 +255,8 @@ const Invoices = () => {
                 console.log('📄 PDF Path received:', res.pdfPath);
 
                 // Use the Nginx proxy URL for PDF serving
-                const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-                const baseUrl = apiBase ? apiBase.replace('/api', '') : window.location.origin;
+                const apiBase = getApiBaseUrl() || '';
+                const baseUrl = apiBase ? apiBase.replace('/api', '') : (getAppBasePath() || '');
                 console.log('🌐 Using base URL:', baseUrl);
 
                 // Construct the PDF URL through Nginx proxy

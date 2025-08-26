@@ -6,6 +6,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import { billingAPI } from '../api/billing';
 import { invoicesAPI } from '../api/invoices';
+import { getApiBaseUrl } from '../utils/appBase';
 import { formatCurrency } from '../utils/dateHelpers';
 import Layout from '../components/Layout';
 
@@ -122,16 +123,21 @@ const Dashboard = () => {
   const invoicesData = await invoicesAPI.list();
       setAllInvoices(invoicesData);
 
-      // Fetch all customers
-  // Customers endpoint is public in the no-auth mode
-  const customersResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/customers`);
-  const customersData = await customersResponse.json();
-      setAllCustomers(customersData);
+      // Fetch all customers and items via API base helper
+  const apiBase = getApiBaseUrl() || '';
+  if (apiBase) {
+    const customersResponse = await fetch(`${apiBase}/customers`);
+    const customersData = await customersResponse.json();
+    setAllCustomers(customersData);
 
-      // Fetch all items
-  const itemsResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/items`);
-  const itemsData = await itemsResponse.json();
-      setAllItems(itemsData);
+    const itemsResponse = await fetch(`${apiBase}/items`);
+    const itemsData = await itemsResponse.json();
+    setAllItems(itemsData);
+  } else {
+    // fallback to invoicesAPI provided data where available
+    setAllCustomers([]);
+    setAllItems([]);
+  }
 
     } catch (error) {
       console.error('Error fetching complete data:', error);

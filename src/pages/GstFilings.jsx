@@ -54,16 +54,21 @@ const GstFilings = () => {
   useEffect(() => { fetchAll(); }, []);
 
   const dl = (path, name, extraParams = {}) => {
-    const url = new URL(axiosInstance.defaults.baseURL.replace(/\/$/, '') + path, window.location.origin);
-    url.searchParams.set('from', from);
-    url.searchParams.set('to', to);
-    Object.entries(extraParams).forEach(([k,v]) => url.searchParams.set(k, v));
-    const a = document.createElement('a');
-    a.href = url.toString();
-    a.download = name;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.click();
+  const apiBase = axiosInstance.defaults?.baseURL || (typeof window !== 'undefined' ? (window.__apiBase || '') : '');
+  const prefix = apiBase ? apiBase.replace(/\/$/, '') : ((typeof window !== 'undefined') ? (window.__basename || import.meta.env.BASE_URL || '') : '');
+  // prefer relative path under app base so BrowserRouter and frontend can request via same origin
+  const basePath = (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
+  const urlPath = (basePath + '/' + path).replace(/\/\//g, '/');
+  const url = urlPath;
+  url.searchParams.set('from', from);
+  url.searchParams.set('to', to);
+  Object.entries(extraParams).forEach(([k,v]) => url.searchParams.set(k, v));
+  const a = document.createElement('a');
+  a.href = url.toString();
+  a.download = name;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.click();
   };
 
   const Sum = ({ label, value, className='' }) => (

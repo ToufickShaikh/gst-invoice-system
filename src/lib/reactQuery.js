@@ -1,5 +1,6 @@
 import { QueryClient, QueryCache } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import { getAppBasePath } from '../utils/appBase';
 
 /**
  * Advanced React Query Configuration
@@ -13,7 +14,7 @@ export const queryClient = new QueryClient({
   if (error?.response?.status === 401) {
   // Authentication removed: clear legacy keys
   localStorage.removeItem('auth-token');
-    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+    const base = getAppBasePath() || '/';
     window.location.href = `${base}/login`;
     return;
   }

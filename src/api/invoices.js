@@ -1,10 +1,17 @@
 import axiosInstance from './axiosInstance';
+import { getApiBaseUrl } from '../utils/appBase';
 
 // New v2 Invoice API (mapped to /api/invoices backend)
 export const invoicesAPI = {
-  list: async (billingType) => {
-    const res = await axiosInstance.get(`/invoices`, { params: { billingType } });
-    return res.data;
+  // list accepts an optional params object: { page, pageSize, status, search, dateFrom, dateTo, sortBy, sortDir, billingType }
+  list: async (params = {}) => {
+    const res = await axiosInstance.get(`/invoices`, { params });
+    // backend returns { data, totalCount } when params are used
+    if (params && Object.keys(params).length > 0) {
+      return res.data; // { data, totalCount }
+    }
+    // backward compatibility: return an array when called without params
+    return res.data?.data || res.data;
   },
   get: async (id) => {
     const res = await axiosInstance.get(`/invoices/${id}`);
@@ -35,6 +42,10 @@ export const invoicesAPI = {
     return res.data;
   },
   publicPdfUrl: (id, token, format='a4') => {
-  return `${import.meta.env.VITE_API_BASE_URL}/invoices/public/${id}/pdf?format=${format}`;
+  const apiBase = getApiBaseUrl() || '';
+  if (apiBase) return `${apiBase.replace(/\/$/, '')}/invoices/public/${id}/pdf?format=${format}`;
+  const appBase = (typeof window !== 'undefined') ? (window.__basename || import.meta.env.BASE_URL || '') : '';
+  const prefix = appBase.replace(/\/$/, '');
+  return `${prefix}/invoices/public/${id}/pdf?format=${format}`;
   }
 };
