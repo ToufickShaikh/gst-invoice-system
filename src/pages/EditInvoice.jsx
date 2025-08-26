@@ -105,7 +105,6 @@ const EditInvoice = () => {
             const itemsList = itemsRes || [];
             const fetchedInvoice = invoiceRes;
 
-            // The only truly critical data is the invoice itself.
             if (!fetchedInvoice) {
                 throw new Error('Could not load the invoice. It might have been deleted.');
             }
