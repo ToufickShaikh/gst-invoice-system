@@ -20,9 +20,9 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     try {
-      const token = localStorage.getItem('auth_token')
-      const userJson = localStorage.getItem('auth_user')
-      if (token && userJson) setUser(JSON.parse(userJson))
+  const userJson = localStorage.getItem('auth_user')
+  // allow token-less flows: if a stored user exists, restore it
+  if (userJson) setUser(JSON.parse(userJson))
     } catch (e) { /* ignore */ }
   }, [])
 
@@ -30,8 +30,9 @@ export const AuthProvider = ({ children }) => {
     setLoading(true)
     try {
       const res = await authAPI.login({ username, password })
-      if (res && res.token) {
-        localStorage.setItem('auth_token', res.token)
+      // Support token-less backend: persist and set user when available
+      if (res && (res.token || res.user)) {
+        if (res.token) localStorage.setItem('auth_token', res.token)
         localStorage.setItem('auth_user', JSON.stringify(res.user || { username }))
         setUser(res.user || { username })
       }
@@ -45,8 +46,8 @@ export const AuthProvider = ({ children }) => {
     setLoading(true)
     try {
       const res = await authAPI.register({ username, email, password })
-      if (res && res.token) {
-        localStorage.setItem('auth_token', res.token)
+      if (res && (res.token || res.user)) {
+        if (res.token) localStorage.setItem('auth_token', res.token)
         localStorage.setItem('auth_user', JSON.stringify(res.user || { username }))
         setUser(res.user || { username })
       }

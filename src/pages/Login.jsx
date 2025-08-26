@@ -33,9 +33,16 @@ const Login = () => {
         toast.success('Registration successful! Please log in.')
         setIsRegisterMode(false)
       } else {
-        await authLogin(formData.username, formData.password)
-        toast.success('Login successful!')
-        navigate('/dashboard')
+        const res = await authLogin(formData.username, formData.password)
+        // Proceed only when backend returned a user or user was stored locally
+        const userFromRes = res?.user || null
+        const stored = localStorage.getItem('auth_user')
+        if (userFromRes || stored) {
+          toast.success('Login successful!')
+          navigate('/dashboard')
+        } else {
+          toast.error('Login succeeded but user session was not established')
+        }
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || 'An error occurred. Please try again.'
