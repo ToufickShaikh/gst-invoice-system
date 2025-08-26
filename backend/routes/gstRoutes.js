@@ -285,24 +285,46 @@ router.get('/returns/gstr1', async (req, res) => {
 
     // CSV fallback for simple export (legacy)
     if ((req.query.format || '').toLowerCase() === 'csv') {
-      const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).populate('customer');
-      const rows = invoices.map(inv => {
-        const cust = inv.customer || {};
-        const taxable = Number(inv.subTotal || 0);
-        const igst = Number(inv.igst || 0);
-        const cgst = Number(inv.cgst || 0);
-        const sgst = Number(inv.sgst || 0);
-        const total = Number(inv.grandTotal || inv.totalAmount || taxable + igst + cgst + sgst);
-        return [
-          inv.invoiceNumber,
-          inv.invoiceDate?.toISOString().slice(0,10),
-          cust.firmName || cust.name || '',
-          cust.gstNo || '',
-          cust.state || '',
-          taxable,
-          igst, cgst, sgst, total
-        ];
-      });
+        const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).populate('customer').populate('items.item');
+        const compCode = getStateCode(company.state || '');
+
+        const rows = invoices.map(inv => {
+          const cust = inv.customer || {};
+          // compute totals from items when invoice-level fields are missing or zero
+          let taxable = 0, igst = 0, cgst = 0, sgst = 0;
+          const pos = getStateCode(cust.state);
+          const inter = pos && compCode && pos !== compCode;
+          for (const li of (inv.items || [])) {
+            const qty = Number(li.quantity || 0);
+            const rate = Number(li.rate || li.item?.rate || li.item?.sellingPrice || 0);
+            const taxRate = Number(li.taxSlab || li.item?.taxSlab || 0);
+            // discount amount if stored as absolute
+            const discountAmt = Number(li.discountAmount || 0);
+            // if discount stored as percent on line
+            const discountPct = Number(li.discount || 0);
+            const gross = qty * rate;
+            const discount = discountAmt || (gross * (discountPct || 0) / 100);
+            const txval = Math.max(0, gross - discount);
+            const taxAmt = txval * taxRate / 100;
+            taxable += txval;
+            if (inter) igst += taxAmt; else { cgst += taxAmt / 2; sgst += taxAmt / 2; }
+          }
+          // fallback to stored values if present (use stored when > 0)
+          taxable = Number(inv.subTotal) > 0 ? Number(inv.subTotal) : taxable;
+          igst = Number(inv.igst) > 0 ? Number(inv.igst) : igst;
+          cgst = Number(inv.cgst) > 0 ? Number(inv.cgst) : cgst;
+          sgst = Number(inv.sgst) > 0 ? Number(inv.sgst) : sgst;
+          const total = Number(inv.grandTotal || inv.totalAmount || taxable + igst + cgst + sgst);
+          return [
+            inv.invoiceNumber,
+            inv.invoiceDate?.toISOString().slice(0,10),
+            cust.firmName || cust.name || '',
+            cust.gstNo || '',
+            cust.state || '',
+            +taxable.toFixed(2),
+            +igst.toFixed(2), +cgst.toFixed(2), +sgst.toFixed(2), +total.toFixed(2)
+          ];
+        });
       const header = ['Invoice Number','Invoice Date','Customer Name','GSTIN','Place of Supply','Taxable Value','IGST','CGST','SGST','Total'];
       res.setHeader('Content-Type','text/csv');
       res.setHeader('Content-Disposition',`attachment; filename=gstr1-${start.toISOString().slice(0,10)}-${end.toISOString().slice(0,10)}.csv`);
@@ -322,13 +344,35 @@ router.get('/returns/gstr1', async (req, res) => {
 router.get('/returns/gstr3b', async (req, res) => {
   try {
     const { start, end } = parsePeriod(req);
-    const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } });
-    const taxable = invoices.reduce((s, inv) => s + Number(inv.subTotal || 0), 0);
-    const igst = invoices.reduce((s, inv) => s + Number(inv.igst || 0), 0);
-    const cgst = invoices.reduce((s, inv) => s + Number(inv.cgst || 0), 0);
-    const sgst = invoices.reduce((s, inv) => s + Number(inv.sgst || 0), 0);
+    const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).populate('items.item').populate('customer');
+    const compCode = getStateCode(company.state || '');
+    let taxable = 0, igst = 0, cgst = 0, sgst = 0;
+    for (const inv of invoices) {
+      // compute per-invoice totals from items if stored fields missing
+      let invTaxable = 0, invIgst = 0, invCgst = 0, invSgst = 0;
+      const pos = getStateCode((inv.customer && inv.customer.state) || '');
+      const inter = pos && compCode && pos !== compCode;
+      for (const li of (inv.items || [])) {
+        const qty = Number(li.quantity || 0);
+        const rate = Number(li.rate || li.item?.rate || li.item?.sellingPrice || 0);
+        const taxRate = Number(li.taxSlab || li.item?.taxSlab || 0);
+        const discountAmt = Number(li.discountAmount || 0);
+        const discountPct = Number(li.discount || 0);
+        const gross = qty * rate;
+        const discount = discountAmt || (gross * (discountPct || 0) / 100);
+        const txval = Math.max(0, gross - discount);
+        const taxAmt = txval * taxRate / 100;
+        invTaxable += txval;
+        if (inter) invIgst += taxAmt; else { invCgst += taxAmt / 2; invSgst += taxAmt / 2; }
+      }
+      // use stored if available
+      taxable += Number(inv.subTotal) > 0 ? Number(inv.subTotal) : invTaxable;
+      igst += Number(inv.igst) > 0 ? Number(inv.igst) : invIgst;
+      cgst += Number(inv.cgst) > 0 ? Number(inv.cgst) : invCgst;
+      sgst += Number(inv.sgst) > 0 ? Number(inv.sgst) : invSgst;
+    }
 
-    const row = { outwardTaxableSupplies: taxable, igst, cgst, sgst, exemptNil: 0 };
+    const row = { outwardTaxableSupplies: +taxable.toFixed(2), igst: +igst.toFixed(2), cgst: +cgst.toFixed(2), sgst: +sgst.toFixed(2), exemptNil: 0 };
 
     if ((req.query.format || '').toLowerCase() === 'csv') {
       const header = ['Outward Taxable Supplies','IGST','CGST','SGST','Exempt/Nil'];
