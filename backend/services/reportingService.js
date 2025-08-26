@@ -4,6 +4,8 @@ const { cacheManager } = require('../utils/cacheManager');
 const { getOptimizedAggregation } = require('../utils/databaseOptimization');
 const fs = require('fs').promises;
 const path = require('path');
+const Invoice = require('../models/Invoice');
+const company = require('../config/company');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 
@@ -569,6 +571,168 @@ class ReportingService {
             return value;
         }
         return value;
+    }
+
+    // GST helpers and report generators (GSTR-1, GSTR-3B, GSTR-9)
+    _getStateCode(s) {
+        if (!s) return '';
+        const m = String(s).match(/^(\d{2})/);
+        return m ? m[1] : '';
+    }
+
+    _getFp(d) {
+        const y = d.getFullYear();
+        const m = (d.getMonth() + 1).toString().padStart(2, '0');
+        return `${y}${m}`;
+    }
+
+    // Generate GSTR-1 style payload for given period
+    async generateGSTR1Report(start, end, gstNumber) {
+        // Mirror logic from gstRoutes.buildGstr1
+        const invoices = await Invoice.find({ invoiceDate: { $gte: new Date(start), $lte: new Date(end) } }).populate('customer').populate('items.item');
+        const compCode = this._getStateCode(company.state);
+
+        const b2bMap = new Map();
+        const b2clMap = new Map();
+        const b2csAgg = new Map();
+        const exp = [];
+
+        let gt = 0, cur_gt = 0;
+
+        for (const inv of invoices) {
+            const cust = inv.customer || {};
+            const pos = this._getStateCode(cust.state);
+            const inter = pos && compCode && pos !== compCode;
+            const taxable = Number(inv.subTotal || 0);
+            const igst = Number(inv.igst || 0);
+            const cgst = Number(inv.cgst || 0);
+            const sgst = Number(inv.sgst || 0);
+            const total = Number(inv.grandTotal || inv.totalAmount || taxable + igst + cgst + sgst);
+            cur_gt += total;
+
+            const itms = (inv.items || []).map((li, idx) => {
+                const qty = Number(li.quantity || 0);
+                const rate = Number(li.rate || 0);
+                const txval = qty * rate;
+                const rt = Number(li.taxSlab || li.item?.taxSlab || 0);
+                const taxAmt = txval * rt / 100;
+                const split = inter ? { iamt: taxAmt, camt: 0, samt: 0 } : { iamt: 0, camt: taxAmt / 2, samt: taxAmt / 2 };
+                return {
+                    num: idx + 1,
+                    itm_det: {
+                        hsn_sc: li.hsnCode || li.item?.hsnCode || '',
+                        txval: +txval.toFixed(2),
+                        rt: +rt.toFixed(2),
+                        iamt: +split.iamt.toFixed(2),
+                        camt: +split.camt.toFixed(2),
+                        samt: +split.samt.toFixed(2),
+                        csamt: 0
+                    }
+                };
+            });
+
+            const invRow = {
+                inum: inv.invoiceNumber,
+                idt: inv.invoiceDate ? new Date(inv.invoiceDate).toISOString().slice(0,10) : '',
+                val: +total.toFixed(2),
+                pos: pos || compCode || '',
+                rchrg: 'N',
+                inv_typ: 'R',
+                itms
+            };
+
+            if (inv.exportInfo && inv.exportInfo.isExport) {
+                const exp_typ = (inv.exportInfo.exportType || '').toUpperCase() === 'SEZ' ? 'SEZ' : 'WPAY';
+                const sply_ty = inv.exportInfo.withTax ? 'WPAY' : 'WOPAY';
+                exp.push({
+                    exp_typ,
+                    inv: [{
+                        inum: invRow.inum,
+                        idt: invRow.idt,
+                        val: invRow.val,
+                        sbpcode: inv.exportInfo.portCode || '',
+                        sbnum: inv.exportInfo.shippingBillNo || '',
+                        sbdt: inv.exportInfo.shippingBillDate ? new Date(inv.exportInfo.shippingBillDate).toISOString().slice(0,10) : '',
+                        sply_ty: sply_ty,
+                        itms: itms
+                    }]
+                });
+                continue;
+            }
+
+            if (cust.customerType === 'B2B' && cust.gstNo) {
+                const ctin = cust.gstNo;
+                if (!b2bMap.has(ctin)) b2bMap.set(ctin, { ctin, inv: [] });
+                b2bMap.get(ctin).inv.push(invRow);
+            } else {
+                if (inter && total > 250000) {
+                    const key = pos || '00';
+                    if (!b2clMap.has(key)) b2clMap.set(key, { pos: key, inv: [] });
+                    b2clMap.get(key).inv.push(invRow);
+                } else {
+                    for (const it of itms) {
+                        const k = `${pos||'00'}|${it.itm_det.rt}|${inter ? 'INTER' : 'INTRA'}`;
+                        if (!b2csAgg.has(k)) b2csAgg.set(k, {
+                            sply_ty: inter ? 'INTER' : 'INTRA',
+                            typ: 'OE',
+                            pos: pos || compCode || '00',
+                            rt: it.itm_det.rt,
+                            txval: 0,
+                            iamt: 0, camt: 0, samt: 0, csamt: 0
+                        });
+                        const row = b2csAgg.get(k);
+                        row.txval = +(row.txval + it.itm_det.txval).toFixed(2);
+                        row.iamt = +(row.iamt + it.itm_det.iamt).toFixed(2);
+                        row.camt = +(row.camt + it.itm_det.camt).toFixed(2);
+                        row.samt = +(row.samt + it.itm_det.samt).toFixed(2);
+                    }
+                }
+            }
+        }
+
+        const b2b = Array.from(b2bMap.values());
+        const b2cl = Array.from(b2clMap.values());
+        const b2cs = Array.from(b2csAgg.values());
+        const cdnr = [];
+        const cdnur = [];
+
+        const payload = {
+            gstin: company.gstin || '',
+            fp: this._getFp(new Date(start)),
+            version: 'GST3.0',
+            gt: +gt.toFixed(2),
+            cur_gt: +cur_gt.toFixed(2),
+            b2b, b2cl, b2cs, cdnr, cdnur, exp
+        };
+
+        return payload;
+    }
+
+    // Generate GSTR-3B summary
+    async generateGSTR3BReport(start, end, gstNumber) {
+        const invoices = await Invoice.find({ invoiceDate: { $gte: new Date(start), $lte: new Date(end) } });
+        const taxable = invoices.reduce((s, inv) => s + Number(inv.subTotal || 0), 0);
+        const igst = invoices.reduce((s, inv) => s + Number(inv.igst || 0), 0);
+        const cgst = invoices.reduce((s, inv) => s + Number(inv.cgst || 0), 0);
+        const sgst = invoices.reduce((s, inv) => s + Number(inv.sgst || 0), 0);
+
+        const summary = { outwardTaxableSupplies: taxable, igst, cgst, sgst, exemptNil: 0 };
+        return { period: { from: start, to: end }, summary };
+    }
+
+    // Generate a simple yearly GSTR-9 like summary (aggregated)
+    async generateGSTR9Report(start, end, gstNumber) {
+        const invoices = await Invoice.find({ invoiceDate: { $gte: new Date(start), $lte: new Date(end) } }).populate('customer');
+        const totalSales = invoices.reduce((s, inv) => s + Number(inv.grandTotal || inv.totalAmount || inv.subTotal || 0), 0);
+        const totalTax = invoices.reduce((s, inv) => s + Number(inv.totalTax || inv.cgst || inv.sgst || inv.igst || 0), 0);
+        const parties = new Set(invoices.filter(i => i.customer && i.customer.gstNo).map(i => i.customer.gstNo));
+
+        const report = {
+            period: { from: start, to: end },
+            summary: { totalSales, totalTax, registeredParties: parties.size },
+            sections: []
+        };
+        return report;
     }
 
     generateFinancialRecommendations(financialData) {
