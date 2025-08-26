@@ -31,6 +31,7 @@ import { VirtualizedTable } from '../components/VirtualizedTable';
 import { useAppStore } from '../store';
 import { formatCurrency, formatDate } from '../utils/formatting';
 import { api } from '../api';
+import { getAppBasePath } from '../utils/appBase';
 
 const CustomerPortal = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -177,14 +178,13 @@ const CustomerPortal = () => {
       key: 'actions',
       header: 'Actions',
       width: 150,
-      render: (_, row) => (
+          render: (_, row) => (
         <div className="flex gap-2">
           <Button
             size="sm"
             variant="outline"
             onClick={() => {
-              const appBase = (import.meta.env.BASE_URL || '') || window.__basename || '';
-              const prefix = appBase.replace(/\/$/, '');
+              const prefix = getAppBasePath();
               window.open(`${prefix}/invoices/${row._id}/view`, '_blank');
             }}
           >
@@ -194,8 +194,7 @@ const CustomerPortal = () => {
             size="sm"
             variant="outline"
             onClick={() => {
-              const appBase = (import.meta.env.BASE_URL || '') || window.__basename || '';
-              const prefix = appBase.replace(/\/$/, '');
+              const prefix = getAppBasePath();
               window.open(`${prefix}/invoices/${row._id}/download`, '_blank');
             }}
           >

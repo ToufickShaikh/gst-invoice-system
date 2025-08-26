@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '../utils/appBase';
 import React, { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
@@ -462,9 +463,9 @@ const InvoiceSuccess = () => {
 
                   {/* Additional sharing options */}
                   <div className="mt-3 flex flex-wrap gap-2 justify-center">
-                    <Button
+                      <Button
                       onClick={async () => {
-                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5001';
+                        const baseUrl = getApiBaseUrl()?.replace('/api', '') || 'http://localhost:5001';
                         const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
 
                         if (navigator.share) {
@@ -528,7 +529,7 @@ const InvoiceSuccess = () => {
 
                     <Button
                       onClick={() => {
-                        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5001';
+                        const baseUrl = getApiBaseUrl()?.replace('/api', '') || 'http://localhost:5001';
                         const fullPdfUrl = pdfUrl.startsWith('http') ? pdfUrl : `${baseUrl}${pdfUrl}`;
 
                         const emailSubject = encodeURIComponent(`Invoice ${invoiceNumber || invoiceId}`);

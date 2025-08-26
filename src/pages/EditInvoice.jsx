@@ -1,4 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getApiBaseUrl, getAppBasePath } from '../utils/appBase';
+import { calculateTax } from '../utils/taxCalculations';
+import { formatCurrency } from '../utils/dateHelpers';
+import { customersAPI } from '../api/customers';
+import { itemsAPI } from '../api/items';
+import { billingAPI } from '../api/billing';
+import Layout from '../components/Layout';
+import InputField from '../components/InputField';
+import Button from '../components/Button';
+import { toast } from 'react-hot-toast';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
@@ -240,14 +251,9 @@ const EditInvoice = () => {
                                 <button
                                     className="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
                                     onClick={() => {
-                                        const getAppBase = () => {
-                                            const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-                                            if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
-                                            // return app base path (no origin) so relative paths resolve with BrowserRouter basename
-                                            return (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
-                                        };
-                                        const baseUrl = getAppBase();
-                                        const url = `${baseUrl}/api/billing/public/pdf/${id}`;
+                                        const apiBase = getApiBaseUrl() || '';
+                                        const prefix = apiBase ? apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '') : (getAppBasePath() || '').replace(/\/$/, '');
+                                        const url = `${prefix}/api/billing/public/pdf/${id}`;
                                         window.open(url, '_blank');
                                     }}
                                 >
@@ -603,32 +609,24 @@ const EditInvoice = () => {
                         </Button>
                         <div className="flex gap-2">
                             <Button
-                                                onClick={() => {
-                                                    const getAppBase = () => {
-                                                        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-                                                        if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
-                                                        return (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
-                                                    };
-                                                    const baseUrl = getAppBase();
-                                                    const url = `${baseUrl}/api/billing/public/pdf/${id}`;
-                                                    window.open(url, '_blank');
-                                                }}
+                                onClick={() => {
+                                    const apiBase = getApiBaseUrl() || '';
+                                    const prefix = apiBase ? apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '') : (getAppBasePath() || '').replace(/\/$/, '');
+                                    const url = `${prefix}/api/billing/public/pdf/${id}`;
+                                    window.open(url, '_blank');
+                                }}
                                 variant="secondary"
                                 size="lg"
                             >
                                 Download PDF
                             </Button>
                             <Button
-                                                onClick={() => {
-                                                    const getAppBase = () => {
-                                                        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-                                                        if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
-                                                        return (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
-                                                    };
-                                                    const baseUrl = getAppBase();
-                                                    const url = `${baseUrl}/api/billing/public/pdf/${id}?format=thermal`;
-                                                    window.open(url, '_blank');
-                                                }}
+                                onClick={() => {
+                                    const apiBase = getApiBaseUrl() || '';
+                                    const prefix = apiBase ? apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '') : (getAppBasePath() || '').replace(/\/$/, '');
+                                    const url = `${prefix}/api/billing/public/pdf/${id}?format=thermal`;
+                                    window.open(url, '_blank');
+                                }}
                                 variant="secondary"
                                 size="lg"
                             >

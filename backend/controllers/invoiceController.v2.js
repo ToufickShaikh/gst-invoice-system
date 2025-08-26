@@ -11,7 +11,21 @@ function handleError(res, e, status = 400) {
 }
 
 exports.list = async (req, res) => {
-  try { const data = await service.listInvoices({ billingType: req.query.billingType }); res.json(data); }
+  try {
+    const params = {
+      billingType: req.query.billingType,
+      search: req.query.search,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+      status: req.query.status,
+      sortBy: req.query.sortBy,
+      sortDir: req.query.sortDir,
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+    };
+    const out = await service.listInvoices(params);
+    res.json({ data: out.data, totalCount: out.totalCount });
+  }
   catch (e) { handleError(res, e, 500); }
 };
 

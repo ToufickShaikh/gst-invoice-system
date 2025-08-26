@@ -5,6 +5,7 @@ import { useCompany } from '../context/CompanyContext.jsx';
 import { billingAPI } from '../api/billing';
 import { invoicesAPI } from '../api/invoices';
 import axiosInstance from '../api/axiosInstance';
+import { getApiBaseUrl, getAppBasePath } from '../utils/appBase';
 import { portalAPI } from '../api/portal';
 
 const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
@@ -49,46 +50,31 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
         setLoadingPreview(false);
         return;
       }
-
       try {
         setLoadingPreview(true);
         // Create a portal link (protected API expects auth; axiosInstance handles headers)
         const res = await portalAPI.createInvoicePortalLink(invoice._id);
         const url = res?.url;
-        // If backend returned a public URL we can open directly
-        if (url) {
-          // expected portal URL: <base>/portal/invoice/:id/:token
-          try {
-            // Build preview URL relative to the configured API base so subpaths like
-            // /shaikhcarpets are respected when the app is hosted under a prefix.
-            const apiBase = (axiosInstance && axiosInstance.defaults && axiosInstance.defaults.baseURL)
-              ? axiosInstance.defaults.baseURL.replace(/\/$/, '')
-              : '';
 
-            if (url.includes('/portal/invoice/')) {
-              const tail = url.split('/portal/invoice/')[1] || '';
-              const parts = tail.split('/').filter(Boolean);
-              const pid = parts[0] || invoice._id;
-              const ptoken = parts[1] || null;
-              const previewUrl = `${apiBase}/billing/public/print/thermal/${pid}` + (ptoken ? `?token=${ptoken}` : '');
-              if (mounted) setIframeSrc(previewUrl);
-            } else {
-              // If backend returned some other public URL, try to map to thermal endpoint
-              const previewUrl = `${apiBase}/billing/public/print/thermal/${invoice._id}`;
-              if (mounted) setIframeSrc(previewUrl);
-            }
-          } catch (e) {
-            console.warn('Failed to parse portal URL, falling back to direct thermal endpoint', e);
-            const apiBase = (axiosInstance && axiosInstance.defaults && axiosInstance.defaults.baseURL)
-              ? axiosInstance.defaults.baseURL.replace(/\/$/, '')
-              : '';
-            if (mounted) setIframeSrc(`${apiBase}/billing/public/print/thermal/${invoice._id}`);
-          }
+        // Compute api base once (prefer axiosInstance baseURL if set)
+        const apiBase = (axiosInstance && axiosInstance.defaults && axiosInstance.defaults.baseURL)
+          ? axiosInstance.defaults.baseURL.replace(/\/$/, '')
+          : (getApiBaseUrl() || getAppBasePath() || '');
+
+        if (url) {
+          if (url.includes('/portal/invoice/')) {
+            const tail = url.split('/portal/invoice/')[1] || '';
+            const parts = tail.split('/').filter(Boolean);
+            const pid = parts[0] || invoice._id;
+            const ptoken = parts[1] || null;
+            const previewUrl = `${apiBase}/billing/public/print/thermal/${pid}` + (ptoken ? `?token=${ptoken}` : '');
+            if (mounted) setIframeSrc(previewUrl);
           } else {
-          // Fallback: call thermal endpoint directly. Use axiosInstance baseURL when available
-          const apiBase = (axiosInstance && axiosInstance.defaults && axiosInstance.defaults.baseURL)
-            ? axiosInstance.defaults.baseURL.replace(/\/$/, '')
-            : ((window.__basename || '').replace(/\/$/, '') || '');
+            const previewUrl = `${apiBase}/billing/public/print/thermal/${invoice._id}`;
+            if (mounted) setIframeSrc(previewUrl);
+          }
+        } else {
+          // Fallback: call thermal endpoint directly
           if (mounted) setIframeSrc(`${apiBase}/billing/public/print/thermal/${invoice._id}`);
         }
       } catch (e) {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { billingAPI } from '../api/billing';
 import { invoicesAPI } from '../api/invoices';
+import { getApiBaseUrl } from '../utils/appBase';
 import { toast } from 'react-hot-toast';
 
 const BackendDiagnostic = () => {
@@ -17,7 +18,7 @@ const BackendDiagnostic = () => {
 
         try {
             // Test 1: Check API Base URL
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+            const baseUrl = getApiBaseUrl() || 'http://localhost:5001/api';
             addResult('API Base URL', true, `Using: ${baseUrl}`);
 
             // Test 2: Health Check

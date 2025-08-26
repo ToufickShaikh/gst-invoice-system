@@ -63,13 +63,113 @@ async function adjustStock(items, direction) {
 }
 
 // ---------- Core Operations ----------
-async function listInvoices({ billingType } = {}) {
-  const filter = {};
-  if (billingType) {
-    const customers = await Customer.find({ customerType: billingType.toUpperCase() }).select('_id');
-    filter.customer = { $in: customers.map(c => c._id) };
+async function listInvoices({ billingType, search, dateFrom, dateTo, status, sortBy = 'createdAt', sortDir = 'desc', page = 1, pageSize = 20 } = {}) {
+  // Server-side listing with filters, search, sort and pagination.
+  // Convert page/pageSize to ints
+  page = Number(page) || 1;
+  pageSize = Number(pageSize) || 20;
+  const skip = (page - 1) * pageSize;
+
+  const pipeline = [];
+
+  // Join customer for searches and billingType
+  pipeline.push({
+    $lookup: {
+      from: 'customers',
+      localField: 'customer',
+      foreignField: '_id',
+      as: 'customer'
+    }
+  });
+  pipeline.push({ $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } });
+
+  const match = {};
+
+  // Date filters
+  if (dateFrom || dateTo) {
+    match.invoiceDate = {};
+    if (dateFrom) match.invoiceDate.$gte = new Date(dateFrom);
+    if (dateTo) match.invoiceDate.$lte = new Date(dateTo);
   }
-  return Invoice.find(filter).populate('customer').sort({ createdAt: -1 });
+
+  // Billing type (customer.customerType)
+  if (billingType) {
+    match['customer.customerType'] = billingType.toUpperCase();
+  }
+
+  // Status filters using expressions
+  if (status) {
+    switch ((status || '').toLowerCase()) {
+      case 'paid':
+        match.$and = match.$and || [];
+        match.$and.push({ $expr: { $lte: ['$balance', 0] } });
+        match.$and.push({ $expr: { $gt: ['$grandTotal', 0] } });
+        break;
+      case 'partial':
+        match.$and = match.$and || [];
+        match.$and.push({ $expr: { $gt: ['$paidAmount', 0] } });
+        match.$and.push({ $expr: { $gt: ['$balance', 0] } });
+        break;
+      case 'pending':
+        match.$and = match.$and || [];
+        match.$and.push({ $expr: { $eq: ['$paidAmount', 0] } });
+        match.$and.push({ $expr: { $gt: ['$balance', 0] } });
+        break;
+      case 'overdue':
+        match.$and = match.$and || [];
+        match.$and.push({ $expr: { $lt: ['$dueDate', new Date()] } });
+        match.$and.push({ $expr: { $gt: ['$balance', 0] } });
+        break;
+      case 'draft':
+        match.status = 'draft';
+        break;
+      case 'cancelled':
+        match.status = 'cancelled';
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Search across invoiceNumber and customer.name/firmName
+  if (search) {
+    const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    match.$or = match.$or || [];
+    match.$or.push({ invoiceNumber: { $regex: regex } });
+    match.$or.push({ 'customer.firmName': { $regex: regex } });
+    match.$or.push({ 'customer.name': { $regex: regex } });
+  }
+
+  if (Object.keys(match).length) pipeline.push({ $match: match });
+
+  // Sorting
+  const dir = sortDir === 'asc' ? 1 : -1;
+  let sortField = 'createdAt';
+  switch (sortBy) {
+    case 'date': sortField = 'invoiceDate'; break;
+    case 'amount': sortField = 'grandTotal'; break;
+    case 'customer': sortField = 'customer.firmName'; break;
+    case 'status': sortField = 'balance'; break; // approximate
+    default: sortField = 'createdAt';
+  }
+  const sortObj = {};
+  sortObj[sortField] = dir;
+  pipeline.push({ $sort: sortObj });
+
+  // Facet for pagination + total count
+  pipeline.push({
+    $facet: {
+      data: [ { $skip: skip }, { $limit: pageSize } ],
+      totalCount: [ { $count: 'count' } ]
+    }
+  });
+
+  const out = await Invoice.aggregate(pipeline).allowDiskUse(true);
+  const first = (out && out[0]) || { data: [], totalCount: [] };
+  const data = first.data || [];
+  const totalCount = (first.totalCount && first.totalCount[0] && first.totalCount[0].count) ? first.totalCount[0].count : 0;
+
+  return { data, totalCount };
 }
 
 async function getInvoice(id) {

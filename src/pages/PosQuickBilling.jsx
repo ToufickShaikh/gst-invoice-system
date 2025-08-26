@@ -6,6 +6,7 @@ import { itemsAPI } from '../api/items';
 import { billingAPI } from '../api/billing';
 import { invoicesAPI } from '../api/invoices';
 import { formatCurrency } from '../utils/dateHelpers';
+import { getApiBaseUrl, getAppBasePath } from '../utils/appBase';
 import { toast } from 'react-hot-toast';
 
 const PosQuickBilling = () => {
@@ -95,17 +96,13 @@ const PosQuickBilling = () => {
       // open thermal print if ID available
       const id = res?._id || res?.invoiceId || res?.id;
       if (id) {
-        const getAppBase = () => {
-          const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-          if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
-          // return app base path (no origin) so routes resolve with BrowserRouter basename
-          return (window.__basename || import.meta.env.BASE_URL || '').replace(/\/$/, '') || '';
-        };
         try {
           const pdfUrl = invoicesAPI.publicPdfUrl(id, null, 'thermal');
           window.open(pdfUrl, '_blank');
         } catch (e) {
-          const openUrl = `${getAppBase()}/invoices/public/${id}/pdf?format=thermal`;
+          const apiBase = getApiBaseUrl() || '';
+          const prefix = apiBase ? apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '') : (getAppBasePath() || '').replace(/\/$/, '');
+          const openUrl = `${prefix}/invoices/public/${id}/pdf?format=thermal`;
           window.open(openUrl, '_blank');
         }
       }

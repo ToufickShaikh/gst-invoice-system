@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../utils/dateHelpers';
@@ -24,10 +24,15 @@ const InvoiceManagement = () => {
   const [sortDir, setSortDir] = useState('desc'); // asc | desc
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [searchInput, setSearchInput] = useState('');
+  const [menuOpenId, setMenuOpenId] = useState(null);
 
+  // Debounced fetch when filters/search/sort/page change
   useEffect(() => {
-    fetchInvoices();
-  }, [filters, sortBy, sortDir, page, pageSize]);
+    const t = setTimeout(() => fetchInvoices(), 300);
+    return () => clearTimeout(t);
+  }, [filters, sortBy, sortDir, page, pageSize, searchInput]);
 
   const normalizeInvoice = (inv) => {
     const customerName = inv.customer?.firmName || inv.customer?.name || '';
@@ -56,72 +61,27 @@ const InvoiceManagement = () => {
     };
   };
 
-  const applyFiltersSortPaginate = (list) => {
-    let data = list.slice();
-
-    // Filters
-    if (filters.status !== 'all') {
-      data = data.filter((invoice) => invoice.status === filters.status);
-    }
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      data = data.filter((invoice) =>
-        (invoice.invoiceNumber || '').toLowerCase().includes(q) ||
-        (invoice.customer?.name || '').toLowerCase().includes(q)
-      );
-    }
-    if (filters.dateFrom) {
-      const from = new Date(filters.dateFrom);
-      data = data.filter((invoice) => (invoice.date ? new Date(invoice.date) >= from : true));
-    }
-    if (filters.dateTo) {
-      const to = new Date(filters.dateTo);
-      data = data.filter((invoice) => (invoice.date ? new Date(invoice.date) <= to : true));
-    }
-
-    // Sorting
-    data.sort((a, b) => {
-      let av, bv;
-      switch (sortBy) {
-        case 'amount':
-          av = a.total || 0; bv = b.total || 0;
-          break;
-        case 'customer':
-          av = (a.customer?.name || '').toLowerCase();
-          bv = (b.customer?.name || '').toLowerCase();
-          break;
-        case 'status':
-          av = a.status || ''; bv = b.status || '';
-          break;
-        case 'date':
-        default:
-          av = a.date ? new Date(a.date).getTime() : 0;
-          bv = b.date ? new Date(b.date).getTime() : 0;
-      }
-      if (av < bv) return sortDir === 'asc' ? -1 : 1;
-      if (av > bv) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    // Pagination
-    const totalCount = data.length;
-    const start = (page - 1) * pageSize;
-    const end = start + pageSize;
-    const pageData = data.slice(start, end);
-
-    return { data: pageData, totalCount };
-  };
+  // client-side normalize only; server will handle filtering/paging when available
 
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-  const response = await invoicesAPI.list();
-      const raw = Array.isArray(response) ? response : (response.invoices || []);
-      const normalized = raw.map(normalizeInvoice);
-      const { data, totalCount } = applyFiltersSortPaginate(normalized);
-      setInvoices(data);
-      // Optionally store totalCount for pagination UI
-      // setTotalCount(totalCount);
+      const params = {
+        status: filters.status === 'all' ? undefined : filters.status,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+        search: searchInput || undefined,
+        sortBy,
+        sortDir,
+        page,
+        pageSize,
+      };
+      const response = await invoicesAPI.list(params);
+      // response expected shape: { data: [], totalCount }
+      const raw = response?.data || response || [];
+      const normalized = Array.isArray(raw) ? raw.map(normalizeInvoice) : (raw.invoices || []).map(normalizeInvoice);
+      setInvoices(normalized);
+      setTotalCount(response?.totalCount ?? (Array.isArray(response) ? response.length : normalized.length));
     } catch (error) {
       console.error('Error fetching invoices:', error);
       toast.error('Failed to load invoices');
@@ -409,10 +369,10 @@ const InvoiceManagement = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-blue-50 p-6 rounded-lg">
           <h3 className="text-sm font-medium text-blue-600">Total Invoices</h3>
-          <p className="text-2xl font-bold text-blue-900">{invoices.length}</p>
+      <p className="text-2xl font-bold text-blue-900">{totalCount}</p>
         </div>
         <div className="bg-green-50 p-6 rounded-lg">
           <h3 className="text-sm font-medium text-green-600">Total Amount</h3>
@@ -428,7 +388,7 @@ const InvoiceManagement = () => {
         </div>
       </div>
 
-      {/* Filters + Sort */}
+  {/* Filters + Sort */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -469,8 +429,8 @@ const InvoiceManagement = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
             <input
               type="text"
-              value={filters.search}
-              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+              value={searchInput}
+              onChange={(e) => { setPage(1); setSearchInput(e.target.value); }}
               placeholder="Invoice number or customer..."
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -513,7 +473,7 @@ const InvoiceManagement = () => {
         </div>
       </div>
 
-      {/* Bulk Actions */}
+  {/* Bulk Actions */}
       {selectedInvoices.length > 0 && (
         <div className="bg-blue-50 p-4 rounded-lg mb-6">
           <div className="flex items-center justify-between">
@@ -543,7 +503,7 @@ const InvoiceManagement = () => {
         </div>
       )}
 
-      {/* Invoice Table */}
+  {/* Invoice Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="table-mobile-wrapper">
           <table className="min-w-full divide-y divide-gray-200">
@@ -558,22 +518,22 @@ const InvoiceManagement = () => {
                   />
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Invoice
+                  <button className="text-left" onClick={() => { setSortBy('date'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Invoice'}</button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
+                  <button className="text-left" onClick={() => { setSortBy('customer'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Customer'}</button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
+                  <button className="text-left" onClick={() => { setSortBy('date'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Date'}</button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Due Date
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
+                  <button className="text-left" onClick={() => { setSortBy('amount'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Amount'}</button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                  <button className="text-left" onClick={() => { setSortBy('status'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Status'}</button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -615,74 +575,20 @@ const InvoiceManagement = () => {
                     </span>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
-                      {/* Edit */}
-                      <Link
-                        to={`/edit-invoice/${invoice._id}`}
-                        className="text-gray-700 hover:text-gray-900"
-                        title="Edit Invoice"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5h2m2 0h2m-4 4h2m2 0h2M7 3h2m-2 0H5m2 4H5m0 0H3m9 4l6-6a2.121 2.121 0 013 3l-6 6M7 17l4 0 8-8" />
-                        </svg>
-                      </Link>
-
-                      {/* Print */}
-                      <button
-                        onClick={() => handlePrintInvoice(invoice)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Print Invoice"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                      </button>
-                      
-                      {/* WhatsApp */}
-                      <button
-                        onClick={() => handleWhatsAppInvoice(invoice)}
-                        className="text-green-600 hover:text-green-900"
-                        title="Send via WhatsApp"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.382z"/>
-                        </svg>
-                      </button>
-
-                      {/* Copy Portal Link */}
-                      <button
-                        onClick={() => handleCopyPortalLink(invoice)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        title="Copy Portal Link"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5" />
-                        </svg>
-                      </button>
-                      
-                      {/* Mark as Paid */}
-                      {invoice.status !== 'paid' && (
-                        <button
-                          onClick={() => handleMarkAsPaid(invoice)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Mark as Paid"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </button>
+                    <div className="relative inline-block text-left">
+                      <button onClick={() => setMenuOpenId(menuOpenId === invoice._id ? null : invoice._id)} className="px-2 py-1 border rounded bg-white hover:bg-gray-50" title="Actions">•••</button>
+                      {menuOpenId === invoice._id && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white border rounded shadow-lg z-10">
+                          <div className="py-1">
+                            <Link to={`/edit-invoice/${invoice._id}`} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Edit</Link>
+                            <button onClick={() => { setMenuOpenId(null); handlePrintInvoice(invoice); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Print</button>
+                            <button onClick={() => { setMenuOpenId(null); handleWhatsAppInvoice(invoice); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">WhatsApp</button>
+                            <button onClick={() => { setMenuOpenId(null); handleCopyPortalLink(invoice); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Copy Portal Link</button>
+                            {invoice.status !== 'paid' && <button onClick={() => { setMenuOpenId(null); handleMarkAsPaid(invoice); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Mark as Paid</button>}
+                            <button onClick={() => { setMenuOpenId(null); handleDeleteInvoice(invoice); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Delete</button>
+                          </div>
+                        </div>
                       )}
-                      
-                      {/* Delete */}
-                      <button
-                        onClick={() => handleDeleteInvoice(invoice)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete Invoice"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -711,11 +617,11 @@ const InvoiceManagement = () => {
         >
           Previous
         </button>
-        <span className="text-sm">Page {page}</span>
+        <span className="text-sm">Page {page} of {Math.max(1, Math.ceil((totalCount || 0) / pageSize))}</span>
         <button
           className="px-3 py-1 border rounded disabled:opacity-50"
           onClick={() => setPage((p) => p + 1)}
-          disabled={invoices.length < pageSize}
+          disabled={page * pageSize >= (totalCount || 0)}
         >
           Next
         </button>
