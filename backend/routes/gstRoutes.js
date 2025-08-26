@@ -427,6 +427,32 @@ router.get('/returns/hsn-summary', async (req, res) => {
   }
 });
 
+// Debug endpoint to inspect invoices used for GST calculations
+router.get('/returns/debug', async (req, res) => {
+  try {
+    const { start, end } = parsePeriod(req);
+    const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).populate('customer').populate('items.item').limit(50).lean();
+    const compCode = getStateCode(company.state || '');
+    const samples = invoices.slice(0, 10).map(inv => ({
+      _id: inv._id,
+      invoiceNumber: inv.invoiceNumber,
+      invoiceDate: inv.invoiceDate,
+      itemsCount: (inv.items || []).length,
+      subTotal: inv.subTotal,
+      cgst: inv.cgst,
+      sgst: inv.sgst,
+      igst: inv.igst,
+      grandTotal: inv.grandTotal,
+      customer: { _id: inv.customer?._id, name: inv.customer?.firmName || inv.customer?.name, state: inv.customer?.state }
+    }));
+
+    res.json({ period: { from: start, to: end }, count: invoices.length, samples });
+  } catch (err) {
+    console.error('[GST DEBUG] Error', err);
+    res.status(500).json({ error: 'Failed to run GST debug' });
+  }
+});
+
 // Define routes
 router.get('/verify/:gstin', verifyGSTIN);
 router.get('/validate/:gstin', quickValidateGSTIN);
