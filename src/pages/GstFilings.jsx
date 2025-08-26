@@ -35,14 +35,21 @@ const GstFilings = () => {
     try {
       setLoading(true);
       const params = { params: { from, to } };
+      console.info('[GST UI] Fetching GSTR data for', from, '->', to);
       const [r1, r3b, rhsn] = await Promise.all([
         axiosInstance.get('/gst/returns/gstr1', params),
         axiosInstance.get('/gst/returns/gstr3b', params),
         axiosInstance.get('/gst/returns/hsn-summary', params),
-      ]);
-      setGstr1(r1.data);
-      setGstr3b(r3b.data);
-      setHsn(rhsn.data);
+      ]).catch(err => {
+        console.error('[GST UI] Error fetching GST endpoints', err);
+        throw err;
+      });
+      console.debug('[GST UI] gstr1 response', r1?.data);
+      console.debug('[GST UI] gstr3b response', r3b?.data);
+      console.debug('[GST UI] hsn response', rhsn?.data);
+      setGstr1(r1.data || null);
+      setGstr3b(r3b.data || null);
+      setHsn(rhsn.data || null);
     } catch (e) {
       console.error(e);
       toast.error('Failed to fetch GST returns');

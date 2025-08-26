@@ -152,7 +152,9 @@ const getFp = (d) => {
 
 // Build GST portal-like GSTR-1 JSON
 async function buildGstr1(start, end) {
+  console.info('[GST] buildGstr1 invoked for period', start.toISOString(), '->', end.toISOString());
   const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).populate('customer').populate('items.item');
+  console.info('[GST] Found invoices count:', invoices.length);
   const compCode = getStateCode(company.state);
 
   const b2bMap = new Map(); // ctin -> { ctin, inv: [] }
@@ -166,11 +168,13 @@ async function buildGstr1(start, end) {
     const cust = inv.customer || {};
     const pos = getStateCode(cust.state);
     const inter = pos && compCode && pos !== compCode;
-    const taxable = Number(inv.subTotal || 0);
-    const igst = Number(inv.igst || 0);
-    const cgst = Number(inv.cgst || 0);
-    const sgst = Number(inv.sgst || 0);
-    const total = Number(inv.grandTotal || inv.totalAmount || taxable + igst + cgst + sgst);
+  const taxable = Number(inv.subTotal || 0);
+  const igst = Number(inv.igst || 0);
+  const cgst = Number(inv.cgst || 0);
+  const sgst = Number(inv.sgst || 0);
+  const total = Number(inv.grandTotal || inv.totalAmount || taxable + igst + cgst + sgst);
+  // Debug: report per-invoice stored values presence
+  console.debug(`[GST][GSTR1] Invoice ${inv.invoiceNumber} - stored subTotal=${inv.subTotal} cgst=${inv.cgst} sgst=${inv.sgst} igst=${inv.igst} grandTotal=${inv.grandTotal} -> computed total=${total}`);
     cur_gt += total;
 
     // Items mapped to GST portal item schema
@@ -194,6 +198,18 @@ async function buildGstr1(start, end) {
         }
       };
     });
+
+    if (!inv.subTotal && Array.isArray(inv.items) && inv.items.length) {
+      // compute quick item-level totals for debug
+      const comp = itms.reduce((acc, it) => {
+        acc.txval += Number(it.itm_det.txval || 0);
+        acc.iamt += Number(it.itm_det.iamt || 0);
+        acc.camt += Number(it.itm_det.camt || 0);
+        acc.samt += Number(it.itm_det.samt || 0);
+        return acc;
+      }, { txval: 0, iamt: 0, camt: 0, samt: 0 });
+      console.debug(`[GST][GSTR1] Invoice ${inv.invoiceNumber} item-aggregate txval=${comp.txval.toFixed(2)} iamt=${comp.iamt.toFixed(2)} camt=${comp.camt.toFixed(2)} samt=${comp.samt.toFixed(2)}`);
+    }
 
     const invRow = {
       inum: inv.invoiceNumber,
