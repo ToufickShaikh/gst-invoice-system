@@ -1,4 +1,4 @@
-// GST Verification Routes - Fixed Version
+// GST Verification and Filing Routes - Clean Version
 const express = require('express');
 const router = express.Router();
 const { verifyAndAutoFillGST, validateGSTIN, determineTaxType } = require('../utils/gstVerification');
@@ -6,6 +6,7 @@ const Invoice = require('../models/Invoice');
 const Customer = require('../models/Customer');
 const company = require('../config/company');
 
+// GST Verification functions
 const verifyGSTIN = async (req, res) => {
     try {
         const { gstin } = req.params;
@@ -74,7 +75,7 @@ const getTaxType = async (req, res) => {
     }
 };
 
-// Helper functions
+// Helper functions for GST filing calculations
 const parsePeriod = (req) => {
   const { from, to } = req.query;
   const start = from ? new Date(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -105,7 +106,7 @@ const asCsv = (rows) => {
   return rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
 };
 
-// GSTR-1 - Enhanced sales data
+// GSTR-1 - Enhanced sales data for portal upload
 router.get('/returns/gstr1', async (req, res) => {
   try {
     const { start, end } = parsePeriod(req);
@@ -123,11 +124,21 @@ router.get('/returns/gstr1', async (req, res) => {
     let gt = 0, cur_gt = 0;
 
     for (const inv of invoices) {
-      const cust = inv.customer || {};
+      console.log(`[GSTR-1] Processing invoice ${inv.invoiceNumber}, customer:`, inv.customer ? 'present' : 'missing');
+      
+      // Handle missing customer data - assume B2C domestic if no customer
+      const cust = inv.customer || { customerType: 'B2C', state: company.state || 'Tamil Nadu' };
       let custState = cust.state;
+      
       if (!custState && cust.address) {
         const stateMatch = cust.address.match(/,?\s*([A-Za-z\s]+)\s*-?\s*\d{6}/);
         if (stateMatch) custState = stateMatch[1].trim();
+      }
+      
+      // Default to company state if customer state is missing
+      if (!custState) {
+        custState = company.state || 'Tamil Nadu';
+        console.log(`[GSTR-1] Using company state ${custState} for invoice ${inv.invoiceNumber}`);
       }
       
       const pos = getStateCode(custState);
@@ -143,7 +154,7 @@ router.get('/returns/gstr1', async (req, res) => {
         total = subTotal + igst + cgst + sgst;
       }
       
-      console.log(`[GSTR-1] Invoice ${inv.invoiceNumber}: subTotal=${subTotal}, taxes=${igst+cgst+sgst}, total=${total}`);
+      console.log(`[GSTR-1] Invoice ${inv.invoiceNumber}: customer=${cust.name || cust.firmName || 'Unknown'}, state=${custState}, pos=${pos}, inter=${inter}, subTotal=${subTotal}, taxes=${igst+cgst+sgst}, total=${total}`);
       cur_gt += total;
 
       const itms = (inv.items || []).map((li, idx) => {
@@ -181,7 +192,7 @@ router.get('/returns/gstr1', async (req, res) => {
         inum: inv.invoiceNumber,
         idt: inv.invoiceDate ? new Date(inv.invoiceDate).toISOString().slice(0,10) : '',
         val: +total.toFixed(2),
-        pos: pos || compCode || '',
+        pos: pos || compCode || '33', // Default to Tamil Nadu
         rchrg: 'N',
         inv_typ: 'R',
         itms
@@ -192,12 +203,20 @@ router.get('/returns/gstr1', async (req, res) => {
         const sply_ty = inv.exportInfo.withTax ? 'WPAY' : 'WOPAY';
         exp.push({
           exp_typ,
-          inv: [{ ...invRow, sbpcode: inv.exportInfo.portCode || '', sbnum: inv.exportInfo.shippingBillNo || '', sbdt: inv.exportInfo.shippingBillDate ? new Date(inv.exportInfo.shippingBillDate).toISOString().slice(0,10) : '', sply_ty }]
+          inv: [{ 
+            ...invRow, 
+            sbpcode: inv.exportInfo.portCode || '', 
+            sbnum: inv.exportInfo.shippingBillNo || '', 
+            sbdt: inv.exportInfo.shippingBillDate ? new Date(inv.exportInfo.shippingBillDate).toISOString().slice(0,10) : '', 
+            sply_ty 
+          }]
         });
+        console.log(`[GSTR-1] Added Export invoice: ${inv.invoiceNumber}`);
         continue;
       }
 
-      const custGstin = cust.gstin || cust.gstNo || cust.gstNumber;
+      // Determine customer GSTIN - check multiple possible fields
+      const custGstin = cust.gstin || cust.gstNo || cust.gstNumber || cust.gst;
       const isB2B = cust.customerType === 'B2B' || custGstin;
       
       if (isB2B && custGstin) {
@@ -207,17 +226,17 @@ router.get('/returns/gstr1', async (req, res) => {
         console.log(`[GSTR-1] Added B2B invoice for GSTIN: ${ctin}`);
       } else {
         if (inter && total > 250000) {
-          const key = pos || '00';
+          const key = pos || '33';
           if (!b2clMap.has(key)) b2clMap.set(key, { pos: key, inv: [] });
           b2clMap.get(key).inv.push(invRow);
-          console.log(`[GSTR-1] Added B2CL invoice for state: ${key}`);
+          console.log(`[GSTR-1] Added B2CL invoice for state: ${key}, value: ${total}`);
         } else {
           for (const it of itms) {
-            const k = `${pos||'00'}|${it.itm_det.rt}|${inter ? 'INTER' : 'INTRA'}`;
+            const k = `${pos||'33'}|${it.itm_det.rt}|${inter ? 'INTER' : 'INTRA'}`;
             if (!b2csAgg.has(k)) b2csAgg.set(k, {
               sply_ty: inter ? 'INTER' : 'INTRA',
               typ: 'OE',
-              pos: pos || compCode || '00',
+              pos: pos || compCode || '33',
               rt: it.itm_det.rt,
               txval: 0,
               iamt: 0, camt: 0, samt: 0, csamt: 0
@@ -228,6 +247,7 @@ router.get('/returns/gstr1', async (req, res) => {
             row.camt = +(row.camt + it.itm_det.camt).toFixed(2);
             row.samt = +(row.samt + it.itm_det.samt).toFixed(2);
           }
+          console.log(`[GSTR-1] Added B2CS aggregation for POS: ${pos||compCode||'33'}, invoice: ${inv.invoiceNumber}`);
         }
       }
     }
@@ -278,20 +298,51 @@ router.get('/returns/gstr3b', async (req, res) => {
     const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).lean();
     console.log(`[GSTR-3B] Found ${invoices.length} invoices`);
 
-    const taxable = invoices.reduce((sum, inv) => sum + Number(inv.subTotal || inv.itemTotal || 0), 0);
-    const igst = invoices.reduce((sum, inv) => sum + Number(inv.igst || inv.totalIGST || 0), 0);
-    const cgst = invoices.reduce((sum, inv) => sum + Number(inv.cgst || inv.totalCGST || 0), 0);
-    const sgst = invoices.reduce((sum, inv) => sum + Number(inv.sgst || inv.totalSGST || 0), 0);
+    let taxable = 0, igst = 0, cgst = 0, sgst = 0;
+    
+    for (const inv of invoices) {
+      const invTaxable = Number(inv.subTotal || inv.itemTotal || 0);
+      const invIgst = Number(inv.igst || inv.totalIGST || 0);
+      const invCgst = Number(inv.cgst || inv.totalCGST || 0);
+      const invSgst = Number(inv.sgst || inv.totalSGST || 0);
+      
+      taxable += invTaxable;
+      igst += invIgst;
+      cgst += invCgst;
+      sgst += invSgst;
+      
+      console.log(`[GSTR-3B] Invoice ${inv.invoiceNumber}: taxable=${invTaxable}, igst=${invIgst}, cgst=${invCgst}, sgst=${invSgst}`);
+      
+      // If invoice has no tax totals, calculate from items
+      if (!invIgst && !invCgst && !invSgst && inv.items && inv.items.length > 0) {
+        console.log(`[GSTR-3B] Calculating taxes from items for ${inv.invoiceNumber}`);
+        for (const li of inv.items) {
+          const qty = Number(li.quantity || 0);
+          const rate = Number(li.rate || 0);
+          const lineTotal = qty * rate;
+          const taxRate = Number(li.taxSlab || li.item?.taxSlab || 0) / 100;
+          const lineTax = lineTotal * taxRate;
+          
+          // Simple assumption: if customer has different state, it's IGST, otherwise split CGST/SGST
+          if (inv.customer && inv.customer.state && inv.customer.state !== (company.state || 'Tamil Nadu')) {
+            igst += lineTax;
+          } else {
+            cgst += lineTax / 2;
+            sgst += lineTax / 2;
+          }
+        }
+      }
+    }
 
-    const summary = {
-      outwardTaxableSupplies: +taxable.toFixed(2),
-      igst: +igst.toFixed(2),
-      cgst: +cgst.toFixed(2),
-      sgst: +sgst.toFixed(2),
-      exemptNil: 0
+    const summary = { 
+      outwardTaxableSupplies: +taxable.toFixed(2), 
+      igst: +igst.toFixed(2), 
+      cgst: +cgst.toFixed(2), 
+      sgst: +sgst.toFixed(2), 
+      exemptNil: 0 
     };
 
-    console.log(`[GSTR-3B] Summary:`, summary);
+    console.log(`[GSTR-3B] Final summary:`, summary);
 
     if ((req.query.format || '').toLowerCase() === 'csv') {
       const csvData = [
@@ -372,7 +423,7 @@ router.get('/returns/hsn-summary', async (req, res) => {
   }
 });
 
-// Debug endpoint
+// Debug endpoint to inspect invoices used for GST calculations
 router.get('/returns/debug', async (req, res) => {
   try {
     const { start, end } = parsePeriod(req);
@@ -398,418 +449,19 @@ router.get('/returns/debug', async (req, res) => {
       }
     }));
 
-    res.json({ period: { from: start, to: end }, count: invoices.length, companyStateCode: getStateCode(company.state || ''), samples });
+    res.json({ 
+      period: { from: start, to: end }, 
+      count: invoices.length, 
+      companyStateCode: getStateCode(company.state || 'Tamil Nadu'),
+      samples 
+    });
   } catch (err) {
     console.error('[GST DEBUG] Error', err);
     res.status(500).json({ error: 'Failed to run GST debug' });
   }
 });
 
-/**
- * @desc    Quick GSTIN format validation
- * @route   GET /api/gst/validate/:gstin
- * @access  Public
- */
-const quickValidateGSTIN = async (req, res) => {
-    try {
-        const { gstin } = req.params;
-
-        const validation = validateGSTIN(gstin);
-
-        if (validation.valid) {
-            const taxInfo = determineTaxType(validation.stateCode);
-            res.json({
-                valid: true,
-                gstin: validation.gstin,
-                stateCode: validation.stateCode,
-                stateName: validation.stateName,
-                taxInfo: taxInfo
-            });
-        } else {
-            res.status(400).json(validation);
-        }
-
-    } catch (error) {
-        console.error('[GST API] Validation error:', error);
-        res.status(500).json({
-            valid: false,
-            error: 'Validation service error'
-        });
-    }
-};
-
-/**
- * @desc    Get tax type based on state codes
- * @route   GET /api/gst/tax-type
- * @access  Public
- */
-const getTaxType = async (req, res) => {
-    try {
-        const { companyStateCode, customerStateCode } = req.query;
-
-        if (!companyStateCode || !customerStateCode) {
-            return res.status(400).json({
-                error: 'Both companyStateCode and customerStateCode are required'
-            });
-        }
-
-        const taxType = companyStateCode === customerStateCode ? 'CGST_SGST' : 'IGST';
-
-        res.json({
-            taxType,
-            companyStateCode,
-            customerStateCode,
-            isInterState: taxType === 'IGST'
-        });
-
-    } catch (error) {
-        console.error('[GST API] Tax type error:', error);
-        res.status(500).json({
-            error: 'Tax type determination error'
-        });
-    }
-};
-
-// Utilities to compute period
-const parsePeriod = (req) => {
-  const { from, to } = req.query;
-  const start = from ? new Date(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const end = to ? new Date(to) : new Date();
-  return { start, end };
-};
-
-const asCsv = (rows) => rows.map(r => r.map(v => (v==null?'':String(v).replace(/"/g,'""'))).map(v => `"${v}"`).join(',')).join('\n');
-
-const getStateCode = (s) => {
-  if (!s) return '';
-  const m = String(s).match(/^(\d{2})/);
-  return m ? m[1] : '';
-}
-
-const getFp = (d) => {
-  const y = d.getFullYear();
-  const m = (d.getMonth() + 1).toString().padStart(2, '0');
-  return `${y}${m}`;
-}
-
-// Build GST portal-like GSTR-1 JSON
-async function buildGstr1(start, end) {
-  console.info('[GST] buildGstr1 invoked for period', start.toISOString(), '->', end.toISOString());
-  const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).populate('customer').populate('items.item');
-  console.info('[GST] Found invoices count:', invoices.length);
-  const compCode = getStateCode(company.state);
-
-  const b2bMap = new Map(); // ctin -> { ctin, inv: [] }
-  const b2clMap = new Map(); // pos -> { pos, inv: [] }
-  const b2csAgg = new Map(); // key: pos|rt|sply_ty -> row
-  const exp = []; // export invoices
-
-  let gt = 0, cur_gt = 0; // placeholders
-
-  for (const inv of invoices) {
-    const cust = inv.customer || {};
-    const pos = getStateCode(cust.state);
-    const inter = pos && compCode && pos !== compCode;
-  const taxable = Number(inv.subTotal || 0);
-  const igst = Number(inv.igst || 0);
-  const cgst = Number(inv.cgst || 0);
-  const sgst = Number(inv.sgst || 0);
-  const total = Number(inv.grandTotal || inv.totalAmount || taxable + igst + cgst + sgst);
-  // Debug: report per-invoice stored values presence
-  console.debug(`[GST][GSTR1] Invoice ${inv.invoiceNumber} - stored subTotal=${inv.subTotal} cgst=${inv.cgst} sgst=${inv.sgst} igst=${inv.igst} grandTotal=${inv.grandTotal} -> computed total=${total}`);
-    cur_gt += total;
-
-    // Items mapped to GST portal item schema
-      // Enhanced item processing with better tax calculation
-      const itms = (inv.items || []).map((li, idx) => {
-        const qty = Number(li.quantity || 0);
-        const rate = Number(li.rate || li.sellingPrice || 0);
-        let txval = qty * rate;
-        
-        // Apply line-level discount if present
-        if (li.discount) {
-          const discountAmount = (Number(li.discount) / 100) * txval;
-          txval = txval - discountAmount;
-        }
-        
-        // Get tax rate with multiple fallbacks
-        const rt = Number(li.taxSlab || li.taxRate || li.item?.taxSlab || li.item?.taxRate || 18);
-        const taxAmt = txval * rt / 100;
-        
-        // Split tax based on inter-state or intra-state
-        const split = inter ? 
-          { iamt: taxAmt, camt: 0, samt: 0 } : 
-          { iamt: 0, camt: taxAmt / 2, samt: taxAmt / 2 };
-        
-        console.log(`[GSTR-1] Item ${idx + 1}: qty=${qty}, rate=${rate}, txval=${txval}, rt=${rt}, taxAmt=${taxAmt}`);
-        
-        return {
-          num: idx + 1,
-          itm_det: {
-            hsn_sc: li.hsnCode || li.item?.hsnCode || '9999',
-            txval: +txval.toFixed(2),
-            rt: +rt.toFixed(2),
-            iamt: +split.iamt.toFixed(2),
-            camt: +split.camt.toFixed(2),
-            samt: +split.samt.toFixed(2),
-            csamt: 0
-          }
-        };
-      });    if (!inv.subTotal && Array.isArray(inv.items) && inv.items.length) {
-      // compute quick item-level totals for debug
-      const comp = itms.reduce((acc, it) => {
-        acc.txval += Number(it.itm_det.txval || 0);
-        acc.iamt += Number(it.itm_det.iamt || 0);
-        acc.camt += Number(it.itm_det.camt || 0);
-        acc.samt += Number(it.itm_det.samt || 0);
-        return acc;
-      }, { txval: 0, iamt: 0, camt: 0, samt: 0 });
-      console.debug(`[GST][GSTR1] Invoice ${inv.invoiceNumber} item-aggregate txval=${comp.txval.toFixed(2)} iamt=${comp.iamt.toFixed(2)} camt=${comp.camt.toFixed(2)} samt=${comp.samt.toFixed(2)}`);
-    }
-
-    const invRow = {
-      inum: inv.invoiceNumber,
-      idt: inv.invoiceDate ? new Date(inv.invoiceDate).toISOString().slice(0,10) : '',
-      val: +total.toFixed(2),
-      pos: pos || compCode || '',
-      rchrg: 'N',
-      inv_typ: 'R',
-      itms
-    };
-
-    // Exports / SEZ (exp section)
-    if (inv.exportInfo && inv.exportInfo.isExport) {
-      const exp_typ = (inv.exportInfo.exportType || '').toUpperCase() === 'SEZ' ? 'SEZ' : 'WPAY';
-      const sply_ty = inv.exportInfo.withTax ? 'WPAY' : 'WOPAY';
-      exp.push({
-        exp_typ, // SEZ/EXP as per schema; using SEZ and generic WPAY for overseas
-        inv: [{
-          inum: invRow.inum,
-          idt: invRow.idt,
-          val: invRow.val,
-          sbpcode: inv.exportInfo.portCode || '',
-          sbnum: inv.exportInfo.shippingBillNo || '',
-          sbdt: inv.exportInfo.shippingBillDate ? new Date(inv.exportInfo.shippingBillDate).toISOString().slice(0,10) : '',
-          sply_ty: sply_ty,
-          itms: itms
-        }]
-      });
-      continue; // skip normal B2B/B2C classification if export
-    }
-
-    if (cust.customerType === 'B2B' && cust.gstNo) {
-      const ctin = cust.gstNo;
-      if (!b2bMap.has(ctin)) b2bMap.set(ctin, { ctin, inv: [] });
-      b2bMap.get(ctin).inv.push(invRow);
-    } else {
-      // B2C split into B2CL (>2.5L inter-state) or B2CS (aggregated)
-      if (inter && total > 250000) {
-        const key = pos || '00';
-        if (!b2clMap.has(key)) b2clMap.set(key, { pos: key, inv: [] });
-        b2clMap.get(key).inv.push(invRow);
-      } else {
-        // Aggregate by POS, rate, supply type
-        for (const it of itms) {
-          const k = `${pos||'00'}|${it.itm_det.rt}|${inter ? 'INTER' : 'INTRA'}`;
-          if (!b2csAgg.has(k)) b2csAgg.set(k, {
-            sply_ty: inter ? 'INTER' : 'INTRA',
-            typ: 'OE',
-            pos: pos || compCode || '00',
-            rt: it.itm_det.rt,
-            txval: 0,
-            iamt: 0, camt: 0, samt: 0, csamt: 0
-          });
-          const row = b2csAgg.get(k);
-          row.txval = +(row.txval + it.itm_det.txval).toFixed(2);
-          row.iamt = +(row.iamt + it.itm_det.iamt).toFixed(2);
-          row.camt = +(row.camt + it.itm_det.camt).toFixed(2);
-          row.samt = +(row.samt + it.itm_det.samt).toFixed(2);
-        }
-      }
-    }
-  }
-
-  const b2b = Array.from(b2bMap.values());
-  const b2cl = Array.from(b2clMap.values());
-  const b2cs = Array.from(b2csAgg.values());
-
-  // Placeholders for sections not tracked yet
-  const cdnr = []; // Credit/Debit Notes to registered
-  const cdnur = []; // Credit/Debit Notes to unregistered
-
-  const today = new Date();
-  const payload = {
-    gstin: company.gstin || '',
-    fp: getFp(start),
-    version: 'GST3.0',
-    gt: +gt.toFixed(2),
-    cur_gt: +cur_gt.toFixed(2),
-    b2b, b2cl, b2cs, cdnr, cdnur, exp
-  };
-
-  return payload;
-}
-
-// GSTR-1 - sales data in portal-ready format
-router.get('/returns/gstr1', async (req, res) => {
-  try {
-    const { start, end } = parsePeriod(req);
-    console.log(`[GSTR-1] Processing period: ${start.toISOString()} to ${end.toISOString()}`);
-    
-    const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } })
-      .populate('customer')
-      .populate('items.item')
-      .lean();
-
-    console.log(`[GSTR-1] Found ${invoices.length} invoices`);
-
-    const compCode = getStateCode(company.state || '');
-    const b2bMap = new Map(), b2clMap = new Map(), b2csAgg = new Map();
-    const exp = [];
-    let gt = 0, cur_gt = 0;
-
-    for (const inv of invoices) {
-      const cust = inv.customer || {};
-      
-      // Enhanced customer state extraction
-      let custState = cust.state;
-      if (!custState && cust.address) {
-        // Try to extract state from address
-        const stateMatch = cust.address.match(/,?\s*([A-Za-z\s]+)\s*-?\s*\d{6}/);
-        if (stateMatch) custState = stateMatch[1].trim();
-      }
-      
-      const pos = getStateCode(custState);
-      const inter = pos && compCode && pos !== compCode;
-      
-      // Improved tax calculation with fallbacks
-      const subTotal = Number(inv.subTotal || inv.itemTotal || 0);
-      const igst = Number(inv.igst || inv.totalIGST || 0);
-      const cgst = Number(inv.cgst || inv.totalCGST || 0);  
-      const sgst = Number(inv.sgst || inv.totalSGST || 0);
-      
-      // Calculate total with multiple fallback strategies
-      let total = Number(inv.grandTotal || inv.totalAmount || inv.total || 0);
-      if (!total || total === 0) {
-        total = subTotal + igst + cgst + sgst;
-      }
-      
-      console.log(`[GSTR-1] Invoice ${inv.invoiceNumber}: subTotal=${subTotal}, taxes=${igst+cgst+sgst}, total=${total}`);
-      
-      cur_gt += total;// GSTR-3B summary
-router.get('/returns/gstr3b', async (req, res) => {
-  try {
-    const { start, end } = parsePeriod(req);
-    const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).populate('items.item').populate('customer');
-    const compCode = getStateCode(company.state || '');
-    let taxable = 0, igst = 0, cgst = 0, sgst = 0;
-    for (const inv of invoices) {
-      // compute per-invoice totals from items if stored fields missing
-      let invTaxable = 0, invIgst = 0, invCgst = 0, invSgst = 0;
-      const pos = getStateCode((inv.customer && inv.customer.state) || '');
-      const inter = pos && compCode && pos !== compCode;
-      for (const li of (inv.items || [])) {
-        const qty = Number(li.quantity || 0);
-        const rate = Number(li.rate || li.item?.rate || li.item?.sellingPrice || 0);
-        const taxRate = Number(li.taxSlab || li.item?.taxSlab || 0);
-        const discountAmt = Number(li.discountAmount || 0);
-        const discountPct = Number(li.discount || 0);
-        const gross = qty * rate;
-        const discount = discountAmt || (gross * (discountPct || 0) / 100);
-        const txval = Math.max(0, gross - discount);
-        const taxAmt = txval * taxRate / 100;
-        invTaxable += txval;
-        if (inter) invIgst += taxAmt; else { invCgst += taxAmt / 2; invSgst += taxAmt / 2; }
-      }
-      // use stored if available
-      taxable += Number(inv.subTotal) > 0 ? Number(inv.subTotal) : invTaxable;
-      igst += Number(inv.igst) > 0 ? Number(inv.igst) : invIgst;
-      cgst += Number(inv.cgst) > 0 ? Number(inv.cgst) : invCgst;
-      sgst += Number(inv.sgst) > 0 ? Number(inv.sgst) : invSgst;
-    }
-
-    const row = { outwardTaxableSupplies: +taxable.toFixed(2), igst: +igst.toFixed(2), cgst: +cgst.toFixed(2), sgst: +sgst.toFixed(2), exemptNil: 0 };
-
-    if ((req.query.format || '').toLowerCase() === 'csv') {
-      const header = ['Outward Taxable Supplies','IGST','CGST','SGST','Exempt/Nil'];
-      const data = [[row.outwardTaxableSupplies,row.igst,row.cgst,row.sgst,row.exemptNil]];
-      res.setHeader('Content-Type','text/csv');
-      res.setHeader('Content-Disposition',`attachment; filename=gstr3b-${start.toISOString().slice(0,10)}-${end.toISOString().slice(0,10)}.csv`);
-      return res.send(asCsv([header, ...data]));
-    }
-
-    res.json({ period: { from: start, to: end }, summary: row });
-  } catch (error) {
-    console.error('[GST] GSTR-3B error', error);
-    res.status(500).json({ error: 'Failed to compute GSTR-3B' });
-  }
-});
-
-// HSN summary
-router.get('/returns/hsn-summary', async (req, res) => {
-  try {
-    const { start, end } = parsePeriod(req);
-    const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).populate('items.item');
-
-    const map = new Map();
-    for (const inv of invoices) {
-      for (const li of inv.items || []) {
-        const hsn = li.hsnCode || li.item?.hsnCode || 'NA';
-        const name = li.item?.name || li.name || '';
-        const qty = Number(li.quantity || 0);
-        const rate = Number(li.rate || 0);
-        const taxable = qty * rate;
-        const taxRate = Number(li.taxSlab || li.item?.taxSlab || 0);
-        const taxAmt = taxable * taxRate / 100;
-        if (!map.has(hsn)) map.set(hsn, { hsn, description: name, quantity: 0, taxableValue: 0, taxAmount: 0, taxRate });
-        const row = map.get(hsn);
-        row.quantity += qty; row.taxableValue += taxable; row.taxAmount += taxAmt; row.taxRate = taxRate || row.taxRate;
-      }
-    }
-    const rows = Array.from(map.values());
-
-    if ((req.query.format || '').toLowerCase() === 'csv') {
-      const header = ['HSN','Description','Quantity','Tax Rate %','Taxable Value','Tax Amount'];
-      const data = rows.map(r => [r.hsn,r.description,r.quantity,r.taxRate,r.taxableValue,r.taxAmount]);
-      res.setHeader('Content-Type','text/csv');
-      res.setHeader('Content-Disposition',`attachment; filename=hsn-summary-${start.toISOString().slice(0,10)}-${end.toISOString().slice(0,10)}.csv`);
-      return res.send(asCsv([header, ...data]));
-    }
-
-    res.json({ period: { from: start, to: end }, count: rows.length, rows });
-  } catch (error) {
-    console.error('[GST] HSN summary error', error);
-    res.status(500).json({ error: 'Failed to compute HSN summary' });
-  }
-});
-
-// Debug endpoint to inspect invoices used for GST calculations
-router.get('/returns/debug', async (req, res) => {
-  try {
-    const { start, end } = parsePeriod(req);
-    const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).populate('customer').populate('items.item').limit(50).lean();
-    const compCode = getStateCode(company.state || '');
-    const samples = invoices.slice(0, 10).map(inv => ({
-      _id: inv._id,
-      invoiceNumber: inv.invoiceNumber,
-      invoiceDate: inv.invoiceDate,
-      itemsCount: (inv.items || []).length,
-      subTotal: inv.subTotal,
-      cgst: inv.cgst,
-      sgst: inv.sgst,
-      igst: inv.igst,
-      grandTotal: inv.grandTotal,
-      customer: { _id: inv.customer?._id, name: inv.customer?.firmName || inv.customer?.name, state: inv.customer?.state }
-    }));
-
-    res.json({ period: { from: start, to: end }, count: invoices.length, samples });
-  } catch (err) {
-    console.error('[GST DEBUG] Error', err);
-    res.status(500).json({ error: 'Failed to run GST debug' });
-  }
-});
-
-// Define routes
+// Define verification routes
 router.get('/verify/:gstin', verifyGSTIN);
 router.get('/validate/:gstin', quickValidateGSTIN);
 router.get('/tax-type', getTaxType);
