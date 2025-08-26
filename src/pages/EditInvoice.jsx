@@ -10,16 +10,6 @@ import InputField from '../components/InputField';
 import Button from '../components/Button';
 import { toast } from 'react-hot-toast';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useParams, useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import Layout from '../components/Layout';
-import InputField from '../components/InputField';
-import Button from '../components/Button';
-import { customersAPI } from '../api/customers';
-import { itemsAPI } from '../api/items';
-import { billingAPI } from '../api/billing';
-import { calculateTax } from '../utils/taxCalculations';
-import { formatCurrency } from '../utils/dateHelpers';
 
 const EditInvoice = () => {
     const { id } = useParams();
