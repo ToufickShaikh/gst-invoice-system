@@ -583,22 +583,32 @@ const EditInvoice = () => {
                         </Button>
                         <div className="flex gap-2">
                             <Button
-                                onClick={() => {
-                                    const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-                                    const url = `${baseUrl}/api/billing/public/pdf/${id}`;
-                                    window.open(url, '_blank');
-                                }}
+                                                onClick={() => {
+                                                    const getAppBase = () => {
+                                                        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+                                                        if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
+                                                        return window.location.origin + (window.__basename || import.meta.env.BASE_URL || '');
+                                                    };
+                                                    const baseUrl = getAppBase();
+                                                    const url = `${baseUrl}/api/billing/public/pdf/${id}`;
+                                                    window.open(url, '_blank');
+                                                }}
                                 variant="secondary"
                                 size="lg"
                             >
                                 Download PDF
                             </Button>
                             <Button
-                                onClick={() => {
-                                    const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-                                    const url = `${baseUrl}/api/billing/public/pdf/${id}?format=thermal`;
-                                    window.open(url, '_blank');
-                                }}
+                                                onClick={() => {
+                                                    const getAppBase = () => {
+                                                        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+                                                        if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
+                                                        return window.location.origin + (window.__basename || import.meta.env.BASE_URL || '');
+                                                    };
+                                                    const baseUrl = getAppBase();
+                                                    const url = `${baseUrl}/api/billing/public/pdf/${id}?format=thermal`;
+                                                    window.open(url, '_blank');
+                                                }}
                                 variant="secondary"
                                 size="lg"
                             >

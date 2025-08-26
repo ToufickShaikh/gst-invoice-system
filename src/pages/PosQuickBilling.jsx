@@ -95,15 +95,16 @@ const PosQuickBilling = () => {
       // open thermal print if ID available
       const id = res?._id || res?.invoiceId || res?.id;
       if (id) {
-        const apiBase = import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '');
-        const baseUrl = apiBase.replace(/\/api$/, '');
-        try {
-          // Create portal token via v2 endpoint
-          // Portal link creation is now public; open the public PDF directly
-          window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal`, '_blank');
-        } catch (e) {
-          window.open(`${apiBase}/invoices/public/${id}/pdf?format=thermal`, '_blank');
-        }
+        const getAppBase = () => {
+          const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+          if (apiBase) return apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
+          return window.location.origin + (window.__basename || import.meta.env.BASE_URL || '');
+        };
+        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+        const baseUrl = getAppBase();
+        // prefer calling API directly if apiBase available
+        const openUrl = apiBase ? `${apiBase.replace(/\/$/, '')}/invoices/public/${id}/pdf?format=thermal` : `${baseUrl}/invoices/public/${id}/pdf?format=thermal`;
+        window.open(openUrl, '_blank');
       }
       // reset
   setSaleItems([]); setPaidAmount(0); setDiscount(0); setCustomerName('');

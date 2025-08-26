@@ -35,6 +35,10 @@ export const invoicesAPI = {
     return res.data;
   },
   publicPdfUrl: (id, token, format='a4') => {
-  return `${import.meta.env.VITE_API_BASE_URL}/invoices/public/${id}/pdf?format=${format}`;
+  const apiBase = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? (window.__apiBase || '') : '');
+  if (apiBase) return `${apiBase.replace(/\/$/, '')}/invoices/public/${id}/pdf?format=${format}`;
+  const appBase = (typeof window !== 'undefined') ? (window.__basename || import.meta.env.BASE_URL || '') : '';
+  const prefix = appBase.replace(/\/$/, '');
+  return `${prefix}/invoices/public/${id}/pdf?format=${format}`;
   }
 };

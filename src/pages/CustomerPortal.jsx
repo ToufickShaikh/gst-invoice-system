@@ -182,14 +182,22 @@ const CustomerPortal = () => {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => window.open(`${import.meta.env.BASE_URL || ''}invoices/${row._id}/view`, '_blank')}
+            onClick={() => {
+              const appBase = (import.meta.env.BASE_URL || '') || window.__basename || '';
+              const prefix = appBase.replace(/\/$/, '');
+              window.open(`${prefix}/invoices/${row._id}/view`, '_blank');
+            }}
           >
             <Eye className="w-3 h-3" />
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => window.open(`${import.meta.env.BASE_URL || ''}invoices/${row._id}/download`, '_blank')}
+            onClick={() => {
+              const appBase = (import.meta.env.BASE_URL || '') || window.__basename || '';
+              const prefix = appBase.replace(/\/$/, '');
+              window.open(`${prefix}/invoices/${row._id}/download`, '_blank');
+            }}
           >
             <Download className="w-3 h-3" />
           </Button>
