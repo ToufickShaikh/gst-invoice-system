@@ -6,11 +6,8 @@ import { itemsAPI } from '../api/items';
 import { billingAPI } from '../api/billing';
 import { formatCurrency } from '../utils/dateHelpers';
 import AdvancedInvoicePrint from './AdvancedInvoicePrint';
-import { cashDrawerAPI } from '../api/cashDrawer';
 
 const EnhancedBillingForm = () => {
-  // Feature flag: disable cash drawer interactions when false
-  const CASH_DRAWER_ENABLED = false;
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     customer: null,
@@ -33,16 +30,11 @@ const EnhancedBillingForm = () => {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState(null);
   const [autoCalculate, setAutoCalculate] = useState(true);
+  
   // Payment controls
   const [recordPaymentNow, setRecordPaymentNow] = useState(false);
   const [paidAmount, setPaidAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
-  // Cash denominations for cash drawer recording
-  const [cashDenoms, setCashDenoms] = useState({ d500:0,d200:0,d100:0,d50:0,d20:0,d10:0,d5:0,d2:0,d1:0 });
-  const [drawerStatus, setDrawerStatus] = useState(null);
-  // Change computation states
-  const [changeSuggestions, setChangeSuggestions] = useState([]);
-  const [selectedChangeDenoms, setSelectedChangeDenoms] = useState(null);
 
   // Customer form data - single form, derive type from GSTIN presence
   const [newCustomer, setNewCustomer] = useState({
@@ -99,12 +91,6 @@ const EnhancedBillingForm = () => {
       ...prev,
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     }));
-    // Load cash drawer status (guarded by feature flag)
-    if (CASH_DRAWER_ENABLED) {
-      (async () => {
-        try { const s = await cashDrawerAPI.getStatus(); setDrawerStatus(s); } catch (e) { console.warn('Drawer status load failed:', e?.message||e); }
-      })();
-    }
   }, []);
 
   // Preselect customer when coming from Customers page
@@ -277,103 +263,6 @@ const EnhancedBillingForm = () => {
       total: roundedTotal,
     };
   };
-
-  // ===== Cash change-making helpers =====
-  // Denominations used in India (no 2000 notes in backend)
-  const denomOrder = [500, 200, 100, 50, 20, 10, 5, 2, 1];
-
-  function sumDenoms(d = {}) {
-    return denomOrder.reduce((sum, v) => sum + v * (d[`d${v}`] || 0), 0);
-  }
-
-  function addDenoms(a = {}, b = {}) {
-    const out = {};
-    denomOrder.forEach(v => {
-      out[`d${v}`] = (a[`d${v}`] || 0) + (b[`d${v}`] || 0);
-    });
-    return out;
-  }
-
-  function makeGreedyChange(amount, available = {}) {
-    let remaining = amount;
-    const result = {};
-    for (const v of denomOrder) {
-      const have = available[`d${v}`] || 0;
-      const canUse = Math.min(have, Math.floor(remaining / v));
-      if (canUse > 0) {
-        result[`d${v}`] = canUse;
-        remaining -= canUse * v;
-      }
-    }
-    return { result, remaining };
-  }
-
-  function makePreferredChange(amount, available = {}) {
-    // Prefer 20 and 10 first, then fallback greedy
-  const preferredOrder = [20, 10, 200, 500, 100, 50, 5, 2, 1];
-    let remaining = amount;
-    const result = {};
-    for (const v of preferredOrder) {
-      const have = available[`d${v}`] || 0;
-      const canUse = Math.min(have, Math.floor(remaining / v));
-      if (canUse > 0) {
-        result[`d${v}`] = canUse;
-        remaining -= canUse * v;
-      }
-    }
-    return { result, remaining };
-  }
-
-  function makeSingleDenom(amount, available = {}) {
-    // Try to return change with a single denomination if possible
-    for (const v of denomOrder) {
-      if (amount % v === 0) {
-        const need = amount / v;
-        if ((available[`d${v}`] || 0) >= need) {
-          return { [`d${v}`]: need };
-        }
-      }
-    }
-    return null;
-  }
-
-  // Build change suggestions when recording cash payment
-  useEffect(() => {
-    if (!(recordPaymentNow && paymentMethod === 'Cash')) {
-      setChangeSuggestions([]);
-      setSelectedChangeDenoms(null);
-      return;
-    }
-
-    // Compute change due locally to avoid TDZ with changeDue const defined later
-    const t = calculateTotals();
-    const cd = recordPaymentNow && paymentMethod === 'Cash'
-      ? Math.max(0, Math.round((Number(paidAmount || 0) - Number(t.total || 0))))
-      : 0;
-
-    if (cd <= 0) {
-      setChangeSuggestions([]);
-      setSelectedChangeDenoms(null);
-      return;
-    }
-
-    const available = addDenoms(drawerStatus?.denominations || {}, cashDenoms);
-    const suggestions = [];
-
-    const greedy = makeGreedyChange(cd, available);
-    if (greedy.remaining === 0) suggestions.push({ label: 'Optimal', denoms: greedy.result });
-
-    const pref = makePreferredChange(cd, available);
-    if (pref.remaining === 0 && JSON.stringify(pref.result) !== JSON.stringify(greedy.result)) {
-      suggestions.push({ label: 'Prefer 20/10', denoms: pref.result });
-    }
-
-    const single = makeSingleDenom(cd, available);
-    if (single) suggestions.push({ label: 'Single denom', denoms: single });
-
-    setChangeSuggestions(suggestions);
-    setSelectedChangeDenoms(suggestions[0]?.denoms || null);
-  }, [recordPaymentNow, paymentMethod, paidAmount, formData.items, formData.discountType, formData.discountValue, formData.shippingCharges, drawerStatus, cashDenoms]);
 
   const addItemToInvoice = () => {
     if (!currentItem.name || currentItem.quantity <= 0 || currentItem.rate <= 0) {
@@ -589,43 +478,6 @@ const EnhancedBillingForm = () => {
       const created = await billingAPI.createInvoice(payload);
       setCurrentInvoice(created.invoice || created);
 
-      // Record cash in drawer only if payment is Cash and paidAmount > 0
-      try {
-        if (CASH_DRAWER_ENABLED && recordPaymentNow && paymentMethod === 'Cash' && Number(paidAmount) > 0) {
-          const inv = created.invoice || created; const invoiceId = inv?._id;
-          if (invoiceId) {
-            // Compute change and net collected amount
-            const totalDue = Number(totals.total || 0);
-            const rawPaid = Number(paidAmount || 0);
-            const change = Math.max(0, Math.round(rawPaid - totalDue));
-            const netCollected = Math.max(0, rawPaid - change);
-
-            // Record only net collected cash into drawer
-            await cashDrawerAPI.recordSale({ invoiceId, amount: Number(netCollected), denominations: cashDenoms });
-            if (change > 0) {
-              // Use selected suggestion if valid; else greedy
-              const available = addDenoms(drawerStatus?.denominations || {}, cashDenoms);
-              let chosen = selectedChangeDenoms;
-              if (!chosen || sumDenoms(chosen) !== change) {
-                const g = makeGreedyChange(change, available);
-                if (g.remaining === 0) chosen = g.result;
-              }
-              if (chosen && sumDenoms(chosen) === change) {
-                await cashDrawerAPI.adjust({ type: 'adjust-remove', denominations: chosen, reason: `Change returned for invoice ${inv.invoiceNumber || inv._id}` });
-              } else {
-                console.warn('Unable to compute exact change removal; skipped adjust-remove.');
-              }
-            }
-            // Refresh drawer status (guarded)
-            if (CASH_DRAWER_ENABLED) {
-              try { const s = await cashDrawerAPI.getStatus(); setDrawerStatus(s); } catch {}
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Cash drawer update failed (non-blocking):', e);
-      }
-      
       toast.success(`Invoice ${mode === 'draft' ? 'saved as draft' : 'created'} successfully!`);
       
       if (mode !== 'draft') {
@@ -1366,6 +1218,94 @@ const EnhancedBillingForm = () => {
             </label>
           </div>
         </div>
+      </div>
+
+      {/* Export/SEZ Options */}
+      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-blue-800 mb-2">Export & SEZ Options</h3>
+          <div className="flex items-center space-x-6">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={exportInfo.isExport}
+                onChange={(e) => setExportInfo(prev => ({ 
+                  ...prev, 
+                  isExport: e.target.checked,
+                  // Reset other fields if unchecking
+                  exportType: e.target.checked ? prev.exportType : '',
+                  withTax: e.target.checked ? prev.withTax : false
+                }))}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <span className="ml-2 text-sm font-medium text-blue-700">Export Invoice</span>
+            </label>
+          </div>
+        </div>
+
+        {exportInfo.isExport && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-blue-700 mb-2">Export Type</label>
+              <select
+                value={exportInfo.exportType}
+                onChange={(e) => setExportInfo(prev => ({ ...prev, exportType: e.target.value }))}
+                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Export Type</option>
+                <option value="EXPORT">Overseas Export</option>
+                <option value="SEZ">Special Economic Zone (SEZ)</option>
+              </select>
+            </div>
+
+            <div className="flex items-center">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={exportInfo.withTax}
+                  onChange={(e) => setExportInfo(prev => ({ ...prev, withTax: e.target.checked }))}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-blue-700">With Tax (WPAY)</span>
+              </label>
+              <div className="ml-2 text-xs text-blue-600">
+                {exportInfo.withTax ? 'WPAY' : 'WOPAY'}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-blue-700 mb-2">Shipping Bill No.</label>
+              <input
+                type="text"
+                value={exportInfo.shippingBillNo}
+                onChange={(e) => setExportInfo(prev => ({ ...prev, shippingBillNo: e.target.value }))}
+                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter shipping bill number"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-blue-700 mb-2">Shipping Bill Date</label>
+              <input
+                type="date"
+                value={exportInfo.shippingBillDate}
+                onChange={(e) => setExportInfo(prev => ({ ...prev, shippingBillDate: e.target.value }))}
+                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-blue-700 mb-2">Port Code</label>
+              <input
+                type="text"
+                value={exportInfo.portCode}
+                onChange={(e) => setExportInfo(prev => ({ ...prev, portCode: e.target.value }))}
+                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter port code (e.g., INMAA1)"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Notes and Terms */}

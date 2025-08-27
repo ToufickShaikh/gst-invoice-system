@@ -343,184 +343,365 @@ const Items = () => {
     }
   }
 
-  // CSV import functions
+  // Enhanced CSV import functions - Complete rewrite
   const handleCsvFileChange = (e) => {
     const file = e.target.files[0]
-    if (file && file.type === 'text/csv') {
-      setCsvFile(file)
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const csv = event.target.result
-        const lines = csv.split('\n')
-        const headers = lines[0].split(',').map(h => h.trim())
+    
+    if (!file) {
+      toast.error('Please select a file')
+      return
+    }
+
+    // Accept both .csv files and .txt files with CSV content
+    const isValidFile = file.type === 'text/csv' || 
+                       file.name.toLowerCase().endsWith('.csv') ||
+                       file.type === 'text/plain'
+    
+    if (!isValidFile) {
+      toast.error('Please select a valid CSV file (.csv or .txt)')
+      return
+    }
+
+    setCsvFile(file)
+    const reader = new FileReader()
+    
+    reader.onload = (event) => {
+      try {
+        const csvContent = event.target.result
         
-        // Expected headers: name,hsnCode,rate,priceType,taxSlab,units (stock will be set to 0)
-        const expectedHeaders = ['name', 'hsnCode', 'rate', 'priceType', 'taxSlab', 'units']
-        const isValidFormat = expectedHeaders.every(header => 
-          headers.some(h => h.toLowerCase() === header.toLowerCase())
-        )
-        
-        if (!isValidFormat) {
-          toast.error('Invalid CSV format. Expected headers: name,hsnCode,rate,priceType,taxSlab,units')
+        if (!csvContent || csvContent.trim() === '') {
+          toast.error('CSV file is empty')
           return
         }
-        
-        const data = []
-        for (let i = 1; i < lines.length; i++) {
-          if (lines[i].trim()) {
-            const values = lines[i].split(',').map(v => v.trim())
-            const item = {}
+
+        // Better CSV parsing - handle quotes and commas within quotes
+        const parseCSVLine = (line) => {
+          const result = []
+          let current = ''
+          let inQuotes = false
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i]
             
-            // Create a header mapping for case-insensitive matching
-            const headerMap = {
-              'name': 'name',
-              'hsncode': 'hsnCode',
-              'rate': 'rate', 
-              'pricetype': 'priceType',
-              'taxslab': 'taxSlab',
-              'units': 'units'
-            }
-            
-            headers.forEach((header, index) => {
-              const lowerHeader = header.toLowerCase()
-              const mappedKey = headerMap[lowerHeader]
-              if (mappedKey) {
-                const value = values[index]
-                if (value !== undefined && value !== null) {
-                  item[mappedKey] = value.trim()
-                }
-              }
-            })
-            
-            if (item.name && item.hsnCode) {
-              data.push(item)
+            if (char === '"') {
+              inQuotes = !inQuotes
+            } else if (char === ',' && !inQuotes) {
+              result.push(current.trim())
+              current = ''
+            } else {
+              current += char
             }
           }
+          
+          result.push(current.trim())
+          return result.map(field => field.replace(/^"(.*)"$/, '$1')) // Remove surrounding quotes
         }
+
+        const lines = csvContent.split('\n').map(line => line.trim()).filter(line => line.length > 0)
         
+        if (lines.length < 2) {
+          toast.error('CSV must have at least a header row and one data row')
+          return
+        }
+
+        const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim())
+        console.log('CSV Headers found:', headers)
+        
+        // Flexible header mapping - support variations
+        const headerMapping = {
+          'name': ['name', 'item name', 'itemname', 'product name', 'product'],
+          'hsnCode': ['hsn', 'hsncode', 'hsn code', 'hsn_code', 'hs code'],
+          'rate': ['rate', 'price', 'selling price', 'sellingprice', 'amount', 'cost'],
+          'taxSlab': ['tax', 'taxslab', 'tax slab', 'tax_slab', 'gst', 'tax rate', 'taxrate'],
+          'units': ['unit', 'units', 'uom', 'measurement', 'per'],
+          'stock': ['stock', 'quantity', 'qty', 'inventory', 'available']
+        }
+
+        // Find column indices
+        const columnIndices = {}
+        Object.keys(headerMapping).forEach(field => {
+          const variations = headerMapping[field]
+          const index = headers.findIndex(header => 
+            variations.some(variation => header.includes(variation))
+          )
+          if (index !== -1) {
+            columnIndices[field] = index
+          }
+        })
+
+        console.log('Column mapping:', columnIndices)
+
+        // Validate required columns
+        const requiredFields = ['name', 'hsnCode', 'rate', 'taxSlab']
+        const missingFields = requiredFields.filter(field => columnIndices[field] === undefined)
+        
+        if (missingFields.length > 0) {
+          toast.error(`Missing required columns: ${missingFields.join(', ')}. Available columns: ${headers.join(', ')}`)
+          return
+        }
+
+        const data = []
+        const errors = []
+        
+        // Process data rows
+        for (let i = 1; i < lines.length; i++) {
+          try {
+            const values = parseCSVLine(lines[i])
+            
+            if (values.length === 0 || values.every(v => !v)) {
+              continue // Skip empty rows
+            }
+
+            const item = {
+              name: values[columnIndices.name]?.trim() || '',
+              hsnCode: values[columnIndices.hsnCode]?.trim() || '',
+              rate: values[columnIndices.rate]?.trim() || '',
+              taxSlab: values[columnIndices.taxSlab]?.trim() || '',
+              units: values[columnIndices.units]?.trim() || 'per piece',
+              stock: values[columnIndices.stock]?.trim() || '0'
+            }
+
+            // Validation
+            if (!item.name) {
+              errors.push(`Row ${i + 1}: Missing item name`)
+              continue
+            }
+            
+            if (!item.hsnCode || item.hsnCode.length < 4) {
+              errors.push(`Row ${i + 1}: Invalid HSN code (${item.hsnCode})`)
+              continue
+            }
+
+            // Parse numeric values
+            const rate = parseFloat(item.rate)
+            const taxSlab = parseFloat(item.taxSlab)
+            const stock = parseFloat(item.stock)
+
+            if (isNaN(rate) || rate < 0) {
+              errors.push(`Row ${i + 1}: Invalid rate (${item.rate})`)
+              continue
+            }
+
+            if (isNaN(taxSlab) || taxSlab < 0 || taxSlab > 100) {
+              errors.push(`Row ${i + 1}: Invalid tax slab (${item.taxSlab})`)
+              continue
+            }
+
+            // Create processed item
+            const processedItem = {
+              name: item.name,
+              hsnCode: item.hsnCode,
+              rate: rate,
+              priceType: 'Exclusive', // Default to Exclusive
+              taxSlab: taxSlab,
+              units: item.units,
+              stock: isNaN(stock) ? 0 : Math.max(0, stock)
+            }
+
+            data.push(processedItem)
+            
+          } catch (error) {
+            errors.push(`Row ${i + 1}: ${error.message}`)
+          }
+        }
+
+        if (errors.length > 0 && errors.length >= data.length) {
+          console.error('CSV parsing errors:', errors)
+          toast.error(`Failed to parse CSV. Errors: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`)
+          return
+        }
+
         setCsvData(data)
-        setCsvPreview(data.slice(0, 5)) // Show first 5 rows for preview
+        setCsvPreview(data.slice(0, 10)) // Show first 10 rows for preview
         
-        // Debug: Log items with 0% tax
-        const zeroTaxItems = data.filter(item => parseFloat(item.taxSlab) === 0)
-        if (zeroTaxItems.length > 0) {
-          console.log('Found 0% tax items in CSV:', zeroTaxItems.map(item => ({ name: item.name, taxSlab: item.taxSlab })))
+        let message = `${data.length} items loaded from CSV`
+        if (errors.length > 0) {
+          message += ` (${errors.length} rows had errors)`
+          console.warn('CSV parsing errors:', errors)
         }
         
-        toast.success(`${data.length} items loaded from CSV`)
+        toast.success(message)
+        
+      } catch (error) {
+        console.error('CSV processing error:', error)
+        toast.error(`Failed to process CSV: ${error.message}`)
       }
-      reader.readAsText(file)
-    } else {
-      toast.error('Please select a valid CSV file')
     }
+    
+    reader.onerror = () => {
+      toast.error('Failed to read the file')
+    }
+    
+    reader.readAsText(file)
   }
 
+  // Enhanced CSV template download
   const downloadCsvTemplate = () => {
-  const headers = 'name,hsnCode,rate,taxSlab,units\n'
-  const sample = 'Sample Carpet,12345678,1000,18,per piece\n'
-    const csvContent = headers + sample
+    const headers = 'name,hsnCode,rate,taxSlab,units,stock'
+    const samples = [
+      'Sample Carpet,57011000,1000,18,per piece,10',
+      'Premium Rug,57023100,2500,18,per piece,5', 
+      'Cotton Mat,57024100,500,12,per piece,20',
+      'Exempted Item,99999999,100,0,per piece,0'
+    ]
+    const csvContent = [headers, ...samples].join('\n')
     
-    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'items_template.csv'
+    link.download = `items_template_${new Date().toISOString().slice(0,10)}.csv`
     link.click()
     window.URL.revokeObjectURL(url)
+    
+    toast.success('CSV template downloaded')
   }
 
+  // Enhanced CSV import with better error handling
   const handleCsvImport = async () => {
-    if (csvData.length === 0) {
+    if (!csvData || csvData.length === 0) {
       toast.error('No data to import')
       return
     }
 
+    setLoading(true)
+    let successCount = 0
+    let duplicateCount = 0
+    let errorCount = 0
+    const errors = []
+
     try {
-      let successCount = 0
-      let duplicateCount = 0
-      const errors = []
+      // Fetch existing items for duplicate checking
+      const existingResponse = await itemsAPI.getAll()
+      const existingItems = Array.isArray(existingResponse) 
+        ? existingResponse 
+        : (Array.isArray(existingResponse?.data) ? existingResponse.data : [])
+      
+      // Create lookup maps for faster duplicate detection
+      const existingNames = new Set()
+      const existingHsns = new Set()
+      
+      existingItems.forEach(item => {
+        if (item?.name) existingNames.add(item.name.toLowerCase().trim())
+        if (item?.hsnCode) existingHsns.add(item.hsnCode.trim())
+      })
 
-      // Fetch existing items once and build lookup sets for faster duplicate checks
-      const existing = await itemsAPI.getAll()
-      const existingArr = Array.isArray(existing) ? existing : (Array.isArray(existing?.data) ? existing.data : [])
-      const existingNames = new Set(existingArr.filter(Boolean).map(i => (i.name || '').toLowerCase()))
-      const existingHsns = new Set(existingArr.filter(Boolean).map(i => i.hsnCode))
+      console.log(`Starting CSV import of ${csvData.length} items...`)
+      console.log(`Existing items: ${existingItems.length} (Names: ${existingNames.size}, HSNs: ${existingHsns.size})`)
 
-      for (const item of csvData) {
-        try {
-          // For CSV import, send raw rate and preserve priceType if present; backend will normalize
-          const csvRate = parseFloat(item.rate) || 0
-          const csvTax = item.taxSlab !== undefined && item.taxSlab !== '' ? parseFloat(item.taxSlab) : 0
-          const itemData = {
-            name: item.name,
-            hsnCode: item.hsnCode,
-            rate: csvRate,
-            priceType: item.priceType || 'Exclusive',
-            taxSlab: csvTax,
-            units: item.units || 'per piece',
-            quantityInStock: 0
-          }
+      // Process items in batches to avoid overwhelming the server
+      const batchSize = 10
+      for (let i = 0; i < csvData.length; i += batchSize) {
+        const batch = csvData.slice(i, i + batchSize)
+        
+        await Promise.all(batch.map(async (item, batchIndex) => {
+          const rowNumber = i + batchIndex + 1
           
-          if (parseFloat(item.taxSlab) === 0) {
-            console.log('Processing 0% tax item:', item.name, 'Original taxSlab:', item.taxSlab, 'Parsed taxSlab:', itemData.taxSlab)
-          }
-          
-          if (!itemData.name || !itemData.hsnCode || itemData.rate <= 0) {
-            console.log('Validation failed for item:', itemData)
-            errors.push(`Skipped "${item.name || 'unnamed'}": Missing required fields (name: ${!!itemData.name}, hsnCode: ${!!itemData.hsnCode}, rate: ${itemData.rate})`)
-            continue
-          }
+          try {
+            // Final validation before API call
+            if (!item.name || !item.hsnCode) {
+              errors.push(`Row ${rowNumber}: Missing required fields`)
+              errorCount++
+              return
+            }
 
-          // Duplicate check via prebuilt sets
-          const nameKey = itemData.name.toLowerCase()
-          const hsnKey = itemData.hsnCode
-          const isDuplicate = existingNames.has(nameKey) || existingHsns.has(hsnKey)
+            // Check for duplicates
+            const nameKey = item.name.toLowerCase().trim()
+            const hsnKey = item.hsnCode.trim()
+            
+            if (existingNames.has(nameKey)) {
+              errors.push(`Row ${rowNumber}: Item "${item.name}" already exists`)
+              duplicateCount++
+              return
+            }
+            
+            if (existingHsns.has(hsnKey)) {
+              errors.push(`Row ${rowNumber}: HSN code "${item.hsnCode}" already exists`)
+              duplicateCount++
+              return
+            }
 
-          if (isDuplicate) {
-            duplicateCount++
-            errors.push(`Skipped "${item.name}": Item already exists`)
-            continue
-          }
-          
-          if (itemData.taxSlab === 0) {
-            console.log('Sending 0% tax item to API:', itemData)
-          }
-          
-          await itemsAPI.create(itemData)
-          successCount++
+            // Prepare item data for API
+            const itemData = {
+              name: item.name.trim(),
+              hsnCode: item.hsnCode.trim(),
+              rate: Number(item.rate),
+              priceType: 'Exclusive', // Always store as Exclusive
+              taxSlab: Number(item.taxSlab),
+              units: item.units?.trim() || 'per piece',
+              quantityInStock: Number(item.stock) || 0
+            }
 
-          // Update sets to avoid duplicates within same import
-          existingNames.add(nameKey)
-          existingHsns.add(hsnKey)
-        } catch (error) {
-          if (error.message && error.message.includes('already exists')) {
-            duplicateCount++
-            errors.push(`Skipped "${item.name}": Item already exists`)
-          } else {
-            errors.push(`Failed to add "${item.name}": ${error.message}`)
+            console.log(`Importing item ${rowNumber}:`, itemData)
+
+            // Create item via API
+            const createdItem = await itemsAPI.create(itemData)
+            
+            if (createdItem) {
+              successCount++
+              // Add to lookup sets to prevent duplicates within same import
+              existingNames.add(nameKey)
+              existingHsns.add(hsnKey)
+              
+              console.log(`✅ Item ${rowNumber} created:`, createdItem._id || createdItem.id)
+            } else {
+              errors.push(`Row ${rowNumber}: API returned no data`)
+              errorCount++
+            }
+            
+          } catch (apiError) {
+            console.error(`❌ Item ${rowNumber} failed:`, apiError)
+            
+            if (apiError.message?.includes('duplicate') || 
+                apiError.message?.includes('exists') ||
+                apiError.status === 400) {
+              duplicateCount++
+              errors.push(`Row ${rowNumber}: ${item.name} - Already exists`)
+            } else {
+              errorCount++
+              errors.push(`Row ${rowNumber}: ${item.name} - ${apiError.message || 'Unknown error'}`)
+            }
           }
+        }))
+
+        // Small delay between batches to prevent rate limiting
+        if (i + batchSize < csvData.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
         }
       }
 
-      toast.success(`${successCount} items imported successfully`)
-      if (duplicateCount > 0) {
-        toast(`${duplicateCount} duplicate items were skipped`, { 
-          icon: '⚠️',
-          style: { background: '#fef3c7', color: '#92400e' }
-        })
-      }
-      if (errors.length > duplicateCount) {
-        console.error('Import errors:', errors)
-        toast.error(`${errors.length - duplicateCount} items failed to import`)
+      // Show results
+      if (successCount > 0) {
+        toast.success(`✅ Successfully imported ${successCount} items`)
       }
       
-      fetchItems()
+      if (duplicateCount > 0) {
+        toast(`⚠️ Skipped ${duplicateCount} duplicate items`, { 
+          icon: '⚠️',
+          style: { background: '#fef3c7', color: '#92400e' },
+          duration: 4000
+        })
+      }
+      
+      if (errorCount > 0) {
+        toast.error(`❌ ${errorCount} items failed to import`)
+        console.error('Import errors:', errors.filter(e => !e.includes('Already exists')))
+      }
+
+      // Refresh items list
+      await fetchItems()
+      
+      // Close modal and reset
       setIsCsvModalOpen(false)
       setCsvFile(null)
       setCsvData([])
       setCsvPreview([])
+      
     } catch (error) {
-      toast.error('CSV import failed')
+      console.error('CSV import failed:', error)
+      toast.error(`CSV import failed: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
   }
 

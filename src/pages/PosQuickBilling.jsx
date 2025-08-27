@@ -16,11 +16,28 @@ const PosQuickBilling = () => {
   const [paidAmount, setPaidAmount] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [customerName, setCustomerName] = useState('');
+  
+  // Export/SEZ options for POS
+  const [exportInfo, setExportInfo] = useState({ 
+    isExport: false, 
+    exportType: '', 
+    withTax: false, 
+    shippingBillNo: '', 
+    shippingBillDate: '', 
+    portCode: '' 
+  });
 
   useEffect(() => {
     (async () => {
-      const res = await itemsAPI.getAll();
-      setItems(res || []);
+      try {
+        const res = await itemsAPI.getAll();
+        const itemsData = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+        setItems(itemsData);
+        console.log(`[POS] Loaded ${itemsData.length} items`);
+      } catch (error) {
+        console.error('[POS] Failed to load items:', error);
+        toast.error('Failed to load items');
+      }
     })();
   }, []);
 
@@ -78,22 +95,55 @@ const PosQuickBilling = () => {
   const change = Math.max(0, Number(paidAmount || 0) - grandTotal);
 
   const handleSavePOS = async () => {
-    if (saleItems.length === 0) return toast.error('Add items');
+    if (saleItems.length === 0) {
+      return toast.error('Add items to the bill');
+    }
+    
     // POS must be fully paid (no credit allowed)
-    if (Number(paidAmount || 0) < Number(grandTotal || 0)) return toast.error('POS requires full payment (no credit allowed)');
+    if (Number(paidAmount || 0) < Number(grandTotal || 0)) {
+      return toast.error('POS requires full payment (no credit allowed)');
+    }
+    
     setLoading(true);
     try {
-      const itemsForBackend = saleItems.map(({ id, ...rest }) => ({ ...rest, item: rest.itemId }));
+      const itemsForBackend = saleItems.map(({ id, ...rest }) => ({ 
+        ...rest, 
+        item: rest.itemId,
+        quantity: Number(rest.quantity || 1),
+        rate: Number(rest.price || 0),
+        taxSlab: Number(rest.taxSlab || 0)
+      }));
+      
       const payload = {
         billingType: 'POS',
         items: itemsForBackend,
-  customerName: customerName || undefined,
+        customerName: customerName || undefined,
         paidAmount: Number(paidAmount || 0),
-        discount: Number(discount || 0)
+        discount: Number(discount || 0),
+        // Include export info if applicable
+        exportInfo: exportInfo.isExport ? {
+          isExport: true,
+          exportType: exportInfo.exportType,
+          withTax: !!exportInfo.withTax,
+          shippingBillNo: exportInfo.shippingBillNo || '',
+          shippingBillDate: exportInfo.shippingBillDate || undefined,
+          portCode: exportInfo.portCode || '',
+        } : undefined
       };
-  const res = await invoicesAPI.create(payload);
-      toast.success('POS Invoice saved');
-      // open thermal print if ID available
+
+      console.log('[POS] Creating invoice with payload:', payload);
+      const res = await invoicesAPI.create(payload);
+      
+      toast.success('POS Invoice created successfully!');
+      
+      // Reset form
+      setSaleItems([]);
+      setPaidAmount(0);
+      setDiscount(0);
+      setCustomerName('');
+      setExportInfo({ isExport: false, exportType: '', withTax: false, shippingBillNo: '', shippingBillDate: '', portCode: '' });
+      
+      // Open thermal print if ID available
       const id = res?._id || res?.invoiceId || res?.id;
       if (id) {
         try {
@@ -106,11 +156,12 @@ const PosQuickBilling = () => {
           window.open(openUrl, '_blank');
         }
       }
-      // reset
-  setSaleItems([]); setPaidAmount(0); setDiscount(0); setCustomerName('');
     } catch (err) {
-      console.error(err); toast.error('Failed to save POS invoice');
-    } finally { setLoading(false); }
+      console.error('[POS] Error creating invoice:', err); 
+      toast.error('Failed to save POS invoice');
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
@@ -142,7 +193,61 @@ const PosQuickBilling = () => {
             ))}
 
             <div>
-              <Button size="sm" onClick={addEmpty}>Add Item</Button>
+              <Button size="sm" onClick={addEmpty} className="bg-blue-500 hover:bg-blue-600 text-white">
+                + Add Item
+              </Button>
+            </div>
+
+            {/* Export/SEZ Options for POS */}
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded p-3">
+              <div className="mb-2">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={exportInfo.isExport}
+                    onChange={(e) => setExportInfo(prev => ({ 
+                      ...prev, 
+                      isExport: e.target.checked,
+                      exportType: e.target.checked ? prev.exportType : '',
+                      withTax: e.target.checked ? prev.withTax : false
+                    }))}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm font-medium text-blue-700">Export Invoice</span>
+                </label>
+              </div>
+
+              {exportInfo.isExport && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                  <select
+                    value={exportInfo.exportType}
+                    onChange={(e) => setExportInfo(prev => ({ ...prev, exportType: e.target.value }))}
+                    className="border border-blue-300 rounded px-2 py-1 text-sm"
+                  >
+                    <option value="">Export Type</option>
+                    <option value="EXPORT">Overseas Export</option>
+                    <option value="SEZ">SEZ</option>
+                  </select>
+                  
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={exportInfo.withTax}
+                      onChange={(e) => setExportInfo(prev => ({ ...prev, withTax: e.target.checked }))}
+                      className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-1 text-xs text-blue-700">With Tax</span>
+                  </label>
+                  
+                  <input
+                    type="text"
+                    placeholder="Port Code"
+                    value={exportInfo.portCode}
+                    onChange={(e) => setExportInfo(prev => ({ ...prev, portCode: e.target.value }))}
+                    className="border border-blue-300 rounded px-2 py-1 text-sm"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="mt-4 border-t pt-4 space-y-2">
