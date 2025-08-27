@@ -500,14 +500,20 @@ const EnhancedBillingForm = () => {
   const taxTotal = (Number(totals.cgst || 0) + Number(totals.sgst || 0) + Number(totals.igst || 0));
   const effectivePaid = recordPaymentNow ? Number(paidAmount || 0) : 0;
   const balanceDue = Math.max(0, Number(totals.total || 0) - effectivePaid);
-  const changeDue = recordPaymentNow && paymentMethod === 'Cash' ? Math.max(0, Math.round(effectivePaid - Number(totals.total || 0))) : 0;
 
   return (
     <div className="space-y-8 pb-20 lg:pb-0 max-w-6xl mx-auto p-6 bg-white">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Create Invoice</h1>
-        <div className="text-xs text-gray-600">Cash in drawer: <span className="font-semibold">{formatCurrency(drawerStatus?.totalCash || 0)}</span></div>
+        <div className="text-sm text-gray-500">
+          {new Date().toLocaleDateString('en-IN', { 
+            weekday: 'short', 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+          })}
+        </div>
       </div>
 
       {/* Customer and Item Selection */}
@@ -1115,59 +1121,6 @@ const EnhancedBillingForm = () => {
                     <div className={`w-full text-sm font-medium ${effectivePaid >= totals.total ? 'text-green-700' : (effectivePaid > 0 ? 'text-yellow-700' : 'text-gray-700')}`}>
                       {effectivePaid >= totals.total ? 'Will be marked as PAID' : (effectivePaid > 0 ? 'Will be marked as PARTIAL' : 'Will be marked as PENDING')}
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {recordPaymentNow && paymentMethod === 'Cash' && (
-                <div className="mt-4">
-                  <div className="text-xs font-semibold text-gray-700 mb-2">Cash denominations (for drawer)</div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[500,200,100,50,20,10,5,2,1].map((v) => (
-                      <div key={v} className="flex items-center gap-2">
-                        <label className="text-xs w-12">₹{v}</label>
-                        <input
-                          type="number" min={0}
-                          value={cashDenoms[`d${v}`]}
-                          onChange={(e)=> setCashDenoms(prev => ({ ...prev, [`d${v}`]: parseInt(e.target.value||'0',10) }))}
-                          className="w-20 px-2 py-1 border rounded text-sm"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Change suggestions */}
-                  <div className="mt-3 p-3 border rounded bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium text-gray-800">Change to return:</div>
-                      <div className={`text-sm font-bold ${changeDue>0 ? 'text-red-700':'text-gray-700'}`}>{formatCurrency(changeDue)}</div>
-                    </div>
-                    {changeDue > 0 && (
-                      <div className="mt-2">
-                        <div className="text-xs text-gray-600 mb-1">Suggestions</div>
-                        <div className="flex flex-wrap gap-2">
-                          {changeSuggestions.length === 0 && (
-                            <span className="text-xs text-gray-500">No exact combination available with current drawer</span>
-                          )}
-                          {changeSuggestions.map((opt, idx) => {
-                            const text = denomOrder
-                              .filter(v => (opt.denoms[`d${v}`]||0) > 0)
-                              .map(v => `₹${v}×${opt.denoms[`d${v}`]}`)
-                              .join(' + ');
-                            const isSelected = selectedChangeDenoms && JSON.stringify(selectedChangeDenoms) === JSON.stringify(opt.denoms);
-                            return (
-                              <button key={idx} type="button" onClick={()=> setSelectedChangeDenoms(opt.denoms)}
-                                className={`px-2 py-1 rounded text-xs border ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-800 border-gray-300 hover:bg-blue-50'}`}
-                                title={opt.label}
-                              >{text || opt.label}</button>
-                            );
-                          })}
-                          {selectedChangeDenoms && (
-                            <button type="button" onClick={()=> setSelectedChangeDenoms(null)} className="px-2 py-1 rounded text-xs border bg-white text-gray-600">Clear</button>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
