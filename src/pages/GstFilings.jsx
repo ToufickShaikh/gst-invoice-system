@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import Button from '../components/Button';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../api/axiosInstance';
+import Gstr1OnlineFiling from '../components/Gstr1OnlineFiling';
 
 const fmtDate = (d) => new Date(d).toISOString().slice(0,10);
 
@@ -115,52 +116,8 @@ const GstFilings = () => {
           </div>
         </div>
 
-        <Section
-          title="GSTR-1 (Portal JSON)"
-          actions={(
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => dl('/gst/returns/gstr1', `gstr1-${from}-${to}.json`)}>Download JSON</Button>
-              <Button variant="outline" onClick={() => dl('/gst/returns/gstr1', `gstr1-${from}-${to}.csv`, { format: 'csv' })}>Download CSV</Button>
-            </div>
-          )}
-        >
-          {!gstr1 ? (
-            <div className="text-sm text-gray-600">No data</div>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Sum label="FP" value={gstr1.fp} />
-                <Sum label="GSTIN" value={gstr1.gstin || '—'} />
-                <Sum label="Current GT" value={gstr1.cur_gt || 0} />
-                <Sum label="B2B Parties" value={(gstr1.b2b||[]).length} />
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                <Sum label="B2B Invoices" value={(gstr1.b2b||[]).reduce((s,x)=>s+(x.inv?.length||0),0)} />
-                <Sum label="B2CL Invoices" value={(gstr1.b2cl||[]).reduce((s,x)=>s+(x.inv?.length||0),0)} />
-                <Sum label="B2CS Rows" value={(gstr1.b2cs||[]).length} />
-                <Sum label="CDNR" value={(gstr1.cdnr||[]).length} />
-                <Sum label="CDNUR" value={(gstr1.cdnur||[]).length} />
-                <Sum label="Exports" value={(gstr1.exp||[]).length} />
-              </div>
-              <div className="text-xs text-gray-500">
-                Preview below shows first few rows per section
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <div className="text-sm font-medium mb-1">B2B</div>
-                  <pre className="text-xs bg-gray-50 p-2 rounded max-h-64 overflow-auto">{JSON.stringify((gstr1.b2b||[]).slice(0,2), null, 2)}</pre>
-                </div>
-                <div>
-                  <div className="text-sm font-medium mb-1">B2CL</div>
-                  <pre className="text-xs bg-gray-50 p-2 rounded max-h-64 overflow-auto">{JSON.stringify((gstr1.b2cl||[]).slice(0,2), null, 2)}</pre>
-                </div>
-                <div>
-                  <div className="text-sm font-medium mb-1">B2CS</div>
-                  <pre className="text-xs bg-gray-50 p-2 rounded max-h-64 overflow-auto">{JSON.stringify((gstr1.b2cs||[]).slice(0,5), null, 2)}</pre>
-                </div>
-              </div>
-            </div>
-          )}
+        <Section title="GSTR-1 Online Filing Helper">
+          <Gstr1OnlineFiling data={gstr1} />
         </Section>
 
         <Section
