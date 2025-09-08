@@ -148,13 +148,77 @@ const Gstr1OnlineFiling = ({ data }) => {
   return (
     <div className="space-y-6">
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 className="text-lg font-semibold text-blue-800">How to File GSTR-1 Online</h3>
-        <ol className="list-decimal list-inside mt-2 text-sm text-gray-700 space-y-1">
-          <li>Open the official GST Portal in a new browser window and navigate to the GSTR-1 filing page for the correct period.</li>
-          <li>Use the tables below to fill in the data for each section (B2B, B2C Large, etc.).</li>
-          <li>Click the copy icon next to any value to copy it to your clipboard, then paste it into the corresponding field on the portal.</li>
-          <li>After filling all sections, review the data on the portal and submit your return.</li>
-        </ol>
+        <h3 className="text-lg font-semibold text-blue-800">A Comprehensive Guide to Filing GSTR-1 Online</h3>
+        <p className="text-xs text-gray-600 mt-1">This guide will walk you through using this helper to file your GSTR-1 return directly on the GST Portal.</p>
+        
+        <div className="mt-4 text-sm text-gray-700 space-y-4">
+          <div>
+            <h4 className="font-semibold">Phase 1: Getting Started on the GST Portal</h4>
+            <ol className="list-decimal list-inside mt-1 space-y-1 pl-2">
+              <li><b>Log In:</b> Open the <a href="https://www.gst.gov.in/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">official GST Portal</a> in a new browser tab and log in with your credentials.</li>
+              <li><b>Navigate to Returns:</b> From your dashboard, go to <b>Services &gt; Returns &gt; Returns Dashboard</b>.</li>
+              <li><b>Select Period:</b> Choose the <b>Financial Year</b> and <b>Return Filing Period</b> (Month) that matches the dates you selected on this page, then click <b>Search</b>.</li>
+              <li><b>Choose Online Preparation:</b> In the GSTR-1 tile, click on <b>PREPARE ONLINE</b>.</li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="font-semibold">Phase 2: Adding B2B Invoices (Business-to-Business)</h4>
+            <ol className="list-decimal list-inside mt-1 space-y-1 pl-2">
+              <li><b>Open B2B Section:</b> On the GSTR-1 summary page, click on the tile named <b>"4A, 4B, 4C, 6B, 6C - B2B Invoices"</b>.</li>
+              <li><b>Add Invoice:</b> Click the <b>Add Invoice</b> button.</li>
+              <li><b>Copy and Paste Details:</b> Use the <b>"B2B Invoices"</b> table below. For each invoice:
+                <ul className="list-disc list-inside pl-4">
+                  <li>Click the copy icon next to the <b>Recipient GSTIN</b> and paste it into the "Receiver GSTIN/UIN" field on the portal. The receiver's name should auto-fill.</li>
+                  <li>Copy the <b>Invoice No.</b> and paste it.</li>
+                  <li>Enter the <b>Invoice Date</b> manually.</li>
+                  <li>Copy the <b>Invoice Value</b> and paste it into the "Total Invoice Value" field.</li>
+                </ul>
+              </li>
+              <li><b>Add Item Details:</b>
+                <ul className="list-disc list-inside pl-4">
+                  <li>Scroll down to the "Invoice Details" section on the portal.</li>
+                  <li>For each invoice, this tool aggregates the total Taxable Value and tax amounts (IGST, CGST, SGST).</li>
+                  <li>Select the correct <b>Tax Rate</b> from the dropdown on the portal.</li>
+                  <li>Copy the <b>Taxable Value</b> from the table below and paste it.</li>
+                  <li>The portal will auto-calculate the tax amounts. Verify they match the amounts shown in the table.</li>
+                </ul>
+              </li>
+              <li><b>Save Invoice:</b> Click <b>Save</b>. You will be taken back to the B2B summary page. Repeat for all B2B invoices.</li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="font-semibold">Phase 3: Adding B2C (Large) Invoices</h4>
+            <ol className="list-decimal list-inside mt-1 space-y-1 pl-2">
+              <li><b>Open B2C Large Section:</b> Go back to the GSTR-1 summary and click on <b>"5A, 5B - B2C (Large) Invoices"</b>.</li>
+              <li><b>Add Invoice:</b> Click <b>Add Invoice</b>.</li>
+              <li><b>Copy and Paste Details:</b> Use the <b>"B2C Large Invoices"</b> table below. For each invoice, copy and paste the details just as you did for B2B invoices.</li>
+              <li><b>Save Invoice:</b> Click <b>Save</b> and repeat for all B2C Large invoices.</li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="font-semibold">Phase 4: Adding B2C (Small) Summary</h4>
+            <ol className="list-decimal list-inside mt-1 space-y-1 pl-2">
+              <li><b>Open B2C Small Section:</b> Go back to the GSTR-1 summary and click on <b>"7 - B2C (Others)"</b>.</li>
+              <li><b>Add Details:</b> Click <b>Add Details</b>.</li>
+              <li><b>Copy and Paste Details:</b> Use the <b>"B2C Small Invoices"</b> table below. For each row in the table, select the <b>Place of Supply (POS)</b> and <b>Tax Rate</b>, then copy and paste the corresponding <b>Taxable Value</b>.</li>
+              <li><b>Save</b> and repeat for each Place of Supply / Tax Rate combination shown in the table.</li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="font-semibold">Phase 5: Finalizing Your Return</h4>
+            <ol className="list-decimal list-inside mt-1 space-y-1 pl-2">
+              <li><b>Generate Summary:</b> After adding all data, go back to the GSTR-1 summary page and click <b>GENERATE GSTR1 SUMMARY</b> at the bottom. This can take a few minutes.</li>
+              <li><b>Preview and Submit:</b> Once the summary is generated (the status will update), tick the acknowledgement checkbox, and click <b>PREVIEW</b> to review a draft PDF.</li>
+              <li><b>Submit:</b> If everything is correct, click <b>SUBMIT</b>. Note: Once submitted, you cannot make any changes.</li>
+              <li><b>File Return:</b> After submitting, click <b>FILE RETURN</b>. You can then file the return using either <b>DSC</b> (Digital Signature Certificate) or <b>EVC</b> (Electronic Verification Code).</li>
+            </ol>
+          </div>
+          <p className="text-xs text-gray-500 italic mt-4">*This guide is for informational purposes. Always refer to the official GST portal for the latest procedures.*</p>
+        </div>
       </div>
 
       {data.b2b && data.b2b.length > 0 && <B2BTable data={data.b2b} />}
