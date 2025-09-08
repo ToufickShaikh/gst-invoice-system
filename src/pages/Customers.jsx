@@ -101,7 +101,7 @@ const Customers = () => {
 
   const handleCustomerAdded = (newCustomer) => {
     setCustomers((prev) => [...prev, newCustomer])
-    fetchCustomers() // Re-fetch to ensure data is in sync
+    // fetchCustomers() // Re-fetch to ensure data is in sync
   }
 
   const handleEdit = (customer) => {
