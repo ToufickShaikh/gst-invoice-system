@@ -114,149 +114,185 @@ const asCsv = (rows) => {
 
 // GSTR-1 - Enhanced sales data for portal upload
 router.get('/returns/gstr1', async (req, res) => {
-    try {
-        // Get date range from query
-        const { from, to } = req.query;
-        if (!from || !to) {
-            return res.status(400).json({ 
-                error: 'Missing date range', 
-                message: 'Both from and to dates are required' 
-            });
-        }
+  try {
+    const { start, end } = parsePeriod(req);
+    console.log(`[GSTR-1] Processing period: ${start.toISOString()} to ${end.toISOString()}`);
+    
+    const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } })
+      .populate('customer')
+      .populate('items.item')
+      .lean();
+    console.log(`[GSTR-1] Found ${invoices.length} invoices`);
 
-        const start = new Date(from);
-        const end = new Date(to);
+    const compCode = getStateCode(company.state || '');
+    const b2bMap = new Map(), b2clMap = new Map(), b2csAgg = new Map();
+    const exp = [];
+    let gt = 0, cur_gt = 0;
+
+    for (const inv of invoices) {
+      console.log(`[GSTR-1] Processing invoice ${inv.invoiceNumber}, customer:`, inv.customer ? 'present' : 'missing');
+      
+      // Handle missing customer data - assume B2C domestic if no customer
+      const cust = inv.customer || { customerType: 'B2C', state: company.state || 'Tamil Nadu' };
+      let custState = cust.state;
+      
+      if (!custState && cust.address) {
+        const stateMatch = cust.address.match(/,?\s*([A-Za-z\s]+)\s*-?\s*\d{6}/);
+        if (stateMatch) custState = stateMatch[1].trim();
+      }
+      
+      // Default to company state if customer state is missing
+      if (!custState) {
+        custState = company.state || 'Tamil Nadu';
+        console.log(`[GSTR-1] Using company state ${custState} for invoice ${inv.invoiceNumber}`);
+      }
+      
+      const pos = getStateCode(custState);
+      const inter = pos && compCode && pos !== compCode;
+      
+      const subTotal = Number(inv.subTotal || inv.itemTotal || 0);
+      const igst = Number(inv.igst || inv.totalIGST || 0);
+      const cgst = Number(inv.cgst || inv.totalCGST || 0);
+      const sgst = Number(inv.sgst || inv.totalSGST || 0);
+      
+      let total = Number(inv.grandTotal || inv.totalAmount || inv.total || 0);
+      if (!total || total === 0) {
+        total = subTotal + igst + cgst + sgst;
+      }
+      
+      console.log(`[GSTR-1] Invoice ${inv.invoiceNumber}: customer=${cust.name || cust.firmName || 'Unknown'}, state=${custState}, pos=${pos}, inter=${inter}, subTotal=${subTotal}, taxes=${igst+cgst+sgst}, total=${total}`);
+      cur_gt += total;
+
+      const itms = (inv.items || []).map((li, idx) => {
+        const qty = Number(li.quantity || 0);
+        const rate = Number(li.rate || li.sellingPrice || 0);
+        let txval = qty * rate;
         
-        // Validate dates
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            return res.status(400).json({ 
-                error: 'Invalid date format',
-                message: 'Please use YYYY-MM-DD format' 
-            });
+        if (li.discount) {
+          const discountAmount = (Number(li.discount) / 100) * txval;
+          txval = txval - discountAmount;
         }
-
-        // Set end of day for end date
-        end.setHours(23, 59, 59, 999);
-
-        // Fetch invoices
-        const invoices = await Invoice.find({
-            invoiceDate: { $gte: start, $lte: end },
-            status: { $ne: 'CANCELLED' }
-        })
-        .populate('customer', 'firmName gstin state billingAddress')
-        .populate('items.item', 'name hsnCode taxSlab')
-        .lean();
-
-        // Group invoices by type
-        const b2b = [];
-        const b2cl = [];
-        const b2cs = [];
-        let totalValue = 0;
-
-        // Process each invoice
-        invoices.forEach(inv => {
-            const isB2B = inv.customer?.gstin;
-            const amount = Number(inv.grandTotal || 0);
-            totalValue += amount;
-            const isLarge = amount > 250000;
-
-            // Format invoice data
-            const invoice = {
-                inum: inv.invoiceNumber,
-                idt: inv.invoiceDate.toISOString().split('T')[0],
-                val: amount,
-                pos: (inv.customer?.state || '27').substring(0, 2),
-                rchrg: inv.reverseCharge ? 'Y' : 'N',
-                inv_typ: inv.invoiceType === 'EXPORT' ? 'EXPWP' : 'R',
-                itms: (inv.items || []).map(item => ({
-                    itm_det: {
-                        txval: Number(item.taxable || 0),
-                        iamt: Number(item.igst || 0),
-                        camt: Number(item.cgst || 0),
-                        samt: Number(item.sgst || 0),
-                        rt: Number(item.taxSlab || item.taxRate || item.item?.taxSlab || 0)
-                    }
-                }))
-            };
-
-            // Add to appropriate section
-            if (isB2B) {
-                let party = b2b.find(p => p.ctin === inv.customer.gstin);
-                if (!party) {
-                    party = { ctin: inv.customer.gstin, inv: [] };
-                    b2b.push(party);
-                }
-                party.inv.push(invoice);
-            } else if (isLarge) {
-                let state = b2cl.find(p => p.pos === invoice.pos);
-                if (!state) {
-                    state = { pos: invoice.pos, inv: [] };
-                    b2cl.push(state);
-                }
-                state.inv.push(invoice);
-            } else {
-                // Aggregate B2C Small by state and rate
-                inv.items.forEach(item => {
-                    const rt = Number(item.taxSlab || item.taxRate || item.item?.taxSlab || 0);
-                    const pos = invoice.pos;
-                    let entry = b2cs.find(e => e.pos === pos && e.rt === rt);
-                    if (!entry) {
-                        entry = {
-                            sply_ty: 'INTRA',
-                            pos,
-                            rt,
-                            txval: 0,
-                            iamt: 0,
-                            camt: 0,
-                            samt: 0
-                        };
-                        b2cs.push(entry);
-                    }
-                    entry.txval += Number(item.taxable || 0);
-                    entry.iamt += Number(item.igst || 0);
-                    entry.camt += Number(item.cgst || 0);
-                    entry.samt += Number(item.sgst || 0);
-                });
-            }
-        });
-
-        // Calculate summary
-        const summary = {
-            totalInvoices: invoices.length,
-            counts: {
-                b2b: b2b.reduce((acc, curr) => acc + curr.inv.length, 0),
-                b2cl: b2cl.reduce((acc, curr) => acc + curr.inv.length, 0),
-                b2cs: b2cs.length
-            },
-            totals: {
-                taxableValue: invoices.reduce((acc, inv) => acc + (inv.subTotal || 0), 0),
-                igst: invoices.reduce((acc, inv) => acc + (inv.igst || 0), 0),
-                cgst: invoices.reduce((acc, inv) => acc + (inv.cgst || 0), 0),
-                sgst: invoices.reduce((acc, inv) => acc + (inv.sgst || 0), 0)
-            }
+        
+        const rt = Number(li.taxSlab || li.taxRate || li.item?.taxSlab || li.item?.taxRate || 18);
+        const taxAmt = txval * rt / 100;
+        
+        const split = inter ? 
+          { iamt: taxAmt, camt: 0, samt: 0 } : 
+          { iamt: 0, camt: taxAmt / 2, samt: taxAmt / 2 };
+        
+        return {
+          num: idx + 1,
+          itm_det: {
+            hsn_sc: li.hsnCode || li.item?.hsnCode || '9999',
+            txval: +txval.toFixed(2),
+            rt: +rt.toFixed(2),
+            iamt: +split.iamt.toFixed(2),
+            camt: +split.camt.toFixed(2),
+            samt: +split.samt.toFixed(2),
+            csamt: 0
+          }
         };
+      });
 
-        // Send response
-        res.json({
-            gstr1: {
-                gstin: company.gstin,
-                ret_period: `${start.getFullYear()}${(start.getMonth() + 1).toString().padStart(2, '0')}`,
-                gt: totalValue,
-                b2b,
-                b2cl,
-                b2cs
-            },
-            summary,
-            period: { from: start, to: end }
-        });
+      const invRow = {
+        inum: inv.invoiceNumber,
+        idt: inv.invoiceDate ? new Date(inv.invoiceDate).toISOString().slice(0,10) : '',
+        val: +total.toFixed(2),
+        pos: pos || compCode || '33', // Default to Tamil Nadu
+        rchrg: 'N',
+        inv_typ: 'R',
+        itms
+      };
 
-    } catch (error) {
-        console.error('[GSTR1] Error:', error);
-        res.status(500).json({ 
-            error: 'Failed to generate GSTR1',
-            message: error.message 
+      if (inv.exportInfo && inv.exportInfo.isExport) {
+        const exp_typ = (inv.exportInfo.exportType || '').toUpperCase() === 'SEZ' ? 'SEZ' : 'WPAY';
+        const sply_ty = inv.exportInfo.withTax ? 'WPAY' : 'WOPAY';
+        exp.push({
+          exp_typ,
+          inv: [{ 
+            ...invRow, 
+            sbpcode: inv.exportInfo.portCode || '', 
+            sbnum: inv.exportInfo.shippingBillNo || '', 
+            sbdt: inv.exportInfo.shippingBillDate ? new Date(inv.exportInfo.shippingBillDate).toISOString().slice(0,10) : '', 
+            sply_ty 
+          }]
         });
+        console.log(`[GSTR-1] Added Export invoice: ${inv.invoiceNumber}`);
+        continue;
+      }
+
+      // Determine customer GSTIN - check multiple possible fields
+      const custGstin = cust.gstin || cust.gstNo || cust.gstNumber || cust.gst;
+      const isB2B = cust.customerType === 'B2B' || custGstin;
+      
+      if (isB2B && custGstin) {
+        const ctin = custGstin;
+        if (!b2bMap.has(ctin)) b2bMap.set(ctin, { ctin, inv: [] });
+        b2bMap.get(ctin).inv.push(invRow);
+        console.log(`[GSTR-1] Added B2B invoice for GSTIN: ${ctin}`);
+      } else {
+        if (inter && total > 250000) {
+          const key = pos || '33';
+          if (!b2clMap.has(key)) b2clMap.set(key, { pos: key, inv: [] });
+          b2clMap.get(key).inv.push(invRow);
+          console.log(`[GSTR-1] Added B2CL invoice for state: ${key}, value: ${total}`);
+        } else {
+          for (const it of itms) {
+            const k = `${pos||'33'}|${it.itm_det.rt}|${inter ? 'INTER' : 'INTRA'}`;
+            if (!b2csAgg.has(k)) b2csAgg.set(k, {
+              sply_ty: inter ? 'INTER' : 'INTRA',
+              typ: 'OE',
+              pos: pos || compCode || '33',
+              rt: it.itm_det.rt,
+              txval: 0,
+              iamt: 0, camt: 0, samt: 0, csamt: 0
+            });
+            const row = b2csAgg.get(k);
+            row.txval = +(row.txval + it.itm_det.txval).toFixed(2);
+            row.iamt = +(row.iamt + it.itm_det.iamt).toFixed(2);
+            row.camt = +(row.camt + it.itm_det.camt).toFixed(2);
+            row.samt = +(row.samt + it.itm_det.samt).toFixed(2);
+          }
+          console.log(`[GSTR-1] Added B2CS aggregation for POS: ${pos||compCode||'33'}, invoice: ${inv.invoiceNumber}`);
+        }
+      }
     }
+
+    const payload = {
+      gstin: company.gstin || '',
+      fp: getFp(start),
+      version: 'GST3.0',
+      gt: +gt.toFixed(2),
+      cur_gt: +cur_gt.toFixed(2),
+      b2b: Array.from(b2bMap.values()),
+      b2cl: Array.from(b2clMap.values()),
+      b2cs: Array.from(b2csAgg.values()),
+      cdnr: [],
+      cdnur: [],
+      exp
+    };
+
+    console.log(`[GSTR-1] Generated payload: B2B=${payload.b2b.length}, B2CL=${payload.b2cl.length}, B2CS=${payload.b2cs.length}, Export=${payload.exp.length}, Total=${cur_gt}`);
+
+    if ((req.query.format || '').toLowerCase() === 'csv') {
+      const csvData = [['Type', 'GSTIN/POS', 'Invoice Number', 'Date', 'Value', 'Taxable Value', 'IGST', 'CGST', 'SGST']];
+      payload.b2b.forEach(party => {
+        party.inv.forEach(invoice => {
+          invoice.itms.forEach(item => {
+            csvData.push(['B2B', party.ctin, invoice.inum, invoice.idt, invoice.val, item.itm_det.txval, item.itm_det.iamt, item.itm_det.camt, item.itm_det.samt]);
+          });
+        });
+      });
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=gstr1-${start.toISOString().slice(0,10)}-${end.toISOString().slice(0,10)}.csv`);
+      return res.send(asCsv(csvData));
+    }
+
+    res.json(payload);
+  } catch (error) {
+    console.error('[GST] GSTR-1 error', error);
+    res.status(500).json({ error: 'Failed to compute GSTR-1', details: error.message });
+  }
 });
 
 // GSTR-3B summary
