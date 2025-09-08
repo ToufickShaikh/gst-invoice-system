@@ -9,6 +9,7 @@ import { getApiBaseUrl, getAppBasePath } from '../utils/appBase';
 import { portalAPI } from '../api/portal';
 
 const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
+  console.log('AdvancedInvoicePrint: invoice prop received:', invoice);
   const { company } = useCompany();
   const [printFormat, setPrintFormat] = useState('A4'); // A4, A5, Thermal
   const [iframeSrc, setIframeSrc] = useState(null);
@@ -97,6 +98,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
   };
 
   const normalize = (inv) => {
+    console.log('normalize: inv received:', inv);
     if (!inv) return {};
     const date = safeDate(inv.invoiceDate || inv.date || inv.createdAt);
     const dueDate = safeDate(inv.dueDate || (date ? new Date(new Date(date).getTime() + 30 * 86400000) : null));
@@ -195,8 +197,10 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
   };
 
   const buildPreviewHtml = (format = 'A4') => {
+    console.log('buildPreviewHtml: invoice received:', invoice);
     if (!invoice) return '';
     const norm = normalize(invoice);
+    console.log('buildPreviewHtml: normalized data (norm):', norm);
     const { rows, totals } = buildTaxSummary(norm);
 
     const itemsHead = ['Item', ...(printOptions.showHSN ? ['HSN'] : []), 'Qty', 'Rate', ...(printOptions.showDiscount ? ['Disc%'] : []), ...(printOptions.showGST ? ['Tax%'] : []), 'Amount'];
