@@ -361,23 +361,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
 
   const handlePrint = async () => {
     try {
-      // Prefer server-rendered PDF for consistent preview and print across deployments.
-      const formatParam = printFormat === 'Thermal' ? 'thermal' : (printFormat === 'A5' ? 'a5' : 'a4');
-      if (invoice?._id) {
-        try {
-          const pdfUrl = invoicesAPI.publicPdfUrl(invoice._id, null, formatParam);
-          const w = window.open(pdfUrl, '_blank');
-          if (!w) {
-            toast.error('Pop-up blocked. Allow pop-ups to print.');
-          }
-          return;
-        } catch (err) {
-          console.warn('Server PDF preview failed, falling back to client-side preview', err);
-          // fallthrough to client-side printing
-        }
-      }
-
-      // Fallback: client-side HTML print (keeps previous behaviour)
+      // Always use client-side HTML print for direct preview printing
       const html = buildPreviewHtml(printFormat === 'A5' ? 'A5' : 'A4');
       const win = window.open('', '_blank');
       if (!win) { toast.error('Pop-up blocked. Allow pop-ups to print.'); return; }
