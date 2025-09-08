@@ -6,16 +6,40 @@ const Invoice = require('../models/Invoice');
 const Customer = require('../models/Customer');
 const company = require('../config/company');
 
-// Utility function to parse period from request
+// Utility function to parse and validate period from request
 const parsePeriod = (req) => {
-  const { from, to } = req.query;
-  if (!from || !to) {
-    throw new Error('From and To dates are required');
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) {
+      throw new Error('From and To dates are required');
+    }
+
+    // Parse dates
+    const start = new Date(from);
+    const end = new Date(to);
+
+    // Validate dates
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new Error('Invalid date format. Use YYYY-MM-DD format');
+    }
+
+    // Validate date range
+    if (end < start) {
+      throw new Error('End date cannot be before start date');
+    }
+
+    const monthDiff = (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth();
+    if (monthDiff > 1) {
+      throw new Error('Date range cannot exceed 1 month');
+    }
+
+    // Set time to end of day for end date
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  } catch (error) {
+    error.statusCode = 400; // Bad Request
+    throw error;
   }
-  const start = new Date(from);
-  const end = new Date(to);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
 };
 
 // HSN summary
@@ -187,6 +211,11 @@ router.get('/returns/gstr1', async (req, res) => {
         const { start, end } = parsePeriod(req);
         console.log(`[GSTR1] Processing period: ${start.toISOString()} to ${end.toISOString()}`);
         
+        // Validate company GSTIN
+        if (!company.gstin) {
+            throw new Error('Company GSTIN not configured');
+        }
+
         // Fetch all invoices with complete customer and item details
         const invoices = await Invoice.find({
             invoiceDate: { $gte: start, $lte: end },
@@ -194,7 +223,11 @@ router.get('/returns/gstr1', async (req, res) => {
         })
         .populate('customer', 'firmName gstin state billingAddress')
         .populate('items.item', 'name hsnCode taxSlab')
-        .lean();
+        .lean()
+        .catch(error => {
+            console.error('[GSTR1] Database error:', error);
+            throw new Error('Failed to fetch invoices from database');
+        });
         
         console.log(`[GSTR1] Found ${invoices.length} invoices`);
 
@@ -507,8 +540,18 @@ router.get('/returns/gstr1', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('GSTR1 generation failed:', error);
-        res.status(500).json({ error: error.message });
+        console.error('[GSTR1] Generation failed:', error);
+        const statusCode = error.statusCode || 500;
+        const errorResponse = {
+            error: true,
+            message: error.message || 'Internal server error occurred while generating GSTR1',
+            code: error.code || 'GSTR1_GENERATION_FAILED',
+            details: process.env.NODE_ENV === 'development' ? {
+                stack: error.stack,
+                cause: error.cause
+            } : undefined
+        };
+        res.status(statusCode).json(errorResponse);
     }
 });
 
