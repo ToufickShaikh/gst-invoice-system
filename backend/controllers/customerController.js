@@ -1,5 +1,6 @@
 const Customer = require('../models/Customer.js');
 const Invoice = require('../models/Invoice.js');
+const { cacheManager } = require('../utils/cacheManager.js');
 
 // Helper function for consistent error responses
 const sendErrorResponse = (res, statusCode, message, errorDetails = null) => {
@@ -91,6 +92,10 @@ const createCustomer = async (req, res) => {
         });
         await customer.save();
 
+        // Invalidate customer cache
+        await cacheManager.invalidatePattern('customers:');
+        console.log('[CACHE] Customer cache invalidated');
+
         console.log('[CUSTOMER] Customer created successfully:', customer._id);
         res.status(201).json(customer);
     } catch (error) {
@@ -134,6 +139,10 @@ const updateCustomer = async (req, res) => {
             return sendErrorResponse(res, 404, 'Customer not found');
         }
 
+        // Invalidate customer cache
+        await cacheManager.invalidatePattern('customers:');
+        console.log('[CACHE] Customer cache invalidated');
+
         console.log('[CUSTOMER] Customer updated successfully:', customer._id);
         res.json(customer);
     } catch (error) {
@@ -167,6 +176,10 @@ const deleteCustomer = async (req, res) => {
         if (!deletedCustomer) {
             return sendErrorResponse(res, 404, 'Customer not found');
         }
+
+        // Invalidate customer cache
+        await cacheManager.invalidatePattern('customers:');
+        console.log('[CACHE] Customer cache invalidated');
 
         console.log('[CUSTOMER] Customer deleted successfully:', customerId);
         res.json({ message: 'Customer and associated invoices deleted successfully' });

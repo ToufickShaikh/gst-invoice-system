@@ -60,24 +60,31 @@ const GstFilings = () => {
 
   useEffect(() => { fetchAll(); }, []);
 
-  const dl = (path, name, extraParams = {}) => {
-  try {
-    const apiBase = axiosInstance.defaults?.baseURL || '';
-    const base = (apiBase || (typeof window !== 'undefined' ? (window.__basename || import.meta.env.BASE_URL || '') : '')).replace(/\/$/, '');
-    const url = new URL((base + path).replace(/\/\//g, '/'), window.location.origin);
-    url.searchParams.set('from', from);
-    url.searchParams.set('to', to);
-    Object.entries(extraParams).forEach(([k,v]) => url.searchParams.set(k, v));
-    const a = document.createElement('a');
-    a.href = url.toString();
-    a.download = name;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.click();
-  } catch (err) {
-    console.error('Failed to build download URL', err);
-    toast.error('Failed to build download URL');
-  }
+  const dl = async (path, name, extraParams = {}) => {
+    const toastId = toast.loading(`Downloading ${name}...`);
+    try {
+      const response = await axiosInstance.get(path, {
+        params: { from, to, ...extraParams },
+        responseType: 'blob', // Important for file downloads
+      });
+
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', name);
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success(`Successfully downloaded ${name}`, { id: toastId });
+    } catch (err) {
+      console.error('Download failed', err);
+      toast.error(`Failed to download ${name}. Please check console for details.`, { id: toastId });
+    }
   };
 
   const Sum = ({ label, value, className='' }) => (

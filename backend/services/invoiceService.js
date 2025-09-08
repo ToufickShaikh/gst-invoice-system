@@ -194,8 +194,9 @@ async function createInvoice(data) {
 
   const { subTotal, taxAmount, totalAmount } = calculateTotals(normalized, customerDoc.state);
   const totalTax = (taxAmount.cgst || 0) + (taxAmount.sgst || 0) + (taxAmount.igst || 0);
+  const grandTotal = totalAmount - discount + shippingCharges;
   const invoiceNumber = await generateInvoiceNumber(customerDoc.customerType);
-  const balance = totalAmount - paidAmount;
+  const balance = grandTotal - paidAmount;
 
   const invoice = await Invoice.create({
     invoiceNumber,
@@ -207,7 +208,7 @@ async function createInvoice(data) {
     sgst: taxAmount.sgst,
     igst: taxAmount.igst,
     totalTax,
-    grandTotal: totalAmount,
+    grandTotal: grandTotal,
     totalAmount,
     discount,
     shippingCharges,
