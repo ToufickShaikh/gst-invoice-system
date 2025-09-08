@@ -28,78 +28,47 @@ const DataCell = ({ children }) => (
   </td>
 );
 
-const B2BTable = ({ data }) => (
-  <div>
-    <h4 className="text-md font-semibold mt-4 mb-2">B2B Invoices ({data.length})</h4>
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-xs bg-white">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="p-2 text-left">Recipient GSTIN</th>
-            <th className="p-2 text-left">Invoice No.</th>
-            <th className="p-2 text-left">Date</th>
-            <th className="p-2 text-right">Value</th>
-            <th className="p-2 text-right">Taxable Value</th>
-            <th className="p-2 text-right">IGST</th>
-            <th className="p-2 text-right">CGST</th>
-            <th className="p-2 text-right">SGST</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map(party => 
-            party.inv.map(invoice => {
-              const taxable = invoice.itms.reduce((acc, i) => acc + i.itm_det.txval, 0);
-              const igst = invoice.itms.reduce((acc, i) => acc + i.itm_det.iamt, 0);
-              const cgst = invoice.itms.reduce((acc, i) => acc + i.itm_det.camt, 0);
-              const sgst = invoice.itms.reduce((acc, i) => acc + i.itm_det.samt, 0);
-              return (
-                <tr key={invoice.inum} className="hover:bg-gray-50">
-                  <DataCell>{party.ctin}</DataCell>
-                  <DataCell>{invoice.inum}</DataCell>
-                  <td className="p-2 border-t">{invoice.idt}</td>
-                  <DataCell>{invoice.val.toFixed(2)}</DataCell>
-                  <DataCell>{taxable.toFixed(2)}</DataCell>
-                  <DataCell>{igst.toFixed(2)}</DataCell>
-                  <DataCell>{cgst.toFixed(2)}</DataCell>
-                  <DataCell>{sgst.toFixed(2)}</DataCell>
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
-const B2CLTable = ({ data }) => (
+const B2BTable = ({ data }) => {
+  const totalInvoices = data.reduce((acc, party) => acc + party.inv.length, 0);
+  
+  return (
     <div>
-      <h4 className="text-md font-semibold mt-4 mb-2">B2C Large Invoices ({data.length})</h4>
+      <h4 className="text-md font-semibold mt-4 mb-2">B2B Invoices ({totalInvoices})</h4>
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs bg-white">
           <thead className="bg-gray-50">
             <tr>
+              <th className="p-2 text-left">Recipient GSTIN</th>
               <th className="p-2 text-left">Invoice No.</th>
               <th className="p-2 text-left">Date</th>
-              <th className="p-2 text-right">Value</th>
               <th className="p-2 text-left">Place of Supply</th>
+              <th className="p-2 text-right">Value</th>
               <th className="p-2 text-right">Taxable Value</th>
               <th className="p-2 text-right">IGST</th>
+              <th className="p-2 text-right">CGST</th>
+              <th className="p-2 text-right">SGST</th>
+              <th className="p-2 text-center">RC</th>
             </tr>
           </thead>
           <tbody>
             {data.map(party => 
               party.inv.map(invoice => {
-                const taxable = invoice.itms.reduce((acc, i) => acc + i.itm_det.txval, 0);
-                const igst = invoice.itms.reduce((acc, i) => acc + i.itm_det.iamt, 0);
+                const taxable = invoice.itms.reduce((acc, i) => acc + Number(i.itm_det.txval), 0);
+                const igst = invoice.itms.reduce((acc, i) => acc + Number(i.itm_det.iamt), 0);
+                const cgst = invoice.itms.reduce((acc, i) => acc + Number(i.itm_det.camt), 0);
+                const sgst = invoice.itms.reduce((acc, i) => acc + Number(i.itm_det.samt), 0);
                 return (
-                  <tr key={invoice.inum} className="hover:bg-gray-50">
+                  <tr key={`${party.ctin}-${invoice.inum}`} className="hover:bg-gray-50">
+                    <DataCell>{party.ctin}</DataCell>
                     <DataCell>{invoice.inum}</DataCell>
                     <td className="p-2 border-t">{invoice.idt}</td>
-                    <DataCell>{invoice.val.toFixed(2)}</DataCell>
                     <DataCell>{invoice.pos}</DataCell>
-                    <DataCell>{taxable.toFixed(2)}</DataCell>
-                    <DataCell>{igst.toFixed(2)}</DataCell>
+                    <DataCell className="text-right">{Number(invoice.val).toFixed(2)}</DataCell>
+                    <DataCell className="text-right">{Number(taxable).toFixed(2)}</DataCell>
+                    <DataCell className="text-right">{Number(igst).toFixed(2)}</DataCell>
+                    <DataCell className="text-right">{Number(cgst).toFixed(2)}</DataCell>
+                    <DataCell className="text-right">{Number(sgst).toFixed(2)}</DataCell>
+                    <td className="p-2 border-t text-center">{invoice.rchrg || 'N'}</td>
                   </tr>
                 );
               })
@@ -109,47 +78,136 @@ const B2CLTable = ({ data }) => (
       </div>
     </div>
   );
+};
 
-const B2CSTable = ({ data }) => (
+const B2CLTable = ({ data }) => {
+  const totalInvoices = data.reduce((acc, party) => acc + party.inv.length, 0);
+  
+  return (
     <div>
-      <h4 className="text-md font-semibold mt-4 mb-2">B2C Small Invoices ({data.length})</h4>
+      <h4 className="text-md font-semibold mt-4 mb-2">B2C Large Invoices ({totalInvoices})</h4>
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs bg-white">
           <thead className="bg-gray-50">
             <tr>
+              <th className="p-2 text-left">Invoice No.</th>
+              <th className="p-2 text-left">Date</th>
               <th className="p-2 text-left">Place of Supply</th>
-              <th className="p-2 text-right">Tax Rate</th>
+              <th className="p-2 text-right">Value</th>
               <th className="p-2 text-right">Taxable Value</th>
               <th className="p-2 text-right">IGST</th>
               <th className="p-2 text-right">CGST</th>
               <th className="p-2 text-right">SGST</th>
+              <th className="p-2 text-center">Type</th>
             </tr>
           </thead>
           <tbody>
-            {data.map((row, i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <DataCell>{row.pos}</DataCell>
-                <DataCell>{row.rt}</DataCell>
-                <DataCell>{row.txval.toFixed(2)}</DataCell>
-                <DataCell>{row.iamt.toFixed(2)}</DataCell>
-                <DataCell>{row.camt.toFixed(2)}</DataCell>
-                <DataCell>{row.samt.toFixed(2)}</DataCell>
-              </tr>
-            ))}
+            {data.map(party => 
+              party.inv.map(invoice => {
+                const taxable = invoice.itms.reduce((acc, i) => acc + Number(i.itm_det.txval), 0);
+                const igst = invoice.itms.reduce((acc, i) => acc + Number(i.itm_det.iamt), 0);
+                const cgst = invoice.itms.reduce((acc, i) => acc + Number(i.itm_det.camt), 0);
+                const sgst = invoice.itms.reduce((acc, i) => acc + Number(i.itm_det.samt), 0);
+                return (
+                  <tr key={`${party.pos}-${invoice.inum}`} className="hover:bg-gray-50">
+                    <DataCell>{invoice.inum}</DataCell>
+                    <td className="p-2 border-t">{invoice.idt}</td>
+                    <DataCell>{party.pos}</DataCell>
+                    <DataCell className="text-right">{Number(invoice.val).toFixed(2)}</DataCell>
+                    <DataCell className="text-right">{Number(taxable).toFixed(2)}</DataCell>
+                    <DataCell className="text-right">{Number(igst).toFixed(2)}</DataCell>
+                    <DataCell className="text-right">{Number(cgst).toFixed(2)}</DataCell>
+                    <DataCell className="text-right">{Number(sgst).toFixed(2)}</DataCell>
+                    <td className="p-2 border-t text-center">{invoice.inv_typ}</td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
     </div>
   );
+};
+
+const B2CSTable = ({ data }) => (
+  <div>
+    <h4 className="text-md font-semibold mt-4 mb-2">B2C Small Invoices ({data.length})</h4>
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-xs bg-white">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="p-2 text-left">Type</th>
+            <th className="p-2 text-left">Place of Supply</th>
+            <th className="p-2 text-right">Tax Rate</th>
+            <th className="p-2 text-right">Taxable Value</th>
+            <th className="p-2 text-right">IGST</th>
+            <th className="p-2 text-right">CGST</th>
+            <th className="p-2 text-right">SGST</th>
+            <th className="p-2 text-right">Cess</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={`${row.pos}-${row.rt}`} className="hover:bg-gray-50">
+              <td className="p-2 border-t">{row.sply_ty}</td>
+              <DataCell>{row.pos}</DataCell>
+              <DataCell className="text-right">{row.rt}</DataCell>
+              <DataCell className="text-right">{Number(row.txval).toFixed(2)}</DataCell>
+              <DataCell className="text-right">{Number(row.iamt).toFixed(2)}</DataCell>
+              <DataCell className="text-right">{Number(row.camt).toFixed(2)}</DataCell>
+              <DataCell className="text-right">{Number(row.samt).toFixed(2)}</DataCell>
+              <DataCell className="text-right">{Number(row.csamt || 0).toFixed(2)}</DataCell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+const SummaryCard = ({ title, value, subtitle }) => (
+  <div className="p-4 bg-white rounded-lg border shadow-sm">
+    <h3 className="text-lg font-bold text-gray-800">{value}</h3>
+    <p className="text-sm font-medium text-gray-600">{title}</p>
+    {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+  </div>
+);
 
 const Gstr1OnlineFiling = ({ data }) => {
-  if (!data) return <div className="text-sm text-gray-600">No GSTR-1 data loaded.</div>;
+  if (!data?.gstr1) return <div className="text-sm text-gray-600">No GSTR-1 data loaded.</div>;
 
+  const { gstr1, summary, docSummary, period } = data;
+  
   return (
     <div className="space-y-6">
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <SummaryCard 
+          title="Filing Period" 
+          value={gstr1.ret_period}
+          subtitle={`${period.from} to ${period.to}`} 
+        />
+        <SummaryCard 
+          title="Total Invoices" 
+          value={summary.totalInvoices}
+          subtitle={`${summary.counts.b2b} B2B, ${summary.counts.b2cl} B2CL, ${summary.counts.b2cs} B2CS`} 
+        />
+        <SummaryCard 
+          title="Total Value" 
+          value={`₹${Number(gstr1.cur_gt).toFixed(2)}`}
+          subtitle="Current Period Turnover" 
+        />
+        <SummaryCard 
+          title="Total Tax" 
+          value={`₹${(summary.totals.igst + summary.totals.cgst + summary.totals.sgst).toFixed(2)}`}
+          subtitle={`IGST: ${summary.totals.igst.toFixed(2)}, CGST: ${summary.totals.cgst.toFixed(2)}, SGST: ${summary.totals.sgst.toFixed(2)}`} 
+        />
+      </div>
+
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 className="text-lg font-semibold text-blue-800">A Comprehensive Guide to Filing GSTR-1 Online</h3>
-        <p className="text-xs text-gray-600 mt-1">This guide will walk you through using this helper to file your GSTR-1 return directly on the GST Portal.</p>
+        <h3 className="text-lg font-semibold text-blue-800">GSTR-1 Online Filing Guide</h3>
+        <p className="text-xs text-gray-600 mt-1">Follow these steps to file your GSTR-1 return on the GST Portal.</p>
         
         <div className="mt-4 text-sm text-gray-700 space-y-4">
           <div>
@@ -189,16 +247,56 @@ const Gstr1OnlineFiling = ({ data }) => {
           </div>
 
           <div>
-            <h4 className="font-semibold">Phase 3: Adding B2C (Large) Invoices</h4>
+            <h4 className="font-semibold">Phase 3: Adding Large B2C Invoices</h4>
             <ol className="list-decimal list-inside mt-1 space-y-1 pl-2">
-              <li><b>Open B2C Large Section:</b> Go back to the GSTR-1 summary and click on <b>"5A, 5B - B2C (Large) Invoices"</b>.</li>
+              <li><b>Open B2C Large Section:</b> Click <b>"5A, 5B - B2C (Large) Invoices"</b>.</li>
               <li><b>Add Invoice:</b> Click <b>Add Invoice</b>.</li>
-              <li><b>Copy and Paste Details:</b> Use the <b>"B2C Large Invoices"</b> table below. For each invoice, copy and paste the details just as you did for B2B invoices.</li>
-              <li><b>Save Invoice:</b> Click <b>Save</b> and repeat for all B2C Large invoices.</li>
+              <li><b>Enter Details:</b> Use the <b>"B2C Large Invoices"</b> table below:
+                <ul className="list-disc list-inside pl-4">
+                  <li>Copy <b>Invoice Number</b> and <b>Date</b></li>
+                  <li>Select correct <b>Place of Supply</b> from dropdown</li>
+                  <li>Enter <b>Invoice Value</b> exactly as shown</li>
+                  <li>Copy <b>Taxable Value</b> and tax amounts</li>
+                </ul>
+              </li>
+              <li><b>Verify Amounts:</b> Double-check all values before saving.</li>
             </ol>
           </div>
 
           <div>
+            <h4 className="font-semibold">Phase 4: Consolidated Entries</h4>
+            <ol className="list-decimal list-inside mt-1 space-y-1 pl-2">
+              <li><b>B2C Small:</b> Click <b>"7 - B2C (Others)"</b>:
+                <ul className="list-disc list-inside pl-4">
+                  <li>Select <b>Supply Type</b> (INTRA/INTER)</li>
+                  <li>Choose correct <b>Place of Supply</b></li>
+                  <li>Copy consolidated amounts for each rate</li>
+                </ul>
+              </li>
+              <li><b>HSN Summary:</b> Click <b>"12 - HSN"</b>:
+                <ul className="list-disc list-inside pl-4">
+                  <li>Add entries from HSN table below</li>
+                  <li>Verify UQC (unit) and quantities</li>
+                  <li>Cross-check tax amounts</li>
+                </ul>
+              </li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="font-semibold">Phase 5: Validation & Filing</h4>
+            <ol className="list-decimal list-inside mt-1 space-y-1 pl-2">
+              <li><b>Generate Summary:</b> Click <b>GENERATE GSTR1 SUMMARY</b>.</li>
+              <li><b>Cross-verify Totals:</b> Match with summary cards above:
+                <ul className="list-disc list-inside pl-4">
+                  <li>Total Invoice Value: ₹{Number(gstr1.cur_gt).toFixed(2)}</li>
+                  <li>Tax Amounts: IGST, CGST, SGST</li>
+                  <li>Document counts by section</li>
+                </ul>
+              </li>
+              <li><b>File Return:</b> If all matches, proceed with filing.</li>
+            </ol>
+          </div>          <div>
             <h4 className="font-semibold">Phase 4: Adding B2C (Small) Summary</h4>
             <ol className="list-decimal list-inside mt-1 space-y-1 pl-2">
               <li><b>Open B2C Small Section:</b> Go back to the GSTR-1 summary and click on <b>"7 - B2C (Others)"</b>.</li>

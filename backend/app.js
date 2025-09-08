@@ -23,6 +23,7 @@ const customerRoutes = require('./routes/customerRoutes');
 const itemRoutes = require('./routes/itemRoutes');
 const billingRoutes = require('./routes/billingRoutes');
 const gstRoutes = require('./routes/gstRoutes');
+const gstReturnsRoutes = require('./routes/gstReturnsRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const salesOrderRoutes = require('./routes/salesOrderRoutes');
 const quoteRoutes = require('./routes/quoteRoutes');
@@ -173,6 +174,7 @@ app.use('/api/invoices',
 
 // Other protected routes
 app.use('/api/gst', ...authStack, gstRoutes);
+app.use('/api/gst', ...authStack, gstReturnsRoutes);
 app.use('/api/purchases', ...authStack, purchaseRoutes);
 app.use('/api/sales-orders', ...authStack, salesOrderRoutes);
 app.use('/api/quotes', ...authStack, quoteRoutes);
