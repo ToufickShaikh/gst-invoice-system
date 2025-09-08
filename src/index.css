@@ -416,7 +416,7 @@
     .whatsapp-button-mobile {
         @apply relative overflow-hidden shadow-md text-white font-medium;
         min-height: 54px;
-        /* Larger touch target */
+        /* Larger touch target for mobile */
         transition: transform 0.2s, box-shadow 0.3s;
     }
 
@@ -426,18 +426,20 @@
     }
 
     /* Invoice Success page enhancements */
-    .mobile-content-wrapper {
-        @apply rounded-lg overflow-hidden;
-        max-width: 100%;
-    }
-
     .card-enhanced {
-        @apply bg-white rounded-lg shadow-md;
+        background-color: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         border: 1px solid rgba(0, 0, 0, 0.05);
+        overflow: hidden;
     }
 
     .action-buttons-mobile {
-        @apply flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-center;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+        justify-content: center;
         margin-top: 0.75rem;
     }
 
@@ -463,6 +465,21 @@
         .whatsapp-button-mobile {
             @apply py-4 px-5 text-base;
             border-radius: 12px;
+            width: 100%;
+        }
+
+        .mobile-content-wrapper {
+            border-radius: 0.5rem;
+            max-width: 100%;
+            overflow: hidden;
+        }
+    }
+
+    @media (min-width: 641px) {
+        .action-buttons-mobile {
+            flex-direction: row;
+            align-items: center;
+            gap: 1rem;
         }
     }
 }
@@ -773,11 +790,10 @@
     }
 }
 
-/* Mobile optimizations */
+/* WhatsApp floating button */
 @media (max-width: 640px) {
     .whatsapp-button-mobile {
-        padding: 1rem 1.25rem;
-        font-size: 1rem;
+        @apply py-4 px-5 text-base;
         border-radius: 12px;
         width: 100%;
     }
@@ -795,4 +811,22 @@
         align-items: center;
         gap: 1rem;
     }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body > #root > *:not(.printable-area) {
+    display: none !important;
+  }
+
+  .printable-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
 }

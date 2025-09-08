@@ -37,6 +37,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
         console.warn('Payment QR generation failed:', e?.message || e);
       }
     }
+
     loadQr();
     return () => { active = false; };
   }, [isVisible, invoice?._id, company?.upi?.qrImageUrl]);
@@ -287,7 +288,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
                     <td class="right">${r.isInterState ? formatCurrency(r.igstAmount) : '-'}</td>
                     <td class="right">${!r.isInterState ? r.cgstRate : '-'}</td>
                     <td class="right">${!r.isInterState ? formatCurrency(r.cgstAmount) : '-'}</td>
-                    <td class="right">${!r.isInterState ? r.sgstRate : '-'}</td>
+                    <td class="right">${!r.isInterState ? formatCurrency(r.sgstRate) : '-'}</td>
                     <td class="right">${!r.isInterState ? formatCurrency(r.sgstAmount) : '-'}</td>
                     <td class="right">${formatCurrency(r.totalTax)}</td>
                   </tr>`).join('')}
