@@ -11,6 +11,7 @@ import { portalAPI } from '../api/portal';
 const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
   console.log('AdvancedInvoicePrint: invoice prop received:', invoice);
   const { company } = useCompany();
+  const [invoiceData, setInvoiceData] = useState(null);
   const [printFormat, setPrintFormat] = useState('A4'); // A4, A5, Thermal
   const [iframeSrc, setIframeSrc] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -23,10 +24,44 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
   const [paymentQr, setPaymentQr] = useState('');
 
   useEffect(() => {
+    async function loadInvoiceData() {
+      try {
+        if (!isVisible || !invoice) return;
+        
+        // If we received a single invoice object with items
+        if (invoice.items) {
+          setInvoiceData(invoice);
+          return;
+        }
+        
+        // If we received an invoice ID
+        if (invoice._id) {
+          const response = await invoicesAPI.getInvoice(invoice._id);
+          setInvoiceData(response);
+          return;
+        }
+
+        // If we received an invoice from the list
+        if (invoice.data && Array.isArray(invoice.data) && invoice.data.length > 0) {
+          const selectedInvoice = invoice.data[0];
+          if (selectedInvoice._id) {
+            const response = await invoicesAPI.getInvoice(selectedInvoice._id);
+            setInvoiceData(response);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load invoice data:', error);
+        toast.error('Failed to load invoice details');
+      }
+    }
+    loadInvoiceData();
+  }, [isVisible, invoice]);
+
+  useEffect(() => {
     let active = true;
     async function loadQr() {
       try {
-        if (!isVisible || !invoice?._id) return;
+        if (!isVisible || !invoiceData?._id) return;
         if (company?.upi?.qrImageUrl) {
           setPaymentQr(company.upi.qrImageUrl);
           return;
@@ -47,7 +82,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
   useEffect(() => {
     let mounted = true;
     async function loadThermalPreview() {
-      if (printFormat !== 'Thermal' || !invoice?._id) {
+      if (printFormat !== 'Thermal' || !invoiceData?._id) {
         setIframeSrc(null);
         setLoadingPreview(false);
         return;
@@ -55,7 +90,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
       try {
         setLoadingPreview(true);
         // Create a portal link (protected API expects auth; axiosInstance handles headers)
-        const res = await portalAPI.createInvoicePortalLink(invoice._id);
+        const res = await portalAPI.createInvoicePortalLink(invoiceData._id);
         const url = res?.url;
 
         // Compute api base once (prefer axiosInstance baseURL if set)
@@ -72,12 +107,12 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
             const previewUrl = `${apiBase}/billing/public/print/thermal/${pid}` + (ptoken ? `?token=${ptoken}` : '');
             if (mounted) setIframeSrc(previewUrl);
           } else {
-            const previewUrl = `${apiBase}/billing/public/print/thermal/${invoice._id}`;
+            const previewUrl = `${apiBase}/billing/public/print/thermal/${invoiceData._id}`;
             if (mounted) setIframeSrc(previewUrl);
           }
         } else {
           // Fallback: call thermal endpoint directly
-          if (mounted) setIframeSrc(`${apiBase}/billing/public/print/thermal/${invoice._id}`);
+          if (mounted) setIframeSrc(`${apiBase}/billing/public/print/thermal/${invoiceData._id}`);
         }
       } catch (e) {
         console.error('Failed to load thermal preview:', e);
@@ -215,9 +250,9 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
   };
 
   const buildPreviewHtml = (format = 'A4') => {
-    console.log('buildPreviewHtml: invoice received:', invoice);
-    if (!invoice) return '';
-    const norm = normalize(invoice);
+    console.log('buildPreviewHtml: invoice received:', invoiceData);
+    if (!invoiceData) return '';
+    const norm = normalize(invoiceData);
     console.log('buildPreviewHtml: normalized data (norm):', norm);
     const { rows, totals } = buildTaxSummary(norm);
 
