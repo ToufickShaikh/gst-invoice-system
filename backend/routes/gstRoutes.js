@@ -140,18 +140,34 @@ router.get('/returns/document-summary', async (req, res) => {
     }
 });
 
-// Format invoice number for GSTR1 (remove special characters)
+// Utility functions for GSTR1 data formatting
 const formatInvoiceNumber = (invoiceNumber) => {
-    return invoiceNumber.replace(/[^a-zA-Z0-9]/g, '');
+    if (!invoiceNumber) return '';
+    return invoiceNumber.replace(/[^a-zA-Z0-9]/g, '').slice(0, 16); // Max 16 chars as per GSTR1 spec
 };
 
 // Format date for GSTR1 (DD-MM-YYYY)
 const formatDate = (date) => {
-    return date.toLocaleDateString('en-IN', {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-IN', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
     }).replace(/\//g, '-');
+};
+
+// Get financial year and period
+const getFinancialYearAndMonth = (date) => {
+    const d = new Date(date);
+    const month = d.getMonth(); // 0-11
+    const year = d.getFullYear();
+    const financialYear = month >= 3 ? year : year - 1; // April onwards is new FY
+    const periodMonth = month >= 3 ? month - 3 : month + 9; // Convert to FY month (0-11)
+    return {
+        fy: `${financialYear}-${(financialYear + 1).toString().slice(2)}`,
+        month: periodMonth + 1 // 1-12
+    };
 };
 
 // Get place of supply code
@@ -182,19 +198,37 @@ router.get('/returns/gstr1', async (req, res) => {
         
         console.log(`[GSTR1] Found ${invoices.length} invoices`);
 
+        // Get financial year and period details
+        const { fy, month } = getFinancialYearAndMonth(start);
+        
         // Initialize sections as per GSTR1 format
         const gstr1Data = {
             gstin: company.gstin,
-            fp: formatDate(start).substring(3), // MMM-YYYY
-            version: "GST3.0.4",
+            ret_period: `${fy}${month.toString().padStart(2, '0')}`, // Format: 2023-24[01-12]
+            fp: formatDate(start).substring(3), // MM-YYYY
+            version: "GST3.1.5",
+            gt: 0, // Aggregate turnover for the period
+            cur_gt: 0, // Current period turnover
             b2b: [], // B2B Invoices
+            b2ba: [], // B2B Amendments
             b2cl: [], // B2C Large Invoices (Above 2.5L)
+            b2cla: [], // B2C Large Amendments
             b2cs: [], // B2C Small Consolidated
+            b2csa: [], // B2C Small Amendments
             cdnr: [], // Credit/Debit Notes Registered
+            cdnra: [], // Credit/Debit Notes Registered Amendments
             cdnur: [], // Credit/Debit Notes Unregistered
+            cdnura: [], // Credit/Debit Notes Unregistered Amendments
             exp: [], // Exports
+            expa: [], // Export Amendments
             hsn: {
                 data: []
+            },
+            nil: { // Nil rated, exempted and non GST supplies
+                inv: []
+            },
+            doc_issue: { // Document issue details
+                doc_det: []
             }
         };
 
@@ -216,16 +250,25 @@ router.get('/returns/gstr1', async (req, res) => {
                 itms: []
             };
 
-            // Process items with proper rate-wise tax amounts
+            // Process items with proper rate-wise tax amounts and HSN details
             const rateWiseItems = new Map(); // Group items by tax rate
+            const hsnItems = new Map(); // Group items by HSN code
+
+            // Track total value for grand total calculation
+            gstr1Data.cur_gt += Number(inv.grandTotal || 0);
 
             (inv.items || []).forEach(item => {
-                const rate = Number(item.taxSlab || item.taxRate || item.item?.taxSlab || 0);
+                const itemData = item.item || {};
+                const rate = Number(item.taxSlab || item.taxRate || itemData.taxSlab || 0);
                 const taxable = Number(item.taxable || 0);
                 const igst = Number(item.igst || 0);
                 const cgst = Number(item.cgst || 0);
                 const sgst = Number(item.sgst || 0);
+                const quantity = Number(item.quantity || 0);
+                const hsnCode = itemData.hsnCode || '00000000';
+                const uqc = item.unit || 'NOS'; // Unit of measurement
 
+                // Process rate-wise aggregation
                 const key = rate.toString();
                 if (!rateWiseItems.has(key)) {
                     rateWiseItems.set(key, {
@@ -234,7 +277,8 @@ router.get('/returns/gstr1', async (req, res) => {
                         txval: 0,
                         iamt: 0,
                         camt: 0,
-                        samt: 0
+                        samt: 0,
+                        csamt: 0 // Cess amount if applicable
                     });
                 }
 
@@ -243,6 +287,31 @@ router.get('/returns/gstr1', async (req, res) => {
                 entry.iamt += igst;
                 entry.camt += cgst;
                 entry.samt += sgst;
+
+                // Process HSN-wise aggregation
+                const hsnKey = `${hsnCode}-${rate}`;
+                if (!hsnItems.has(hsnKey)) {
+                    hsnItems.set(hsnKey, {
+                        num: 1,
+                        hsn_sc: hsnCode,
+                        desc: itemData.name || 'Goods',
+                        uqc,
+                        qty: 0,
+                        rt: rate,
+                        txval: 0,
+                        iamt: 0,
+                        camt: 0,
+                        samt: 0,
+                        csamt: 0
+                    });
+                }
+
+                const hsnEntry = hsnItems.get(hsnKey);
+                hsnEntry.qty += quantity;
+                hsnEntry.txval += taxable;
+                hsnEntry.iamt += igst;
+                hsnEntry.camt += cgst;
+                hsnEntry.samt += sgst;
             });
 
             // Convert rate-wise items to GSTR1 format
@@ -307,13 +376,35 @@ router.get('/returns/gstr1', async (req, res) => {
             }
         });
 
-        // Round all decimal values to 2 places
+        // Add HSN summary data
+        gstr1Data.hsn.data = Array.from(hsnItems.values()).map(item => ({
+            num: item.num,
+            hsn_sc: item.hsn_sc,
+            desc: item.desc,
+            uqc: item.uqc,
+            qty: Number(item.qty.toFixed(2)),
+            val: Number((item.txval + item.iamt + item.camt + item.samt).toFixed(2)),
+            txval: Number(item.txval.toFixed(2)),
+            iamt: Number(item.iamt.toFixed(2)),
+            camt: Number(item.camt.toFixed(2)),
+            samt: Number(item.samt.toFixed(2)),
+            csamt: Number(item.csamt.toFixed(2))
+        }));
+
+        // Set the grand total (current period turnover)
+        gstr1Data.gt = Number(gstr1Data.cur_gt.toFixed(2));
+
+        // Round all decimal values to 2 places and ensure proper number formatting
         const roundSection = (section) => {
             if (Array.isArray(section)) {
                 section.forEach(entry => {
                     Object.keys(entry).forEach(key => {
                         if (typeof entry[key] === 'number') {
-                            entry[key] = Number(entry[key].toFixed(2));
+                            entry[key] = Number(Number(entry[key]).toFixed(2));
+                        }
+                        // Convert string numbers to proper format
+                        if (typeof entry[key] === 'string' && !isNaN(entry[key])) {
+                            entry[key] = Number(Number(entry[key]).toFixed(2));
                         }
                     });
                 });
@@ -324,19 +415,95 @@ router.get('/returns/gstr1', async (req, res) => {
         roundSection(gstr1Data.b2cs);
         gstr1Data.b2b.forEach(b2b => roundSection(b2b.inv));
         gstr1Data.b2cl.forEach(b2cl => roundSection(b2cl.inv));
+        roundSection(gstr1Data.hsn.data);
 
-        // Add summary statistics
+        // Calculate section-wise totals
+        const sectionTotals = {
+            b2b: gstr1Data.b2b.reduce((acc, curr) => {
+                curr.inv.forEach(inv => {
+                    acc.taxable += Number(inv.val || 0);
+                    inv.itms.forEach(item => {
+                        acc.igst += Number(item.itm_det.iamt || 0);
+                        acc.cgst += Number(item.itm_det.camt || 0);
+                        acc.sgst += Number(item.itm_det.samt || 0);
+                    });
+                });
+                return acc;
+            }, { taxable: 0, igst: 0, cgst: 0, sgst: 0 }),
+            b2cl: gstr1Data.b2cl.reduce((acc, curr) => {
+                curr.inv.forEach(inv => {
+                    acc.taxable += Number(inv.val || 0);
+                    inv.itms.forEach(item => {
+                        acc.igst += Number(item.itm_det.iamt || 0);
+                        acc.cgst += Number(item.itm_det.camt || 0);
+                        acc.sgst += Number(item.itm_det.samt || 0);
+                    });
+                });
+                return acc;
+            }, { taxable: 0, igst: 0, cgst: 0, sgst: 0 }),
+            b2cs: gstr1Data.b2cs.reduce((acc, curr) => {
+                acc.taxable += Number(curr.txval || 0);
+                acc.igst += Number(curr.iamt || 0);
+                acc.cgst += Number(curr.camt || 0);
+                acc.sgst += Number(curr.samt || 0);
+                return acc;
+            }, { taxable: 0, igst: 0, cgst: 0, sgst: 0 })
+        };
+
+        // Add comprehensive summary statistics
         const summary = {
             totalInvoices: invoices.length,
-            b2bCount: gstr1Data.b2b.reduce((acc, curr) => acc + curr.inv.length, 0),
-            b2clCount: gstr1Data.b2cl.reduce((acc, curr) => acc + curr.inv.length, 0),
-            b2csCount: gstr1Data.b2cs.length
+            counts: {
+                b2b: gstr1Data.b2b.reduce((acc, curr) => acc + curr.inv.length, 0),
+                b2cl: gstr1Data.b2cl.reduce((acc, curr) => acc + curr.inv.length, 0),
+                b2cs: gstr1Data.b2cs.length,
+                hsn: gstr1Data.hsn.data.length
+            },
+            totals: {
+                taxableValue: Number((sectionTotals.b2b.taxable + sectionTotals.b2cl.taxable + sectionTotals.b2cs.taxable).toFixed(2)),
+                igst: Number((sectionTotals.b2b.igst + sectionTotals.b2cl.igst + sectionTotals.b2cs.igst).toFixed(2)),
+                cgst: Number((sectionTotals.b2b.cgst + sectionTotals.b2cl.cgst + sectionTotals.b2cs.cgst).toFixed(2)),
+                sgst: Number((sectionTotals.b2b.sgst + sectionTotals.b2cl.sgst + sectionTotals.b2cs.sgst).toFixed(2))
+            },
+            sectionTotals
         };
+
+        // Add document numbering summary
+        const docSummary = {
+            fromNumber: '',
+            toNumber: '',
+            totalDocs: invoices.length,
+            cancelled: 0,
+            netIssued: invoices.length
+        };
+
+        if (invoices.length > 0) {
+            const sortedInvoices = [...invoices].sort((a, b) => 
+                (a.invoiceNumber || '').localeCompare(b.invoiceNumber || ''));
+            docSummary.fromNumber = sortedInvoices[0].invoiceNumber;
+            docSummary.toNumber = sortedInvoices[sortedInvoices.length - 1].invoiceNumber;
+        }
+
+        gstr1Data.doc_issue.doc_det.push({
+            doc_num: 1,
+            doc_typ: 'INV',
+            from: docSummary.fromNumber,
+            to: docSummary.toNumber,
+            totnum: docSummary.totalDocs,
+            cancel: docSummary.cancelled,
+            net_issue: docSummary.netIssued
+        });
 
         res.json({
             gstr1: gstr1Data,
             summary,
-            period: { from: start, to: end }
+            docSummary,
+            period: { 
+                from: start, 
+                to: end,
+                fy,
+                month
+            }
         });
 
     } catch (error) {
