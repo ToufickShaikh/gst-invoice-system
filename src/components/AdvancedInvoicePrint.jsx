@@ -102,6 +102,10 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
     if (!inv) return {};
     const date = safeDate(inv.invoiceDate || inv.date || inv.createdAt);
     const dueDate = safeDate(inv.dueDate || (date ? new Date(new Date(date).getTime() + 30 * 86400000) : null));
+    
+    // Preserve invoice number and type
+    const invoiceNumber = inv.invoiceNumber || inv.number || '';
+    const invoiceType = inv.invoiceType || inv.type || 'INVOICE';
 
     const items = (inv.items || []).map((it, idx) => {
       const src = it.item && typeof it.item === 'object' ? it.item : it;
@@ -144,9 +148,23 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
       name: inv.customer?.firmName || inv.customer?.name || 'Customer Name',
       phone: inv.customer?.contact || inv.customer?.phone || '',
       address: inv.customer?.firmAddress || inv.customer?.billingAddress || inv.customer?.address || 'Customer Address',
+      gstin: inv.customer?.gstin || '',
+      state: inv.customer?.state || ''
     };
 
-    return { date, dueDate, items, subTotal, totalTax, shippingCharges, total, paidAmount, customer };
+    return { 
+      date, 
+      dueDate, 
+      items, 
+      subTotal, 
+      totalTax, 
+      shippingCharges, 
+      total, 
+      paidAmount, 
+      customer,
+      invoiceNumber,
+      invoiceType
+    };
   };
 
   const formatDate = (date) => {
@@ -243,11 +261,41 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
       .right{ text-align:right; }
       .grid { display:flex; gap:10mm; }
       .col { flex:1; }
-      .box { border:1px solid #000; padding:4mm; }
+      .box { border:1px solid #000; padding:4mm; margin-bottom: 4mm; }
       .amount-row { display:flex; justify-content:space-between; padding:2px 0; }
       .amount-row.total { border-top:1px solid #000; font-weight:bold; margin-top:2mm; padding-top:2mm; }
+      .header-company { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 2mm; }
+      .header-address { font-size: 11px; text-align: center; margin-bottom: 2mm; }
+      .header-gstin { font-size: 12px; font-weight: bold; text-align: center; margin-bottom: 4mm; }
+      .invoice-title { font-size: 16px; font-weight: bold; text-align: center; margin: 4mm 0; text-transform: uppercase; }
     </style></head>
     <body><div class="container">
+      <!-- Company Header -->
+      <div class="header-company">${company?.name || ''}</div>
+      <div class="header-address">${company?.address || ''}</div>
+      ${company?.gstin ? `<div class="header-gstin">GSTIN: ${company.gstin}</div>` : ''}
+      
+      <!-- Invoice Title -->
+      <div class="invoice-title">${norm.invoiceType || 'TAX INVOICE'}</div>
+      
+      <!-- Invoice Details Box -->
+      <div class="box">
+        <div class="grid">
+          <div class="col">
+            <strong>Invoice No:</strong> ${norm.invoiceNumber || ''}<br>
+            <strong>Date:</strong> ${formatDate(norm.date)}<br>
+            ${norm.dueDate ? `<strong>Due Date:</strong> ${formatDate(norm.dueDate)}<br>` : ''}
+          </div>
+          <div class="col">
+            <strong>Customer:</strong><br>
+            ${norm.customer.name}<br>
+            ${norm.customer.address}<br>
+            ${norm.customer.gstin ? `GSTIN: ${norm.customer.gstin}<br>` : ''}
+            ${norm.customer.state ? `State: ${norm.customer.state}<br>` : ''}
+            ${norm.customer.phone ? `Phone: ${norm.customer.phone}` : ''}
+          </div>
+        </div>
+      </div>
       <div class="center">
         <div style="font-size:18px;font-weight:bold;">${company?.name || 'Company Name'}</div>
         <div style="font-size:11px;">${company?.address || ''}</div>
