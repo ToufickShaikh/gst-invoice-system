@@ -393,6 +393,84 @@ router.get('/returns/hsn-summary', async (req, res) => {
   }
 });
 
+// Document summary endpoint for GST filings
+router.get('/returns/document-summary', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) {
+      return res.status(400).json({ 
+        error: 'Missing date range', 
+        message: 'Both from and to dates are required' 
+      });
+    }
+
+    const start = new Date(from);
+    const end = new Date(to);
+    
+    // Validate dates
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ 
+        error: 'Invalid date format',
+        message: 'Please use YYYY-MM-DD format' 
+      });
+    }
+
+    // Set end of day for end date
+    end.setHours(23, 59, 59, 999);
+
+    const invoices = await Invoice.find({
+      invoiceDate: { $gte: start, $lte: end },
+      status: { $ne: 'CANCELLED' }
+    })
+    .select('invoiceNumber invoiceDate customer grandTotal status invoiceType items')
+    .populate('customer', 'firmName gstin state')
+    .lean();
+
+    const summary = {
+      totalDocuments: invoices.length,
+      b2b: 0,
+      b2c: 0,
+      export: 0,
+      cancelled: 0,
+      totalValue: 0,
+      documentList: invoices.map(inv => ({
+        invoiceNumber: inv.invoiceNumber,
+        date: inv.invoiceDate,
+        type: inv.customer?.gstin ? 'B2B' : 'B2C',
+        partyName: inv.customer?.firmName || 'Walk-in Customer',
+        value: Number(inv.grandTotal || 0),
+        status: inv.status || 'ACTIVE'
+      }))
+    };
+
+    // Calculate totals
+    invoices.forEach(inv => {
+      summary.totalValue += Number(inv.grandTotal || 0);
+      if (inv.status === 'CANCELLED') {
+        summary.cancelled++;
+      } else if (inv.invoiceType === 'EXPORT') {
+        summary.export++;
+      } else if (inv.customer?.gstin) {
+        summary.b2b++;
+      } else {
+        summary.b2c++;
+      }
+    });
+
+    res.json({
+      period: { from: start, to: end },
+      summary
+    });
+
+  } catch (error) {
+    console.error('[GST] Document summary error:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate document summary',
+      message: error.message 
+    });
+  }
+});
+
 // Debug endpoint to inspect invoices used for GST calculations
 router.get('/returns/debug', async (req, res) => {
   try {
