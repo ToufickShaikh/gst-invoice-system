@@ -10,17 +10,17 @@ import DocumentSummary from '../components/DocumentSummary';
 const fmtDate = (d) => new Date(d).toISOString().slice(0,10);
 
 const usePeriod = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth(); // 0-indexed
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-indexed
 
-    // Default to the start and end of the previous month
-    const firstDayOfPreviousMonth = new Date(year, month - 1, 1);
-    const lastDayOfPreviousMonth = new Date(year, month, 0);
+  // Default to the start and end of the previous month
+  const firstDayOfPreviousMonth = new Date(year, month - 1, 1);
+  const lastDayOfPreviousMonth = new Date(year, month, 0);
 
-    const [from, setFrom] = useState(fmtDate(firstDayOfPreviousMonth));
-    const [to, setTo] = useState(fmtDate(lastDayOfPreviousMonth));
-    return { from, setFrom, to, setTo };
+  const [from, setFrom] = useState(fmtDate(firstDayOfPreviousMonth));
+  const [to, setTo] = useState(fmtDate(lastDayOfPreviousMonth));
+  return { from, setFrom, to, setTo };
 };
 
 const Section = ({ title, children, actions }) => (

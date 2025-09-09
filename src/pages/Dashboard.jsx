@@ -98,8 +98,10 @@ const Dashboard = () => {
 
   const fetchRecentActivity = async () => {
     try {
-  const invoices = await invoicesAPI.list();
-      const recentInvoices = invoices
+  const response = await invoicesAPI.list();
+      // Handle both array and object { data: [...] } responses
+      const invoices = Array.isArray(response) ? response : response.data || [];
+      const recentInvoices = (invoices || [])
         .sort((a, b) => new Date(b.createdAt || b.invoiceDate) - new Date(a.createdAt || a.invoiceDate))
         .slice(0, 5)
         .map((invoice, index) => ({
@@ -120,8 +122,9 @@ const Dashboard = () => {
   const fetchAllData = async () => {
     try {
       // Fetch all invoices
-  const invoicesData = await invoicesAPI.list();
-      setAllInvoices(invoicesData);
+  const response = await invoicesAPI.list();
+      // Handle both array and object { data: [...] } responses
+      setAllInvoices(Array.isArray(response) ? response : response.data || []);
 
       // Fetch all customers and items via API base helper
   const apiBase = getApiBaseUrl() || '';
@@ -219,10 +222,11 @@ const Dashboard = () => {
       console.log('Generating GST report for month:', selectedMonth, reportDateRange);
 
       // Fetch invoices for the date range
-  const invoices = await invoicesAPI.list();
+  const response = await invoicesAPI.list();
+      const invoices = Array.isArray(response) ? response : response.data || [];
 
       // Filter invoices by date range
-      const filteredInvoices = invoices.filter(invoice => {
+      const filteredInvoices = (invoices || []).filter(invoice => {
         const invoiceDate = new Date(invoice.createdAt || invoice.invoiceDate);
         return invoiceDate >= startDate && invoiceDate <= endDate;
       });

@@ -245,6 +245,8 @@ const createInvoice = async (req, res) => {
         try {
             await cacheManager.invalidatePattern('invoices');
             await cacheManager.invalidatePattern('dashboard');
+            // Add a small delay to allow cache to propagate before responding
+            await new Promise(resolve => setTimeout(resolve, 200));
         } catch (e) {
             console.warn('[CACHE] Failed to invalidate caches after invoice create', e && e.message);
         }
@@ -368,6 +370,8 @@ const updateInvoice = async (req, res) => {
         try {
             await cacheManager.invalidatePattern('invoices');
             await cacheManager.invalidatePattern('dashboard');
+            // Add a small delay to allow cache to propagate before responding
+            await new Promise(resolve => setTimeout(resolve, 200));
         } catch (e) {
             console.warn('[CACHE] Failed to invalidate caches after invoice update', e && e.message);
         }
@@ -435,6 +439,8 @@ const deleteInvoice = async (req, res) => {
         try {
             await cacheManager.invalidatePattern('invoices');
             await cacheManager.invalidatePattern('dashboard');
+            // Add a small delay to allow cache to propagate before responding
+            await new Promise(resolve => setTimeout(resolve, 200));
             console.log('[CACHE] Invalidated invoices & dashboard patterns after deletion');
         } catch (e) {
             console.warn('[CACHE] Failed to invalidate caches after invoice delete', e && e.message);

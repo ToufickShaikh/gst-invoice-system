@@ -40,44 +40,59 @@ exports.getDocumentSummary = async (req, res) => {
         const endDate = new Date(to);
         endDate.setHours(23, 59, 59, 999); // Include the entire 'to' date
 
-        const invoices = await Invoice.find({
-            invoiceDate: { $gte: startDate, $lte: endDate }
-        }).populate('customer', 'firmName gstin state');
+        const matchStage = {
+            invoiceDate: { $gte: startDate, $lte: endDate },
+        };
 
-        const documents = invoices.map(inv => ({
-            date: inv.invoiceDate,
-            number: inv.invoiceNumber,
-            type: inv.invoiceType || 'INVOICE',
-            party: {
-                name: inv.customer?.firmName || 'Walk-in Customer',
-                gstin: inv.customer?.gstin || '',
-                state: inv.customer?.state || ''
+        // Use an aggregation pipeline for efficiency
+        const results = await Invoice.aggregate([
+            { $match: matchStage },
+            { $sort: { invoiceDate: 1 } },
+            {
+                $lookup: {
+                    from: 'customers',
+                    localField: 'customer',
+                    foreignField: '_id',
+                    as: 'customerInfo'
+                }
             },
-            placeOfSupply: inv.customer?.state || '',
-            taxableValue: inv.subTotal || 0,
-            igst: inv.igst || 0,
-            cgst: inv.cgst || 0,
-            sgst: inv.sgst || 0,
-            total: inv.grandTotal || 0,
-            status: inv.status || 'COMPLETED'
-        }));
+            { $unwind: { path: '$customerInfo', preserveNullAndEmptyArrays: true } },
+            {
+                $group: {
+                    _id: null,
+                    documents: {
+                        $push: {
+                            date: '$invoiceDate',
+                            number: '$invoiceNumber',
+                            type: { $ifNull: ['$invoiceType', 'INVOICE'] },
+                            party: {
+                                name: { $ifNull: ['$customerInfo.firmName', 'Walk-in Customer'] },
+                                gstin: { $ifNull: ['$customerInfo.gstin', ''] },
+                                state: { $ifNull: ['$customerInfo.state', ''] }
+                            },
+                            placeOfSupply: { $ifNull: ['$customerInfo.state', ''] },
+                            taxableValue: { $ifNull: ['$subTotal', 0] },
+                            igst: { $ifNull: ['$igst', 0] },
+                            cgst: { $ifNull: ['$cgst', 0] },
+                            sgst: { $ifNull: ['$sgst', 0] },
+                            total: { $ifNull: ['$grandTotal', 0] },
+                            status: { $ifNull: ['$status', 'COMPLETED'] }
+                        }
+                    },
+                    totalInvoices: { $sum: 1 },
+                    totalTaxableValue: { $sum: { $ifNull: ['$subTotal', 0] } },
+                    totalIgst: { $sum: { $ifNull: ['$igst', 0] } },
+                    totalCgst: { $sum: { $ifNull: ['$cgst', 0] } },
+                    totalSgst: { $sum: { $ifNull: ['$sgst', 0] } },
+                    totalAmount: { $sum: { $ifNull: ['$grandTotal', 0] } }
+                }
+            },
+            { $project: { _id: 0 } } // Remove the _id field from the final output
+        ]);
 
-        // Calculate summary statistics
-        const summary = documents.reduce((acc, doc) => ({
-            totalInvoices: acc.totalInvoices + 1,
-            totalTaxableValue: acc.totalTaxableValue + doc.taxableValue,
-            totalIgst: acc.totalIgst + doc.igst,
-            totalCgst: acc.totalCgst + doc.cgst,
-            totalSgst: acc.totalSgst + doc.sgst,
-            totalAmount: acc.totalAmount + doc.total
-        }), {
-            totalInvoices: 0,
-            totalTaxableValue: 0,
-            totalIgst: 0,
-            totalCgst: 0,
-            totalSgst: 0,
-            totalAmount: 0
-        });
+        // Aggregation returns an array, we need the first element or a default object
+        const data = results[0] || { documents: [], totalInvoices: 0, totalTaxableValue: 0, totalIgst: 0, totalCgst: 0, totalSgst: 0, totalAmount: 0 };
+        const { documents, ...summary } = data;
 
         res.json({
             period: { from, to },
