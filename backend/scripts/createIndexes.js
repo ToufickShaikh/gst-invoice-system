@@ -1,6 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const Invoice = require('./models/Invoice');
+const Invoice = require('../models/Invoice');
 
 async function createIndexes() {
     try {
