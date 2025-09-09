@@ -40,8 +40,14 @@ exports.getDocumentSummary = async (req, res) => {
         const endDate = new Date(to);
         endDate.setHours(23, 59, 59, 999); // Include the entire 'to' date
 
+        // Robust matching for date, using invoiceDate or falling back to createdAt
         const matchStage = {
-            invoiceDate: { $gte: startDate, $lte: endDate },
+            $expr: {
+                $and: [
+                    { $gte: [{ $ifNull: ['$invoiceDate', '$createdAt'] }, startDate] },
+                    { $lte: [{ $ifNull: ['$invoiceDate', '$createdAt'] }, endDate] }
+                ]
+            }
         };
 
         // Use an aggregation pipeline for efficiency
@@ -62,7 +68,7 @@ exports.getDocumentSummary = async (req, res) => {
                     _id: null,
                     documents: {
                         $push: {
-                            date: '$invoiceDate',
+                            date: { $ifNull: ['$invoiceDate', '$createdAt'] },
                             number: '$invoiceNumber',
                             type: { $ifNull: ['$invoiceType', 'INVOICE'] },
                             party: {

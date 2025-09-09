@@ -71,7 +71,12 @@ const GstFilings = () => {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  // Fetch data on initial load and whenever the date range changes.
+  useEffect(() => {
+    if (from && to) {
+      fetchAll();
+    }
+  }, [from, to]);
 
   const dl = async (path, name, extraParams = {}) => {
     const toastId = toast.loading(`Downloading ${name}...`);
