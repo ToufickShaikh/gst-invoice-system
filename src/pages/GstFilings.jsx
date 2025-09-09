@@ -72,11 +72,13 @@ const GstFilings = () => {
   };
 
   // Fetch data on initial load and whenever the date range changes.
+  const memoizedFetchAll = React.useCallback(fetchAll, [from, to]);
   useEffect(() => {
     if (from && to) {
-      fetchAll();
+      // Use the memoized version to ensure it has the latest from/to values
+      memoizedFetchAll();
     }
-  }, [from, to]);
+  }, [from, to, memoizedFetchAll]);
 
   const dl = async (path, name, extraParams = {}) => {
     const toastId = toast.loading(`Downloading ${name}...`);
@@ -130,7 +132,7 @@ const GstFilings = () => {
                 <label className="text-xs text-gray-600">To</label>
                 <input type="date" value={to} onChange={(e)=>setTo(e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
               </div>
-              <Button onClick={fetchAll} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
+              <Button onClick={() => fetchAll()} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
             </div>
           </div>
           
