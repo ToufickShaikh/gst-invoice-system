@@ -393,9 +393,10 @@ router.get('/returns/hsn-summary', async (req, res) => {
   }
 });
 
-// Document summary endpoint for GST filings
+// Document summary endpoint for GST filings with optimized performance
 router.get('/returns/document-summary', async (req, res) => {
   try {
+    console.time('[GST] Document summary generation');
     const { from, to } = req.query;
     if (!from || !to) {
       return res.status(400).json({ 
@@ -418,48 +419,127 @@ router.get('/returns/document-summary', async (req, res) => {
     // Set end of day for end date
     end.setHours(23, 59, 59, 999);
 
-    const invoices = await Invoice.find({
-      invoiceDate: { $gte: start, $lte: end },
-      status: { $ne: 'CANCELLED' }
-    })
-    .select('invoiceNumber invoiceDate customer grandTotal status invoiceType items')
-    .populate('customer', 'firmName gstin state')
-    .lean();
-
-    const summary = {
-      totalDocuments: invoices.length,
-      b2b: 0,
-      b2c: 0,
-      export: 0,
-      cancelled: 0,
-      totalValue: 0,
-      documentList: invoices.map(inv => ({
-        invoiceNumber: inv.invoiceNumber,
-        date: inv.invoiceDate,
-        type: inv.customer?.gstin ? 'B2B' : 'B2C',
-        partyName: inv.customer?.firmName || 'Walk-in Customer',
-        value: Number(inv.grandTotal || 0),
-        status: inv.status || 'ACTIVE'
-      }))
-    };
-
-    // Calculate totals
-    invoices.forEach(inv => {
-      summary.totalValue += Number(inv.grandTotal || 0);
-      if (inv.status === 'CANCELLED') {
-        summary.cancelled++;
-      } else if (inv.invoiceType === 'EXPORT') {
-        summary.export++;
-      } else if (inv.customer?.gstin) {
-        summary.b2b++;
-      } else {
-        summary.b2c++;
+    // Use aggregation pipeline for better performance
+    const [result] = await Invoice.aggregate([
+      {
+        $match: {
+          invoiceDate: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $lookup: {
+          from: 'customers',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customerInfo'
+        }
+      },
+      {
+        $unwind: {
+          path: '$customerInfo',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalDocuments: { $sum: 1 },
+          totalValue: { $sum: { $ifNull: ['$grandTotal', 0] } },
+          b2b: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $ne: ['$status', 'CANCELLED'] },
+                  { $ne: ['$invoiceType', 'EXPORT'] },
+                  { $ifNull: ['$customerInfo.gstin', false] }
+                ]},
+                1,
+                0
+              ]
+            }
+          },
+          b2c: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $ne: ['$status', 'CANCELLED'] },
+                  { $ne: ['$invoiceType', 'EXPORT'] },
+                  { $not: { $ifNull: ['$customerInfo.gstin', false] } }
+                ]},
+                1,
+                0
+              ]
+            }
+          },
+          export: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $ne: ['$status', 'CANCELLED'] },
+                  { $eq: ['$invoiceType', 'EXPORT'] }
+                ]},
+                1,
+                0
+              ]
+            }
+          },
+          cancelled: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'CANCELLED'] }, 1, 0]
+            }
+          },
+          documents: {
+            $push: {
+              invoiceNumber: '$invoiceNumber',
+              date: '$invoiceDate',
+              type: {
+                $cond: [
+                  { $ifNull: ['$customerInfo.gstin', false] },
+                  'B2B',
+                  'B2C'
+                ]
+              },
+              partyName: {
+                $ifNull: ['$customerInfo.firmName', 'Walk-in Customer']
+              },
+              value: { $ifNull: ['$grandTotal', 0] },
+              status: { $ifNull: ['$status', 'ACTIVE'] }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          summary: {
+            totalDocuments: '$totalDocuments',
+            totalValue: { $round: ['$totalValue', 2] },
+            b2b: '$b2b',
+            b2c: '$b2c',
+            export: '$export',
+            cancelled: '$cancelled',
+            documentList: {
+              $slice: ['$documents', 100] // Limit to last 100 documents for better performance
+            }
+          }
+        }
       }
-    });
+    ]);
 
+    console.timeEnd('[GST] Document summary generation');
+
+    // Send response
     res.json({
       period: { from: start, to: end },
-      summary
+      summary: result?.summary || {
+        totalDocuments: 0,
+        totalValue: 0,
+        b2b: 0,
+        b2c: 0,
+        export: 0,
+        cancelled: 0,
+        documentList: []
+      }
     });
 
   } catch (error) {
