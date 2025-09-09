@@ -83,13 +83,8 @@ const getInvoices = async (req, res) => {
 
         if (billingType && ['B2B', 'B2C'].includes(billingType.toUpperCase())) {
             logger.debug(`Filtering invoices for billing type: ${billingType.toUpperCase()}`);
-
-            // Find customers with the specified customerType
-            const customers = await Customer.find({ customerType: billingType.toUpperCase() });
-            const customerIds = customers.map(c => c._id);
-
-            // Filter invoices by customer IDs
-            query.customer = { $in: customerIds };
+            // Direct filter on the billingType field for efficiency
+            query.billingType = billingType.toUpperCase();
         } else {
             logger.debug('No valid billingType filter applied - returning all invoices.');
         }
@@ -148,6 +143,9 @@ const createInvoice = async (req, res) => {
     }
     if (!customer && String(billingType || '').toUpperCase() !== 'POS') {
         return sendErrorResponse(res, 400, 'Customer is required for non-POS invoices');
+    }
+    if (!billingType || !['B2B', 'B2C', 'POS'].includes(billingType.toUpperCase())) {
+        return sendErrorResponse(res, 400, 'A valid billingType (B2B, B2C, POS) is required');
     }
 
     try {
@@ -222,8 +220,7 @@ const createInvoice = async (req, res) => {
             paidAmount,
             balance,
             paymentMethod,
-            billingType,
-            totalAmount: grandTotal,
+            billingType: billingType.toUpperCase(), // Ensure consistent casing
             exportInfo: exportInfo || undefined,
         });
 
@@ -341,9 +338,10 @@ const updateInvoice = async (req, res) => {
             paidAmount,
             balance,
             paymentMethod,
-            billingType,
-            totalAmount: grandTotal,
+            billingType: billingType || originalInvoice.billingType,
             exportInfo: exportInfo || originalInvoice.exportInfo,
+            // Ensure invoiceNumber is not changed on update
+            invoiceNumber: originalInvoice.invoiceNumber,
         }, { new: true, runValidators: true })
             .populate('customer')
             .populate('items.item');
