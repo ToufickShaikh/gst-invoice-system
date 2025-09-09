@@ -26,10 +26,16 @@ const EditInvoice = () => {
     const [invoiceData, setInvoiceData] = useState(null);
     const [isPOS, setIsPOS] = useState(false);
     const [summary, setSummary] = useState({
+        totalBeforeTax: 0,
+        totalTax: 0,
+        grandTotal: 0,
+        balance: 0
+    });
+
+    useEffect(() => {
         fetchInitialData();
     }, [id]);
 
-    // Recalculate summary whenever invoice data changes
     useEffect(() => {
         if (!invoiceData || !customers.length) return;
 
