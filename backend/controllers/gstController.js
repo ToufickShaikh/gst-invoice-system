@@ -97,8 +97,19 @@ exports.getDocumentSummary = async (req, res) => {
         ]);
 
         // Aggregation returns an array, we need the first element or a default object
-        const data = results[0] || { documents: [], totalInvoices: 0, totalTaxableValue: 0, totalIgst: 0, totalCgst: 0, totalSgst: 0, totalAmount: 0 };
-        const { documents, ...summary } = data;
+        const resultData = results[0];
+
+        // Ensure a valid object is always returned, even if there are no invoices
+        if (!resultData || !resultData.documents) {
+            return res.json({
+                period: { from, to },
+                documents: [],
+                summary: { totalInvoices: 0, totalTaxableValue: 0, totalIgst: 0, totalCgst: 0, totalSgst: 0, totalAmount: 0 },
+                totalCount: 0
+            });
+        }
+
+        const { documents, ...summary } = resultData;
 
         res.json({
             period: { from, to },

@@ -11,13 +11,14 @@ const fmtDate = (d) => new Date(d).toISOString().slice(0,10);
 
 const usePeriod = () => {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth(); // 0-indexed
-
-  // Default to the start and end of the previous month
-  const firstDayOfPreviousMonth = new Date(year, month - 1, 1);
-  const lastDayOfPreviousMonth = new Date(year, month, 0);
-
+  // Go to the 0th day of the current month, which gives the last day of the previous month.
+  const lastDayOfPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  
+  // Now that we are in the previous month, get its year and month to find the first day.
+  const prevMonthYear = lastDayOfPreviousMonth.getFullYear();
+  const prevMonth = lastDayOfPreviousMonth.getMonth();
+  const firstDayOfPreviousMonth = new Date(prevMonthYear, prevMonth, 1);
+  
   const [from, setFrom] = useState(fmtDate(firstDayOfPreviousMonth));
   const [to, setTo] = useState(fmtDate(lastDayOfPreviousMonth));
   return { from, setFrom, to, setTo };
