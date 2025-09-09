@@ -10,11 +10,6 @@ import DocumentSummary from '../components/DocumentSummary';
 const fmtDate = (d) => new Date(d).toISOString().slice(0,10);
 
 const usePeriod = () => {
-  const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const [from, setFrom] = useState(fmtDate(firstDay));
-  const [to, setTo] = useState(fmtDate(now));
-  return { from, setFrom, to, setTo };
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth(); // 0-indexed
