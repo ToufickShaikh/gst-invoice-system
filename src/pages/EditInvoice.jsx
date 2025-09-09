@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
@@ -13,6 +13,7 @@ import { billingAPI } from '../api/billing';
 import Layout from '../components/Layout';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
+import Select from 'react-select'; // Using react-select for searchable dropdowns
 
 const EditInvoice = () => {
     const { id } = useParams();
@@ -25,13 +26,6 @@ const EditInvoice = () => {
     const [invoiceData, setInvoiceData] = useState(null);
     const [isPOS, setIsPOS] = useState(false);
     const [summary, setSummary] = useState({
-        totalBeforeTax: 0,
-        totalTax: 0,
-        grandTotal: 0,
-        balance: 0
-    });
-
-    useEffect(() => {
         fetchInitialData();
     }, [id]);
 
@@ -39,7 +33,7 @@ const EditInvoice = () => {
     useEffect(() => {
         if (!invoiceData || !customers.length) return;
 
-        // Find the full customer object to determine if the sale is inter-state
+        // Find the full customer object to determine if the sale is inter-state for tax calculation
         const customer = customers.find(c => c._id === invoiceData.customer);
         if (!customer) return; // Don't calculate if customer not found yet
 
@@ -84,7 +78,7 @@ const EditInvoice = () => {
 
     }, [invoiceData, customers]);
 
-    const fetchInitialData = async () => {
+    const fetchInitialData = async () => { // This function is well-structured.
         setLoading(true);
         setError(null); // Reset error state on new fetch
         try {
@@ -143,6 +137,48 @@ const EditInvoice = () => {
         }
     };
 
+    // Memoize options for react-select to prevent re-renders
+    const customerOptions = useMemo(() =>
+        customers.map(c => ({
+            value: c._id,
+            label: `${c.firmName || c.name} ${c.gstNo ? `(${c.gstNo})` : ''}`
+        })), [customers]);
+
+    const itemOptions = useMemo(() =>
+        items.map(i => ({
+            value: i._id,
+            label: `${i.name} (HSN: ${i.hsnCode})`,
+            ...i // include full item object
+        })), [items]);
+
+    const summaryCalculations = useMemo(() => {
+        if (!invoiceData || !customers.length) return { totalBeforeTax: 0, totalTax: 0, grandTotal: 0, balance: 0 };
+
+        const customer = customers.find(c => c._id === invoiceData.customer);
+        const isInterState = customer?.state?.toLowerCase() !== 'maharashtra';
+
+        let totalBeforeTax = 0;
+        let totalTax = 0;
+
+        (invoiceData.items || []).forEach(item => {
+            const price = Number(item.price || item.rate || 0);
+            const qty = Number(item.quantity || 0);
+            const taxSlab = Number(item.taxSlab || item.taxRate || 0);
+            
+            // For simplicity, assuming discount is applied at the end.
+            // A more complex item-wise discount logic can be added if needed.
+            const lineTotal = price * qty;
+            totalBeforeTax += lineTotal;
+            const taxInfo = calculateTax(lineTotal, taxSlab, isInterState);
+            totalTax += taxInfo.total;
+        });
+
+        const grandTotal = totalBeforeTax - (invoiceData.discount || 0) + (invoiceData.shippingCharges || 0) + totalTax;
+        const balance = grandTotal - (invoiceData.paidAmount || 0);
+
+        return { totalBeforeTax, totalTax, grandTotal, balance };
+    }, [invoiceData, customers]);
+
     const handleInputChange = (field, value) => {
         setInvoiceData({ ...invoiceData, [field]: value });
     };
@@ -150,16 +186,25 @@ const EditInvoice = () => {
     const handleItemChange = (index, field, value) => {
         const updatedItems = [...invoiceData.items];
         if (field === 'itemId') {
-            const selectedItem = items.find(i => i._id === value);
+            const selectedItem = value; // react-select passes the whole option object
             updatedItems[index] = {
                 ...updatedItems[index],
-                itemId: value,
-                item: selectedItem,
+                isCustom: false,
+                itemId: selectedItem.value,
+                item: selectedItem, // Keep full item for reference
                 price: selectedItem?.rate ?? selectedItem?.price ?? 0,
                 taxSlab: selectedItem?.taxSlab ?? 0,
                 priceType: selectedItem?.priceType ?? 'Exclusive',
                 name: selectedItem?.name ?? '',
                 hsnCode: selectedItem?.hsnCode ?? ''
+            };
+        } else if (field === 'isCustom' && value === true) {
+            // When switching to a custom item, clear catalog-specific fields
+            updatedItems[index] = {
+                ...updatedItems[index],
+                isCustom: true,
+                itemId: '',
+                item: null,
             };
         } else {
             updatedItems[index][field] = value;
@@ -171,6 +216,7 @@ const EditInvoice = () => {
         const newItem = {
             id: Date.now() + Math.random(), // Unique identifier
             itemId: '',
+            isCustom: false,
             quantity: 1,
             item: null,
             price: 0,
@@ -203,10 +249,16 @@ const EditInvoice = () => {
             return;
         }
 
-        // Check if all items have valid values
-        const invalidItems = invoiceData.items.filter(item => !item.itemId || !item.quantity || item.quantity <= 0);
+        // Validate all items
+        const invalidItems = invoiceData.items.filter(item => {
+            const isCatalogItem = !item.isCustom && item.itemId;
+            const isCustomItem = item.isCustom && item.name && item.hsnCode;
+            const hasQuantity = item.quantity > 0;
+            return !((isCatalogItem || isCustomItem) && hasQuantity);
+        });
+
         if (invalidItems.length > 0) {
-            toast.error('Please complete all item details (select an item and set a valid quantity)');
+            toast.error('Please complete all item details. Each item must have a name, HSN, and a valid quantity.');
             setLoading(false);
             return;
         }
@@ -215,9 +267,16 @@ const EditInvoice = () => {
             toast.loading('Updating invoice...', { id: 'update-toast' });
 
             // Ensure items being sent to backend have the correct structure
-            const itemsForBackend = invoiceData.items.map(({ item, itemId, ...rest }) => ({
+            const itemsForBackend = invoiceData.items.map(({ item, itemId, isCustom, ...rest }) => ({
                 ...rest,
-                item: itemId, // Send only the ID
+                // Send item ID only for catalog items, otherwise send null/undefined
+                item: isCustom ? null : itemId,
+                // For custom items, ensure name and hsnCode are sent
+                name: isCustom ? rest.name : item?.name,
+                hsnCode: isCustom ? rest.hsnCode : item?.hsnCode,
+                price: rest.price,
+                taxSlab: rest.taxSlab,
+                quantity: rest.quantity,
             }));
 
             const rawExp = invoiceData.exportInfo || {};
@@ -344,20 +403,28 @@ const EditInvoice = () => {
                                 POS / Quick Bill (no customer)
                             </label>
                         </div>
-                        {!isPOS ? (
-                          <select
-                              value={invoiceData.customer}
-                              onChange={(e) => handleInputChange('customer', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                          >
-                              <option value="">-- Select Customer --</option>
-                              {customers.map(c => (
-                                  <option key={c._id} value={c._id}>{c.firmName || c.name} {c.gstin ? `(GSTIN: ${c.gstin})` : ''}</option>
-                              ))}
-                          </select>
+                        {!isPOS ? ( // Using react-select for a better UX
+                            <Select
+                                options={customerOptions}
+                                value={customerOptions.find(opt => opt.value === invoiceData.customer)}
+                                onChange={(selectedOption) => handleInputChange('customer', selectedOption.value)}
+                                placeholder="Search and select a customer..."
+                                className="react-select-container"
+                                classNamePrefix="react-select"
+                                isClearable
+                            />
                         ) : (
                           <div className="p-3 bg-yellow-50 rounded">This invoice will be saved as POS/Walk-in (no customer required).</div>
                         )}
+                    </div>
+
+                    {/* Items Table Header */}
+                    <div className="hidden md:grid grid-cols-12 gap-3 mb-2 text-xs font-bold text-gray-600 uppercase">
+                        <div className="col-span-4">Item Details</div>
+                        <div className="col-span-2">Stock / Qty</div>
+                        <div className="col-span-4 grid grid-cols-3 gap-2"><div>Rate</div><div>Tax %</div><div>HSN</div></div>
+                        <div className="col-span-1 text-right">Amount</div>
+                        <div className="col-span-1"></div>
                     </div>
 
                     {/* Items Section */}
@@ -367,86 +434,69 @@ const EditInvoice = () => {
                             <Button onClick={handleAddItem} size="sm">Add Item</Button>
                         </div>
                         <div className="space-y-4">
-                            {invoiceData.items.map((billItem, index) => (
-                                <div key={billItem.id || `item-${index}`} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                                    <div className="md:col-span-4 col-span-1">
-                                        <label className="block text-sm font-medium">Item</label>
-                                        <select
-                                            value={billItem.itemId}
-                                            onChange={(e) => handleItemChange(index, 'itemId', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                        >
-                                            <option value="">Select an item</option>
-                                            {items.map(item => (
-                                                <option key={item._id} value={item._id}>{item.name}</option>
-                                            ))}
-                                        </select>
+                            {(invoiceData.items || []).map((billItem, index) => (
+                                <div key={billItem.id || `item-${index}`} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start p-3 border rounded-lg bg-gray-50/50">
+                                    {/* Item Selection / Custom Item Input */}
+                                    <div className="md:col-span-4">
+                                        <label className="flex items-center text-xs text-gray-500 mb-1">
+                                            <input type="checkbox" className="mr-2 h-4 w-4" checked={billItem.isCustom} onChange={(e) => handleItemChange(index, 'isCustom', e.target.checked)} />
+                                            Custom Item
+                                        </label>
+                                        {billItem.isCustom ? (
+                                            <InputField placeholder="Enter Item Name" value={billItem.name || ''} onChange={(e) => handleItemChange(index, 'name', e.target.value)} />
+                                        ) : (
+                                            <Select
+                                                options={itemOptions}
+                                                value={itemOptions.find(opt => opt.value === billItem.itemId)}
+                                                onChange={(selectedOption) => handleItemChange(index, 'itemId', selectedOption)}
+                                                placeholder="Search products..."
+                                                className="react-select-container"
+                                                classNamePrefix="react-select"
+                                            />
+                                        )}
                                     </div>
 
-                                    <div className="md:col-span-1 col-span-1">
-                                        <InputField
-                                            label="Qty"
-                                            type="number"
-                                            value={billItem.quantity}
-                                            onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                                        />
+                                    {/* Stock and Quantity */}
+                                    <div className="md:col-span-2 flex items-end gap-2">
+                                        <div className="flex-1">
+                                            <label className="text-xs text-gray-500">Stock</label>
+                                            <div className={`p-2 rounded text-center font-bold ${billItem.item?.stock > 0 ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}`}>
+                                                {billItem.isCustom ? 'N/A' : (billItem.item?.stock ?? '-')}
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <InputField label="Qty" type="number" value={billItem.quantity} onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)} />
+                                        </div>
                                     </div>
 
-                                    <div className="md:col-span-2 col-span-1">
-                                        <InputField
-                                            label="Rate"
-                                            type="number"
-                                            value={billItem.price ?? billItem.rate ?? 0}
-                                            onChange={(e) => handleItemChange(index, 'price', parseFloat(e.target.value) || 0)}
-                                        />
+                                    {/* Rate, Tax, HSN */}
+                                    <div className="md:col-span-4 grid grid-cols-3 gap-2">
+                                        <div>
+                                            <InputField label="Rate" type="number" value={billItem.price ?? billItem.rate ?? 0} onChange={(e) => handleItemChange(index, 'price', parseFloat(e.target.value) || 0)} />
+                                        </div>
+                                        <div>
+                                            <InputField label="Tax %" type="number" value={billItem.taxSlab ?? billItem.taxRate ?? 0} onChange={(e) => handleItemChange(index, 'taxSlab', parseFloat(e.target.value) || 0)} />
+                                        </div>
+                                        <div>
+                                            <InputField label="HSN" type="text" value={billItem.hsnCode || ''} onChange={(e) => handleItemChange(index, 'hsnCode', e.target.value)} disabled={!billItem.isCustom} />
+                                        </div>
                                     </div>
 
-                                    <div className="md:col-span-1 col-span-1">
-                                        <InputField
-                                            label="Tax %"
-                                            type="number"
-                                            value={billItem.taxSlab ?? billItem.taxRate ?? 0}
-                                            onChange={(e) => handleItemChange(index, 'taxSlab', parseFloat(e.target.value) || 0)}
-                                        />
-                                    </div>
-
-                                    {/* Price Type selector removed - rates stored canonical Exclusive. */}
-
-                                    <div className="md:col-span-1 col-span-1">
-                                        <InputField
-                                            label="HSN"
-                                            type="text"
-                                            value={billItem.hsnCode || ''}
-                                            onChange={(e) => handleItemChange(index, 'hsnCode', e.target.value)}
-                                        />
-                                    </div>
-
-                                    <div className="md:col-span-1 col-span-1 text-right">
+                                    {/* Line Total */}
+                                    <div className="md:col-span-1 text-right">
                                         <div className="text-sm text-gray-500">Amount</div>
                                         <div className="font-medium text-gray-900">{formatCurrency((() => {
                                             const qty = Number(billItem.quantity || 0);
                                             const price = Number(billItem.price ?? billItem.rate ?? 0);
-                                            const disc = Number(invoiceData.discount || 0) || 0;
                                             const tax = Number(billItem.taxSlab ?? billItem.taxRate ?? 0) || 0;
-                                            const priceType = String(billItem.priceType ?? billItem.item?.priceType ?? 'Exclusive');
-                                            if (priceType === 'Inclusive' && tax) {
-                                                // Backwards compatibility: if the item/document still marks Inclusive, handle it
-                                                const line = price * qty;
-                                                const totalBase = (invoiceData.items || []).reduce((s, it) => s + (Number(it.price ?? it.rate ?? 0) * Number(it.quantity ?? 0)), 0) || 1;
-                                                const propDiscount = (line / totalBase) * disc;
-                                                const discountedInclusive = Math.max(0, line - propDiscount);
-                                                return (discountedInclusive).toFixed(2);
-                                            }
-                                            const line = price * qty;
-                                            const totalBase = (invoiceData.items || []).reduce((s, it) => s + (Number(it.price ?? it.rate ?? 0) * Number(it.quantity ?? 0)), 0) || 1;
-                                            const propDiscount = (line / totalBase) * disc;
-                                            const taxable = Math.max(0, line - propDiscount);
+                                            const taxable = price * qty;
                                             const taxAmt = taxable * (tax / 100);
                                             return (taxable + taxAmt).toFixed(2);
                                         })())}</div>
                                     </div>
 
-                                    <div className="md:col-span-1 col-span-1 flex justify-end">
+                                    {/* Remove Button */}
+                                    <div className="md:col-span-1 flex items-end justify-end">
                                         <Button onClick={() => handleRemoveItem(index)} variant="danger" size="sm">Remove</Button>
                                     </div>
                                 </div>
@@ -561,28 +611,28 @@ const EditInvoice = () => {
                         <h3 className="text-lg font-medium mb-4">Summary</h3>
                         <div className="space-y-2">
                             <div className="flex justify-between">
-                                <span>Total Before Tax:</span>
-                                <span>{formatCurrency(summary.totalBeforeTax)}</span>
+                                <span>Subtotal:</span>
+                                <span>{formatCurrency(summaryCalculations.totalBeforeTax)}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span>Discount:</span>
                                 <span>- {formatCurrency(invoiceData.discount || 0)}</span>
                             </div>
                             <div className="flex justify-between">
+                                <span>Tax Amount:</span>
+                                <span>{formatCurrency(summaryCalculations.totalTax)}</span>
+                            </div>
+                            <div className="flex justify-between">
                                 <span>Shipping Charges:</span>
                                 <span>{formatCurrency(invoiceData.shippingCharges || 0)}</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span>Tax Amount:</span>
-                                <span>{formatCurrency(summary.totalTax)}</span>
-                            </div>
                             <div className="flex justify-between font-bold text-lg border-t pt-2">
                                 <span>Grand Total:</span>
-                                <span>{formatCurrency(summary.grandTotal)}</span>
+                                <span>{formatCurrency(summaryCalculations.grandTotal)}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span>Paid Amount:</span>
-                                <span>{formatCurrency(invoiceData.paidAmount || 0)}</span>
+                                <span className="text-green-600 font-semibold">{formatCurrency(invoiceData.paidAmount || 0)}</span>
                             </div>
                             <div className="flex justify-between font-medium">
                                 <span>Balance:</span>
