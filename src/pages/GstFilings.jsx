@@ -41,44 +41,44 @@ const GstFilings = () => {
   const [hsn, setHsn] = useState(null);
   const [docSummary, setDocSummary] = useState(null);
   const [activeTab, setActiveTab] = useState('summary');
-
-  const fetchAll = async () => {
-    try {
-      setLoading(true);
-      const params = { params: { from, to } };
-      console.info('[GST UI] Fetching GSTR data for', from, '->', to);
-      const [r1, r3b, rhsn, rdocs] = await Promise.all([
-        axiosInstance.get('/gst/returns/gstr1', params),
-        axiosInstance.get('/gst/returns/gstr3b', params),
-        axiosInstance.get('/gst/returns/hsn-summary', params),
-        axiosInstance.get('/gst/returns/document-summary', params),
-      ]).catch(err => {
-        console.error('[GST UI] Error fetching GST endpoints', err);
-        throw err;
-      });
-      console.debug('[GST UI] gstr1 response', r1?.data);
-      console.debug('[GST UI] gstr3b response', r3b?.data);
-      console.debug('[GST UI] hsn response', rhsn?.data);
-      setGstr1(r1.data || null);
-      setGstr3b(r3b.data || null);
-      setHsn(rhsn.data || null);
-      setDocSummary(rdocs.data || null);
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to fetch GST returns');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  
   // Fetch data on initial load and whenever the date range changes.
-  const memoizedFetchAll = React.useCallback(fetchAll, [from, to]);
   useEffect(() => {
+    const fetchAll = async () => {
+      if (!from || !to) return;
+      
+      try {
+        setLoading(true);
+        const params = { params: { from, to } };
+        console.info('[GST UI] Fetching GSTR data for', from, '->', to);
+        const [r1, r3b, rhsn, rdocs] = await Promise.all([
+          axiosInstance.get('/gst/returns/gstr1', params),
+          axiosInstance.get('/gst/returns/gstr3b', params),
+          axiosInstance.get('/gst/returns/hsn-summary', params),
+          axiosInstance.get('/gst/returns/document-summary', params),
+        ]).catch(err => {
+          console.error('[GST UI] Error fetching GST endpoints', err);
+          throw err;
+        });
+        console.debug('[GST UI] gstr1 response', r1?.data);
+        console.debug('[GST UI] gstr3b response', r3b?.data);
+        console.debug('[GST UI] hsn response', rhsn?.data);
+        setGstr1(r1.data || null);
+        setGstr3b(r3b.data || null);
+        setHsn(rhsn.data || null);
+        setDocSummary(rdocs.data || null);
+      } catch (e) {
+        console.error(e);
+        toast.error('Failed to fetch GST returns');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     if (from && to) {
-      // Use the memoized version to ensure it has the latest from/to values
-      memoizedFetchAll();
+      fetchAll();
     }
-  }, [from, to, memoizedFetchAll]);
+  }, [from, to]);
 
   const dl = async (path, name, extraParams = {}) => {
     const toastId = toast.loading(`Downloading ${name}...`);
@@ -132,7 +132,12 @@ const GstFilings = () => {
                 <label className="text-xs text-gray-600">To</label>
                 <input type="date" value={to} onChange={(e)=>setTo(e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
               </div>
-              <Button onClick={() => fetchAll()} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
+              <Button onClick={() => {
+                // Re-trigger the useEffect by temporarily clearing and resetting a date
+                const currentFrom = from;
+                setFrom('');
+                setTimeout(() => setFrom(currentFrom), 0);
+              }} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
             </div>
           </div>
           
