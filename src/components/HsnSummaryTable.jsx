@@ -29,7 +29,7 @@ const HsnSummaryTable = ({ data }) => {
     let bVal = b[sortField];
     
     // Handle numeric fields
-    if (['quantity', 'taxRate', 'taxableValue', 'taxAmount'].includes(sortField)) {
+    if (['quantity', 'taxRate', 'taxableValue', 'igst', 'cgst', 'sgst'].includes(sortField)) {
       aVal = Number(aVal || 0);
       bVal = Number(bVal || 0);
     }
@@ -44,8 +44,10 @@ const HsnSummaryTable = ({ data }) => {
   const totals = data.rows.reduce((acc, row) => ({
     quantity: acc.quantity + Number(row.quantity || 0),
     taxableValue: acc.taxableValue + Number(row.taxableValue || 0),
-    taxAmount: acc.taxAmount + Number(row.taxAmount || 0)
-  }), { quantity: 0, taxableValue: 0, taxAmount: 0 });
+    igst: acc.igst + Number(row.igst || 0),
+    cgst: acc.cgst + Number(row.cgst || 0),
+    sgst: acc.sgst + Number(row.sgst || 0),
+  }), { quantity: 0, taxableValue: 0, igst: 0, cgst: 0, sgst: 0 });
 
   const SortIcon = ({ field }) => {
     if (sortField !== field) return null;
@@ -97,7 +99,9 @@ const HsnSummaryTable = ({ data }) => {
               <SortableHeader field="quantity">Total Quantity</SortableHeader>
               <SortableHeader field="taxRate">Tax Rate %</SortableHeader>
               <SortableHeader field="taxableValue">Taxable Value</SortableHeader>
-              <SortableHeader field="taxAmount">Tax Amount</SortableHeader>
+              <SortableHeader field="igst">IGST</SortableHeader>
+              <SortableHeader field="cgst">CGST</SortableHeader>
+              <SortableHeader field="sgst">SGST</SortableHeader>
             </tr>
           </thead>
           <tbody>
@@ -111,7 +115,9 @@ const HsnSummaryTable = ({ data }) => {
                 <td className="p-2 text-right">{Number(row.quantity||0).toFixed(2)}</td>
                 <td className="p-2 text-right">{Number(row.taxRate||0).toFixed(2)}%</td>
                 <td className="p-2 text-right">₹{Number(row.taxableValue||0).toFixed(2)}</td>
-                <td className="p-2 text-right">₹{Number(row.taxAmount||0).toFixed(2)}</td>
+                <td className="p-2 text-right">₹{Number(row.igst||0).toFixed(2)}</td>
+                <td className="p-2 text-right">₹{Number(row.cgst||0).toFixed(2)}</td>
+                <td className="p-2 text-right">₹{Number(row.sgst||0).toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
@@ -121,7 +127,9 @@ const HsnSummaryTable = ({ data }) => {
               <td className="p-2 text-right">{totals.quantity.toFixed(2)}</td>
               <td className="p-2"></td>
               <td className="p-2 text-right">₹{totals.taxableValue.toFixed(2)}</td>
-              <td className="p-2 text-right">₹{totals.taxAmount.toFixed(2)}</td>
+              <td className="p-2 text-right">₹{totals.igst.toFixed(2)}</td>
+              <td className="p-2 text-right">₹{totals.cgst.toFixed(2)}</td>
+              <td className="p-2 text-right">₹{totals.sgst.toFixed(2)}</td>
             </tr>
           </tfoot>
         </table>

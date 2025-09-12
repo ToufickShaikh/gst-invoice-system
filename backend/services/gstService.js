@@ -201,16 +201,29 @@ function generateHsnSummary(invoices) {
             const rate = Number(li.rate || 0);
             const txval = qty * rate;
             const taxRate = Number(li.taxSlab || li.item?.taxSlab || 0);
-            const taxAmt = (li.igst || 0) + (li.cgst || 0) + (li.sgst || 0);
+            const igst = li.igst || 0;
+            const cgst = li.cgst || 0;
+            const sgst = li.sgst || 0;
 
             if (!hsnMap.has(hsn)) {
-                hsnMap.set(hsn, { hsn, description: name, quantity: 0, taxableValue: 0, taxAmount: 0, taxRate });
+                hsnMap.set(hsn, { 
+                    hsn, 
+                    description: name, 
+                    quantity: 0, 
+                    taxableValue: 0, 
+                    igst: 0, 
+                    cgst: 0, 
+                    sgst: 0, 
+                    taxRate 
+                });
             }
 
             const row = hsnMap.get(hsn);
             row.quantity += qty;
             row.taxableValue += txval;
-            row.taxAmount += taxAmt;
+            row.igst += igst;
+            row.cgst += cgst;
+            row.sgst += sgst;
             row.taxRate = Math.max(row.taxRate, taxRate);
         });
     });
@@ -219,7 +232,9 @@ function generateHsnSummary(invoices) {
         ...row,
         quantity: +row.quantity.toFixed(2),
         taxableValue: +row.taxableValue.toFixed(2),
-        taxAmount: +row.taxAmount.toFixed(2),
+        igst: +row.igst.toFixed(2),
+        cgst: +row.cgst.toFixed(2),
+        sgst: +row.sgst.toFixed(2),
         taxRate: +row.taxRate.toFixed(2)
     }));
 
