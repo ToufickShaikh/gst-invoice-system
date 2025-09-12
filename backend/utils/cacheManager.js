@@ -233,6 +233,12 @@ const cacheMiddleware = (ttl = 300, keyGenerator) => {
           return originalJson(data);
         }
 
+        // Special check for invoice list to not cache empty results
+        if (req.originalUrl.includes('/api/invoices') && data && Array.isArray(data.data) && data.data.length === 0) {
+            res.setHeader('X-Cache-Reason', 'empty-invoice-list');
+            return originalJson(data);
+        }
+
         // Cache successful GET responses
         cacheManager.set(cacheKey, data, ttl);
         return originalJson(data);

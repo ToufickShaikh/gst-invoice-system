@@ -168,7 +168,6 @@ app.use('/api/billing',
 // New cleaner invoice API (v2) - mounted after legacy to allow gradual migration
 app.use('/api/invoices',
     ...authStack,
-    cacheMiddleware(cacheConfig.invoices.ttl, cacheConfig.invoices.key),
     invoiceV2Routes
 );
 
