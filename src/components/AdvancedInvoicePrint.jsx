@@ -36,7 +36,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
         
         // If we received an invoice ID
         if (invoice._id) {
-          const response = await invoicesAPI.getInvoice(invoice._id);
+          const response = await invoicesAPI.get(invoice._id);
           setInvoiceData(response);
           return;
         }
@@ -45,7 +45,7 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
         if (invoice.data && Array.isArray(invoice.data) && invoice.data.length > 0) {
           const selectedInvoice = invoice.data[0];
           if (selectedInvoice._id) {
-            const response = await invoicesAPI.getInvoice(selectedInvoice._id);
+            const response = await invoicesAPI.get(selectedInvoice._id);
             setInvoiceData(response);
           }
         }
