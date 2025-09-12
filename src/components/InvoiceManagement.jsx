@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../utils/dateHelpers';
@@ -27,6 +27,22 @@ const InvoiceManagement = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [searchInput, setSearchInput] = useState('');
   const [menuOpenId, setMenuOpenId] = useState(null);
+  const [error, setError] = useState(null);
+  const menuRef = useRef(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpenId(null);
+      }
+    };
+
+    if (menuOpenId) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [menuOpenId]);
 
   // Debounced fetch when filters/search/sort/page change
   useEffect(() => {
@@ -66,6 +82,7 @@ const InvoiceManagement = () => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
+      setError(null);
       const params = {
         status: filters.status === 'all' ? undefined : filters.status,
         dateFrom: filters.dateFrom || undefined,
@@ -84,6 +101,7 @@ const InvoiceManagement = () => {
       setTotalCount(response?.totalCount ?? (Array.isArray(response) ? response.length : normalized.length));
     } catch (error) {
       console.error('Error fetching invoices:', error);
+      setError('Failed to load invoices. Please try again.');
       toast.error('Failed to load invoices');
     } finally {
       setLoading(false);
@@ -362,68 +380,170 @@ const InvoiceManagement = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="loading-mobile">
+        <div className="loading-spinner-mobile"></div>
+        <p className="text-sm text-gray-600 mt-2">Loading invoices...</p>
       </div>
     );
   }
 
-  if (invoices.length === 0) {
+  if (error) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-8 text-center">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="card-enhanced">
+        <div className="empty-state-mobile">
+          <svg className="mx-auto h-12 w-12 text-red-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Invoices</h3>
+          <p className="text-gray-500 mb-4">{error}</p>
+          <button 
+            onClick={() => fetchInvoices()} 
+            className="btn-enhanced btn-primary"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (invoices.length === 0 && !loading) {
+    return (
+      <div className="card-enhanced">
+        <div className="empty-state-mobile">
+          <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices found</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Get started by creating your first invoice.
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {searchInput || filters.status !== 'all' || filters.dateFrom || filters.dateTo 
+              ? 'No invoices match your filters' 
+              : 'No invoices found'
+            }
+          </h3>
+          <p className="text-gray-500 mb-4">
+            {searchInput || filters.status !== 'all' || filters.dateFrom || filters.dateTo 
+              ? 'Try adjusting your search criteria or filters.' 
+              : 'Get started by creating your first invoice.'
+            }
           </p>
+          {!(searchInput || filters.status !== 'all' || filters.dateFrom || filters.dateTo) && (
+            <Link to="/billing" className="btn-enhanced btn-primary">
+              Create First Invoice
+            </Link>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Invoice Management</h1>
-        <p className="text-gray-600">Manage all your invoices with advanced features</p>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="text-center sm:text-left">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Invoice Management</h2>
+          <p className="text-sm sm:text-base text-gray-600">Manage all your invoices with advanced features</p>
+        </div>
+        <Link to="/billing" className="btn-enhanced btn-primary touch-target">
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Create Invoice
+        </Link>
       </div>
 
-      {/* Summary Cards */}
-  <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-        <div className="bg-blue-50 p-6 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-600">Total Invoices</h3>
-      <p className="text-2xl font-bold text-blue-900">{totalCount}</p>
+      {/* Enhanced Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-blue-600 mb-1">Total Invoices</h3>
+              <p className="text-2xl font-bold text-blue-900">{totalCount}</p>
+            </div>
+            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+          </div>
         </div>
-        <div className="bg-green-50 p-6 rounded-lg">
-          <h3 className="text-sm font-medium text-green-600">Total Amount</h3>
-          <p className="text-2xl font-bold text-green-900">{formatCurrency(getTotalAmount())}</p>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-green-600 mb-1">Total Amount</h3>
+              <p className="text-2xl font-bold text-green-900">{formatCurrency(getTotalAmount())}</p>
+            </div>
+            <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+            </div>
+          </div>
         </div>
-        <div className="bg-yellow-50 p-6 rounded-lg">
-          <h3 className="text-sm font-medium text-yellow-600">Paid Amount</h3>
-          <p className="text-2xl font-bold text-yellow-900">{formatCurrency(getPaidAmount())}</p>
+        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-4 border border-yellow-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-yellow-600 mb-1">Paid Amount</h3>
+              <p className="text-2xl font-bold text-yellow-900">{formatCurrency(getPaidAmount())}</p>
+            </div>
+            <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
         </div>
-        <div className="bg-purple-50 p-6 rounded-lg">
-          <h3 className="text-sm font-medium text-purple-600">Discount Given</h3>
-          <p className="text-2xl font-bold text-purple-900">{formatCurrency(getDiscountGiven())}</p>
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-purple-600 mb-1">Discount Given</h3>
+              <p className="text-2xl font-bold text-purple-900">{formatCurrency(getDiscountGiven())}</p>
+            </div>
+            <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </div>
+          </div>
         </div>
-        <div className="bg-red-50 p-6 rounded-lg">
-          <h3 className="text-sm font-medium text-red-600">Overdue Amount</h3>
-          <p className="text-2xl font-bold text-red-900">{formatCurrency(getOverdueAmount())}</p>
+        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border border-red-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-red-600 mb-1">Overdue Amount</h3>
+              <p className="text-2xl font-bold text-red-900">{formatCurrency(getOverdueAmount())}</p>
+            </div>
+            <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
 
-  {/* Filters + Sort */}
-      <div className="bg-white p-6 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Enhanced Filters Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Filters & Search</h3>
+          <button
+            onClick={() => {
+              setFilters({ status: 'all', dateFrom: '', dateTo: '', search: '' });
+              setSearchInput('');
+              setPage(1);
+            }}
+            className="text-sm text-gray-500 hover:text-gray-700 underline"
+          >
+            Clear All
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
             <select
               value={filters.status}
               onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">All Status</option>
               <option value="draft">Draft</option>
@@ -434,84 +554,98 @@ const InvoiceManagement = () => {
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
             <input
               type="date"
               value={filters.dateFrom}
               onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">To Date</label>
             <input
               type="date"
               value={filters.dateTo}
               onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <div>
+          
+          <div className="sm:col-span-2 lg:col-span-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => { setPage(1); setSearchInput(e.target.value); }}
-              placeholder="Invoice number or customer..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
-            <div className="flex gap-2">
-              <select
-                value={sortBy}
-                onChange={(e) => { setPage(1); setSortBy(e.target.value); }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="date">Date</option>
-                <option value="amount">Amount</option>
-                <option value="customer">Customer</option>
-                <option value="status">Status</option>
-              </select>
-              <select
-                value={sortDir}
-                onChange={(e) => { setPage(1); setSortDir(e.target.value); }}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="desc">Desc</option>
-                <option value="asc">Asc</option>
-              </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => { setPage(1); setSearchInput(e.target.value); }}
+                placeholder="Invoice number or customer..."
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
           </div>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Per Page</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => { setPage(1); setSortBy(e.target.value); }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="date">Date</option>
+              <option value="amount">Amount</option>
+              <option value="customer">Customer</option>
+              <option value="status">Status</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Order</label>
+            <select
+              value={sortDir}
+              onChange={(e) => { setPage(1); setSortDir(e.target.value); }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="desc">Newest First</option>
+              <option value="asc">Oldest First</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Items Per Page</label>
             <select
               value={pageSize}
               onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)); }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
+              <option value={10}>10 items</option>
+              <option value={20}>20 items</option>
+              <option value={50}>50 items</option>
             </select>
           </div>
         </div>
       </div>
 
-  {/* Bulk Actions */}
+      {/* Bulk Actions */}
       {selectedInvoices.length > 0 && (
-        <div className="bg-blue-50 p-4 rounded-lg mb-6">
-          <div className="flex items-center justify-between">
-            <span className="text-blue-800">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <span className="text-blue-800 font-medium text-center sm:text-left">
               {selectedInvoices.length} invoice(s) selected
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <select
                 value={bulkAction}
                 onChange={(e) => setBulkAction(e.target.value)}
-                className="px-3 py-1 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="select-mobile border-blue-300 focus:ring-blue-500"
               >
                 <option value="">Select Action</option>
                 <option value="markPaid">Mark as Paid</option>
@@ -521,7 +655,7 @@ const InvoiceManagement = () => {
               </select>
               <button
                 onClick={handleBulkAction}
-                className="px-4 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                className="btn-enhanced bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500"
               >
                 Apply
               </button>
@@ -530,89 +664,100 @@ const InvoiceManagement = () => {
         </div>
       )}
 
-  {/* Invoice Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="table-mobile-wrapper">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+      {/* Invoice List - Mobile First Design */}
+      <div className="card-enhanced">
+        {/* Desktop Table View */}
+        <div className="hidden lg:block table-mobile-wrapper">
+          <table className="table-enhanced">
+            <thead>
               <tr>
-                <th className="px-4 py-3 text-left">
+                <th className="w-12">
                   <input
                     type="checkbox"
                     checked={selectedInvoices.length === invoices.length && invoices.length > 0}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 touch-target"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <button className="text-left" onClick={() => { setSortBy('date'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Invoice'}</button>
+                <th>
+                  <button className="text-left hover:text-blue-600" onClick={() => { setSortBy('date'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>
+                    Invoice {sortBy === 'date' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <button className="text-left" onClick={() => { setSortBy('customer'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Customer'}</button>
+                <th>
+                  <button className="text-left hover:text-blue-600" onClick={() => { setSortBy('customer'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>
+                    Customer {sortBy === 'customer' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <button className="text-left" onClick={() => { setSortBy('date'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Date'}</button>
+                <th>
+                  <button className="text-left hover:text-blue-600" onClick={() => { setSortBy('date'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>
+                    Date {sortBy === 'date' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Due Date
+                <th>Due Date</th>
+                <th>
+                  <button className="text-left hover:text-blue-600" onClick={() => { setSortBy('amount'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>
+                    Amount {sortBy === 'amount' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <button className="text-left" onClick={() => { setSortBy('amount'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Amount'}</button>
+                <th>
+                  <button className="text-left hover:text-blue-600" onClick={() => { setSortBy('status'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>
+                    Status {sortBy === 'status' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <button className="text-left" onClick={() => { setSortBy('status'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>{'Status'}</button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th>Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {invoices.map((invoice) => (
                 <tr key={invoice._id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4">
+                  <td>
                     <input
                       type="checkbox"
                       checked={selectedInvoices.includes(invoice._id)}
                       onChange={() => handleSelectInvoice(invoice._id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 touch-target"
                     />
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {invoice.invoiceNumber}
-                    </div>
+                  <td>
+                    <div className="font-medium text-gray-900">{invoice.invoiceNumber}</div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{invoice.customer?.name}</div>
+                  <td>
+                    <div className="text-gray-900">{invoice.customer?.name}</div>
                     <div className="text-sm text-gray-500">{invoice.customer?.phone}</div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="text-gray-900">
                     {new Date(invoice.date).toLocaleDateString()}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="text-gray-900">
                     {new Date(invoice.dueDate).toLocaleDateString()}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className="font-medium text-gray-900">
                     {formatCurrency(invoice.total)}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
+                  <td>
+                    <span className={`status-badge-mobile ${getStatusColor(invoice.status)}`}>
                       {invoice.status}
                     </span>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="relative inline-block text-left">
-                      <button onClick={() => setMenuOpenId(menuOpenId === invoice._id ? null : invoice._id)} className="px-2 py-1 border rounded bg-white hover:bg-gray-50" title="Actions">•••</button>
+                  <td>
+                    <div className="relative" ref={menuOpenId === invoice._id ? menuRef : null}>
+                      <button 
+                        onClick={() => setMenuOpenId(menuOpenId === invoice._id ? null : invoice._id)} 
+                        className="touch-target px-2 py-1 border rounded bg-white hover:bg-gray-50 transition-colors" 
+                        title="Actions"
+                      >
+                        •••
+                      </button>
                       {menuOpenId === invoice._id && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white border rounded shadow-lg z-10">
+                        <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg z-20 animate-fade-in">
                           <div className="py-1">
-                            <Link to={`/edit-invoice/${invoice._id}`} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Edit</Link>
-                            <button onClick={() => { setMenuOpenId(null); handlePrintInvoice(invoice); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Print</button>
-                            <button onClick={() => { setMenuOpenId(null); handleWhatsAppInvoice(invoice); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">WhatsApp</button>
-                            <button onClick={() => { setMenuOpenId(null); handleCopyPortalLink(invoice); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Copy Portal Link</button>
-                            {invoice.status !== 'paid' && <button onClick={() => { setMenuOpenId(null); handleMarkAsPaid(invoice); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Mark as Paid</button>}
-                            <button onClick={() => { setMenuOpenId(null); handleDeleteInvoice(invoice); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Delete</button>
+                            <Link to={`/edit-invoice/${invoice._id}`} className="dropdown-item-mobile text-sm text-gray-700">Edit</Link>
+                            <button onClick={() => { setMenuOpenId(null); handlePrintInvoice(invoice); }} className="dropdown-item-mobile w-full text-left text-sm text-gray-700">Print</button>
+                            <button onClick={() => { setMenuOpenId(null); handleWhatsAppInvoice(invoice); }} className="dropdown-item-mobile w-full text-left text-sm text-gray-700">WhatsApp</button>
+                            <button onClick={() => { setMenuOpenId(null); handleCopyPortalLink(invoice); }} className="dropdown-item-mobile w-full text-left text-sm text-gray-700">Copy Portal Link</button>
+                            {invoice.status !== 'paid' && <button onClick={() => { setMenuOpenId(null); handleMarkAsPaid(invoice); }} className="dropdown-item-mobile w-full text-left text-sm text-gray-700">Mark as Paid</button>}
+                            <button onClick={() => { setMenuOpenId(null); handleDeleteInvoice(invoice); }} className="dropdown-item-mobile w-full text-left text-sm text-red-600">Delete</button>
                           </div>
                         </div>
                       )}
@@ -624,34 +769,98 @@ const InvoiceManagement = () => {
           </table>
         </div>
 
-        {invoices.length === 0 && (
-          <div className="text-center py-12">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices found</h3>
-            <p className="mt-1 text-sm text-gray-500">Get started by creating a new invoice.</p>
-          </div>
-        )}
+        {/* Mobile Card View */}
+        <div className="lg:hidden space-y-3">
+          {invoices.map((invoice) => (
+            <div key={invoice._id} className="invoice-item-mobile">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedInvoices.includes(invoice._id)}
+                    onChange={() => handleSelectInvoice(invoice._id)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 touch-target"
+                  />
+                  <div>
+                    <div className="font-semibold text-gray-900">{invoice.invoiceNumber}</div>
+                    <div className="text-sm text-gray-600">{invoice.customer?.name}</div>
+                  </div>
+                </div>
+                <span className={`status-badge-mobile ${getStatusColor(invoice.status)}`}>
+                  {invoice.status}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                <div>
+                  <span className="text-gray-500">Date:</span>
+                  <div className="font-medium">{new Date(invoice.date).toLocaleDateString()}</div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Due:</span>
+                  <div className="font-medium">{new Date(invoice.dueDate).toLocaleDateString()}</div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Amount:</span>
+                  <div className="font-bold text-lg">{formatCurrency(invoice.total)}</div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Phone:</span>
+                  <div className="font-medium">{invoice.customer?.phone}</div>
+                </div>
+              </div>
+
+              <div className="mobile-actions">
+                <Link to={`/edit-invoice/${invoice._id}`} className="btn-enhanced btn-secondary">
+                  ✏️ Edit
+                </Link>
+                <button onClick={() => handlePrintInvoice(invoice)} className="btn-enhanced btn-secondary">
+                  🖨️ Print
+                </button>
+                <button onClick={() => handleWhatsAppInvoice(invoice)} className="btn-enhanced bg-green-600 text-white hover:bg-green-700">
+                  📱 WhatsApp
+                </button>
+                <button onClick={() => handleCopyPortalLink(invoice)} className="btn-enhanced btn-secondary">
+                  🔗 Portal
+                </button>
+                {invoice.status !== 'paid' && (
+                  <button onClick={() => handleMarkAsPaid(invoice)} className="btn-enhanced btn-success">
+                    ✅ Mark Paid
+                  </button>
+                )}
+                <button onClick={() => handleDeleteInvoice(invoice)} className="btn-enhanced btn-danger">
+                  🗑️ Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-end gap-2 mt-4">
-        <button
-          className="px-3 py-1 border rounded disabled:opacity-50"
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-        >
-          Previous
-        </button>
-        <span className="text-sm">Page {page} of {Math.max(1, Math.ceil((totalCount || 0) / pageSize))}</span>
-        <button
-          className="px-3 py-1 border rounded disabled:opacity-50"
-          onClick={() => setPage((p) => p + 1)}
-          disabled={page * pageSize >= (totalCount || 0)}
-        >
-          Next
-        </button>
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="text-sm text-gray-600">
+          Showing {Math.min((page - 1) * pageSize + 1, totalCount)} to {Math.min(page * pageSize, totalCount)} of {totalCount} invoices
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn-enhanced btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            ← Previous
+          </button>
+          <span className="text-sm px-3 py-2 bg-gray-100 rounded-md">
+            {page} of {Math.max(1, Math.ceil((totalCount || 0) / pageSize))}
+          </span>
+          <button
+            className="btn-enhanced btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={page * pageSize >= (totalCount || 0)}
+          >
+            Next →
+          </button>
+        </div>
       </div>
 
       {/* Print Modal */}
