@@ -266,7 +266,7 @@ async function updateInvoice(id, data) {
   await existing.save();
   await adjustStock(normalized, -1);
   try { await cacheManager.invalidatePattern('invoices'); await cacheManager.invalidatePattern('dashboard'); } catch(_){}
-  return existing.populate('customer').populate('items.item');
+  return await Invoice.findById(existing._id).populate('customer').populate('items.item');
 }
 
 async function deleteInvoice(id) {

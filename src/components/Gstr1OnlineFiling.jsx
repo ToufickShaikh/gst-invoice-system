@@ -1,5 +1,6 @@
 import React from 'react';
 import { toast } from 'react-hot-toast';
+import DocumentSummary from './DocumentSummary';
 
 const CopyButton = ({ textToCopy }) => {
   const handleCopy = () => {
@@ -204,6 +205,8 @@ const Gstr1OnlineFiling = ({ data }) => {
           subtitle={`IGST: ${summary.totals.igst.toFixed(2)}, CGST: ${summary.totals.cgst.toFixed(2)}, SGST: ${summary.totals.sgst.toFixed(2)}`} 
         />
       </div>
+
+      {docSummary && <DocumentSummary data={docSummary} />}
 
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 className="text-lg font-semibold text-blue-800">GSTR-1 Online Filing Guide</h3>

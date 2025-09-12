@@ -210,7 +210,7 @@ const GstFilings = () => {
 
         {activeTab === 'gstr1' && (
           <Section title="GSTR-1 Online Filing Helper">
-            <Gstr1OnlineFiling data={gstr1} />
+            <Gstr1OnlineFiling data={gstr1 ? { ...gstr1, docSummary, period: { from, to } } : null} />
           </Section>
         )}
 
