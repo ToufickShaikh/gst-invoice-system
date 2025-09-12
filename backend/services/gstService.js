@@ -1,7 +1,7 @@
-
 // Unified GST Reporting Service
 const Invoice = require('../models/Invoice');
 const company = require('../config/company');
+const { calculateItemTaxes } = require('../utils/taxHelpers');
 
 // Main function to generate all GST reports for a given period
 async function generateGstReports({ from, to }) {
@@ -56,14 +56,14 @@ function generateGstr1(invoices, startDate) {
             rchrg: inv.reverseCharge ? 'Y' : 'N',
             inv_typ: inv.invoiceType === 'EXPORT' ? 'EXPWP' : 'R',
             itms: (inv.items || []).map(item => {
-                const taxableValue = (item.rate * item.quantity);
+                const { igst, cgst, sgst, taxableValue } = calculateItemTaxes(item, inv.customer?.state);
                 return {
                     num: 1,
                     itm_det: {
                         txval: taxableValue,
-                        iamt: item.igst || 0,
-                        camt: item.cgst || 0,
-                        samt: item.sgst || 0,
+                        iamt: igst,
+                        camt: cgst,
+                        samt: sgst,
                         rt: item.taxSlab || item.item?.taxSlab || 0
                     }
                 };
@@ -86,9 +86,9 @@ function generateGstr1(invoices, startDate) {
             state.inv.push(invoicePayload);
         } else {
             (inv.items || []).forEach(item => {
+                const { igst, cgst, sgst, taxableValue } = calculateItemTaxes(item, inv.customer?.state);
                 const rt = item.taxSlab || item.item?.taxSlab || 0;
                 const pos = invoicePayload.pos;
-                const taxableValue = (item.rate * item.quantity);
 
                 let entry = b2cs.find(e => e.pos === pos && e.rt === rt);
                 if (!entry) {
@@ -96,9 +96,9 @@ function generateGstr1(invoices, startDate) {
                     b2cs.push(entry);
                 }
                 entry.txval += taxableValue;
-                entry.iamt += item.igst || 0;
-                entry.camt += item.cgst || 0;
-                entry.samt += item.sgst || 0;
+                entry.iamt += igst;
+                entry.camt += cgst;
+                entry.samt += sgst;
             });
         }
     });
@@ -195,15 +195,12 @@ function generateHsnSummary(invoices) {
     const hsnMap = new Map();
     invoices.forEach(inv => {
         (inv.items || []).forEach(li => {
+            const { igst, cgst, sgst, taxableValue } = calculateItemTaxes(li, inv.customer?.state);
+
             const hsn = li.hsnCode || li.item?.hsnCode || 'NA';
             const name = li.item?.name || li.name || '';
             const qty = Number(li.quantity || 0);
-            const rate = Number(li.rate || 0);
-            const txval = qty * rate;
             const taxRate = Number(li.taxSlab || li.item?.taxSlab || 0);
-            const igst = li.igst || 0;
-            const cgst = li.cgst || 0;
-            const sgst = li.sgst || 0;
 
             if (!hsnMap.has(hsn)) {
                 hsnMap.set(hsn, { 
@@ -220,7 +217,7 @@ function generateHsnSummary(invoices) {
 
             const row = hsnMap.get(hsn);
             row.quantity += qty;
-            row.taxableValue += txval;
+            row.taxableValue += taxableValue;
             row.igst += igst;
             row.cgst += cgst;
             row.sgst += sgst;
