@@ -49,57 +49,6 @@ function extractStateCode(stateString) {
     return stateMapping[stateString] || null;
 }
 
-const GST_RATES = {
-    0: 0,
-    3: 3,
-    5: 5,
-    12: 12,
-    18: 18,
-    28: 28,
-};
-
-const company = require('../config/company');
-
-// Company's state code and name derived from config (default Tamil Nadu 33)
-const COMPANY_STATE_CODE = (company.state && String(company.state).split('-')[0].trim()) || '33';
-const COMPANY_STATE_NAME = (company.state && String(company.state).split('-')[1]) || 'Tamil Nadu';
-
-/**
- * Extract state code from formatted state string (e.g., "33-Tamil Nadu" -> "33")
- */
-function extractStateCode(stateString) {
-    if (!stateString) return null;
-
-    // Handle different formats
-    if (stateString.includes('-')) {
-        return stateString.split('-')[0].trim();
-    }
-
-    // If it's just a number, return as is
-    if (/^\d{2}$/.test(stateString)) {
-        return stateString;
-    }
-
-    // If it's a state name, try to find the code
-    const stateMapping = {
-        'Tamil Nadu': '33',
-        'Maharashtra': '27',
-        'Karnataka': '29',
-        'Kerala': '32',
-        'Andhra Pradesh': '28',
-        'Telangana': '36',
-        'Gujarat': '24',
-        'Rajasthan': '08',
-        'Uttar Pradesh': '09',
-        'West Bengal': '19',
-        'Delhi': '07',
-        'Haryana': '06',
-        'Punjab': '03'
-    };
-
-    return stateMapping[stateString] || null;
-}
-
 function calculateItemTaxes(item, customerState) {
     const customerStateCode = extractStateCode(customerState);
     const isInterState = customerStateCode && customerStateCode !== COMPANY_STATE_CODE;
@@ -166,6 +115,3 @@ const calculateTotals = (items, customerState) => {
 };
 
 module.exports = { calculateTotals, calculateItemTaxes, extractStateCode, COMPANY_STATE_CODE, COMPANY_STATE_NAME };
-
-
-module.exports = { calculateTotals, extractStateCode, COMPANY_STATE_CODE, COMPANY_STATE_NAME };
