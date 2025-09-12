@@ -1,44 +1,70 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-
-// JWT is not required in this deployment; authentication will return user info only.
-
-const register = async (req, res) => {
-	try {
-		const { username, email, password } = req.body;
-		if (!username || !email || !password) return res.status(400).json({ success: false, message: 'username, email and password are required' });
-
-		const existing = await User.findOne({ $or: [{ username }, { email }] });
-		if (existing) return res.status(409).json({ success: false, message: 'User already exists' });
-
-		const hashed = await bcrypt.hash(password, 10);
-		const user = new User({ username, email, password: hashed });
-		await user.save();
-
-	return res.json({ success: true, user: { id: user._id, username: user.username, email: user.email } });
-	} catch (err) {
-		console.error('Register error', err);
-		return res.status(500).json({ success: false, message: err.message || 'Server error' });
-	}
-};
+const Tenant = require('../models/Tenant');
 
 const login = async (req, res) => {
 	try {
-		const { username, password } = req.body;
-		if (!username || !password) return res.status(400).json({ success: false, message: 'username and password required' });
+		const { email, password, tenantId } = req.body;
+		if (!email || !password) {
+			return res.status(400).json({ success: false, message: 'Email and password required' });
+		}
 
-		const user = await User.findOne({ username });
-		if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+		// Super admin login (no tenant required)
+		if (!tenantId) {
+			const user = await User.findOne({ email, role: 'super_admin' });
+			if (user && await bcrypt.compare(password, user.password)) {
+				const token = jwt.sign(
+					{ userId: user._id, role: 'super_admin' }, 
+					process.env.JWT_SECRET || 'your-secret-key',
+					{ expiresIn: '24h' }
+				);
+				return res.json({ 
+					success: true, 
+					token, 
+					user: { role: 'super_admin', email: user.email } 
+				});
+			}
+			return res.status(401).json({ success: false, message: 'Invalid super admin credentials' });
+		}
 
-		const match = await bcrypt.compare(password, user.password);
-		if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+		// Tenant user login
+		const user = await User.findOne({ email, tenantId }).populate('tenantId');
+		if (user && await bcrypt.compare(password, user.password)) {
+			const token = jwt.sign(
+				{ userId: user._id, tenantId: user.tenantId._id, role: user.role }, 
+				process.env.JWT_SECRET || 'your-secret-key',
+				{ expiresIn: '24h' }
+			);
+			return res.json({ 
+				success: true, 
+				token, 
+				user: { 
+					role: user.role, 
+					tenantId: user.tenantId._id,
+					tenantName: user.tenantId.name,
+					email: user.email
+				} 
+			});
+		}
 
-	return res.json({ success: true, user: { id: user._id, username: user.username, email: user.email } });
+		return res.status(401).json({ success: false, message: 'Invalid credentials' });
 	} catch (err) {
 		console.error('Login error', err);
 		return res.status(500).json({ success: false, message: err.message || 'Server error' });
 	}
 };
 
-module.exports = { register, login };
+const getTenantsList = async (req, res) => {
+	try {
+		const tenants = await Tenant.find({ isActive: true })
+			.select('_id name')
+			.sort('name');
+		res.json({ success: true, tenants });
+	} catch (error) {
+		console.error('Get tenants error', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+};
+
+module.exports = { login, getTenantsList };

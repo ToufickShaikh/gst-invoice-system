@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const customerSchema = new mongoose.Schema({
+    tenantId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Tenant', 
+        required: true,
+        index: true 
+    },
     customerType: { type: String, enum: ['B2B', 'B2C'], required: true },
     firmName: { type: String },
     gstNo: { type: String },

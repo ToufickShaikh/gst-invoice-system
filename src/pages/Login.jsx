@@ -1,52 +1,66 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
-import { useAuth } from '../context/AuthContext'
 import InputField from '../components/InputField'
 import Button from '../components/Button'
 
 const Login = () => {
   const navigate = useNavigate()
-  const [isRegisterMode, setIsRegisterMode] = useState(false)
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
-    password: ''
+    password: '',
+    tenantId: ''
   })
+  const [tenants, setTenants] = useState([])
   const [loading, setLoading] = useState(false)
+  const [showSuperAdmin, setShowSuperAdmin] = useState(false)
+
+  useEffect(() => {
+    // Load available tenants
+    fetch('/api/auth/tenants')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setTenants(data.tenants)
+        }
+      })
+      .catch(console.error)
+  }, [])
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
-
-  
-
-  const { login: authLogin, register: authRegister } = useAuth()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      if (isRegisterMode) {
-        await authRegister(formData.username, formData.email, formData.password)
-        toast.success('Registration successful! Please log in.')
-        setIsRegisterMode(false)
-      } else {
-        const res = await authLogin(formData.username, formData.password)
-        // Proceed only when backend returned a user or user was stored locally
-        const userFromRes = res?.user || null
-        const stored = localStorage.getItem('auth_user')
-        if (userFromRes || stored) {
-          toast.success('Login successful!')
-          navigate('/dashboard')
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+        
+        toast.success('Login successful!')
+        
+        // Redirect based on role
+        if (data.user.role === 'super_admin') {
+          navigate('/admin')
         } else {
-          toast.error('Login succeeded but user session was not established')
+          navigate('/dashboard')
         }
+      } else {
+        toast.error(data.message || 'Login failed')
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || 'An error occurred. Please try again.'
-      toast.error(errorMessage)
+      toast.error('Login failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -65,25 +79,15 @@ const Login = () => {
           </div>
           <form onSubmit={handleSubmit}>
             <InputField
-              label="Username"
-              name="username"
-              type="text"
-              value={formData.username}
+              label="Email"
+              name="email"
+              type="email"
+              value={formData.email}
               onChange={handleChange}
-              placeholder="Enter username"
+              placeholder="Enter email address"
               required
             />
-            {isRegisterMode && (
-              <InputField
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter email address"
-                required
-              />
-            )}
+            
             <InputField
               label="Password"
               type="password"
@@ -93,33 +97,43 @@ const Login = () => {
               placeholder="Enter password"
               required
             />
-            <Button type="submit" variant="primary" className="w-full" disabled={loading}>{isRegisterMode ? 'Register' : 'Login'}</Button>
-          </form>
-          <p className="text-sm text-gray-600 text-center mt-4">
-            {isRegisterMode ? (
-              <>
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setIsRegisterMode(false)}
-                  className="text-yellow-600 hover:text-yellow-800 font-medium focus:outline-none"
+            
+            {!showSuperAdmin && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Organization</label>
+                <select
+                  name="tenantId"
+                  value={formData.tenantId}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required={!showSuperAdmin}
                 >
-                  Login
-                </button>
-              </>
-            ) : (
-              <>
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setIsRegisterMode(true)}
-                  className="text-yellow-600 hover:text-yellow-800 font-medium focus:outline-none"
-                >
-                  Register
-                </button>
-              </>
+                  <option value="">Select Organization</option>
+                  {tenants.map(tenant => (
+                    <option key={tenant._id} value={tenant._id}>
+                      {tenant.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
-          </p>
+            
+            <Button type="submit" variant="primary" className="w-full" disabled={loading}>
+              {loading ? 'Logging in...' : 'Login'}
+            </Button>
+          </form>
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setShowSuperAdmin(!showSuperAdmin)
+                setFormData({ email: '', password: '', tenantId: '' })
+              }}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
+            >
+              {showSuperAdmin ? 'Switch to Tenant Login' : 'Super Admin Login'}
+            </button>
+          </div>
 
           {/* Developer Credit */}
           <div className="mt-6 text-center">

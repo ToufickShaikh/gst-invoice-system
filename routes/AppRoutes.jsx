@@ -20,6 +20,7 @@ import PortalInvoice from '../src/pages/PortalInvoice'
 import PortalStatement from '../src/pages/PortalStatement'
 import GstFilings from '../src/pages/GstFilings'
 import PosQuickBilling from '../src/pages/PosQuickBilling'
+import SuperAdminDashboard from '../src/pages/SuperAdminDashboard'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -44,9 +45,15 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public portal routes */}
+      {/* Public portal routes */}
       <Route path="/portal/invoice/:id/:token" element={<PortalInvoice />} />
       <Route path="/portal/customer/:customerId/:token/statement" element={<PortalStatement />} />
+      
+      {/* Auth routes */}
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+      
+      {/* Super Admin route */}
+      <Route path="/admin" element={<SuperAdminDashboard />} />
       <Route path="/dashboard" element={<PrivateRoute><AdvancedDashboard /></PrivateRoute>} />
       <Route path="/dashboard-simple" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
