@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
 import { itemsAPI } from '../api/items';
 import { invoicesAPI } from '../api/invoices';
-import { formatCurrency } from '../utils/dateHelpers';
 import { getApiBaseUrl, getAppBasePath } from '../utils/appBase';
-import { toast } from 'react-hot-toast';
+
+// Feature-based imports
+import POSItemList from '../features/pos/components/POSItemList';
+import POSBillingSummary from '../features/pos/components/POSBillingSummary';
+import { usePOSCalculations } from '../features/pos/hooks/usePOSCalculations';
 
 const PosQuickBilling = () => {
   const navigate = useNavigate();
@@ -25,6 +29,9 @@ const PosQuickBilling = () => {
     shippingBillDate: '', 
     portCode: '' 
   });
+
+  const { subtotal, totalTax, grandTotal } = usePOSCalculations(saleItems, discount);
+  const change = Math.max(0, Number(paidAmount || 0) - grandTotal);
 
   useEffect(() => {
     (async () => {
@@ -56,38 +63,6 @@ const PosQuickBilling = () => {
   };
 
   const removeLine = (i) => setSaleItems(prev => prev.filter((_, idx) => idx !== i));
-
-  const totalBase = saleItems.reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 0)), 0) || 0;
-
-  const totals = saleItems.reduce((acc, it) => {
-    const lineBase = Number(it.price || 0) * Number(it.quantity || 0);
-    const tax = Number(it.taxSlab || 0) || 0;
-    const propDiscount = totalBase > 0 ? (lineBase / totalBase) * Number(discount || 0) : 0;
-    const priceType = String(it.priceType ?? it.item?.priceType ?? 'Exclusive');
-
-    if (priceType === 'Inclusive' && tax) {
-      const discountedInclusive = Math.max(0, lineBase - propDiscount);
-      const taxable = discountedInclusive / (1 + tax / 100);
-      const taxAmt = Math.max(0, discountedInclusive - taxable);
-      const lineTotal = discountedInclusive;
-      acc.subtotal += taxable;
-      acc.tax += taxAmt;
-      acc.grand += lineTotal;
-    } else {
-      const taxable = Math.max(0, lineBase - propDiscount);
-      const taxAmt = taxable * (tax / 100);
-      const lineTotal = taxable + taxAmt;
-      acc.subtotal += taxable;
-      acc.tax += taxAmt;
-      acc.grand += lineTotal;
-    }
-    return acc;
-  }, { subtotal: 0, tax: 0, grand: 0 });
-
-  const subtotal = totals.subtotal;
-  const totalTax = totals.tax;
-  const grandTotal = totals.grand;
-  const change = Math.max(0, Number(paidAmount || 0) - grandTotal);
 
   const handleSavePOS = async () => {
     if (saleItems.length === 0) {
@@ -163,12 +138,8 @@ const PosQuickBilling = () => {
         <div className="page-header">
           <div className="flex flex-col space-y-6 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <div className="slide-in">
-              <h1 className="page-title">
-                POS Quick Billing
-              </h1>
-              <p className="page-subtitle">
-                Fast retail billing with instant payment processing
-              </p>
+              <h1 className="page-title">POS Quick Billing</h1>
+              <p className="page-subtitle">Fast retail billing with instant payment processing</p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4 scale-in">
@@ -198,293 +169,97 @@ const PosQuickBilling = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 fade-in">
           {/* Items Section */}
           <div className="lg:col-span-2">
-            <div className="card-enhanced responsive-padding">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-xl font-bold text-slate-900">Sale Items</h2>
-                <button
-                  onClick={addEmpty}
-                  className="btn-enhanced btn-primary"
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Add Item
-                </button>
-              </div>
-
-              {/* Customer Info */}
-              <div className="form-section-modern mb-8">
-                <div className="form-grid-modern">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Customer Name (Optional)</label>
-                    <input
-                      type="text"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Enter customer name"
-                      className="input-enhanced"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Payment Method</label>
-                    <select
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="select-modern"
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="UPI">UPI</option>
-                      <option value="Card">Card</option>
-                      <option value="Bank Transfer">Bank Transfer</option>
-                    </select>
-                  </div>
+            {/* Customer Info */}
+            <div className="form-section-modern mb-8">
+              <div className="form-grid-modern">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Customer Name (Optional)</label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Enter customer name"
+                    className="input-enhanced"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Payment Method</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="select-modern"
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Card">Card</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                  </select>
                 </div>
               </div>
-
-              {/* Items List */}
-              <div className="space-y-6">
-                {saleItems.length === 0 ? (
-                  <div className="empty-state-modern">
-                    <svg className="mx-auto h-16 w-16 text-slate-400 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                    <h3 className="text-xl font-semibold text-slate-900 mb-3">No items added yet</h3>
-                    <p className="text-slate-600 mb-6">Click "Add Item" to start building your sale</p>
-                  </div>
-                ) : (
-                  saleItems.map((line, idx) => (
-                    <div key={line.id} className="mobile-card">
-                      <div className="form-grid-modern">
-                        <div className="sm:col-span-2">
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">Item</label>
-                          <select 
-                            className="select-modern" 
-                            value={line.itemId} 
-                            onChange={(e) => updateLine(idx, 'itemId', e.target.value)}
-                          >
-                            <option value="">Select item</option>
-                            {items.map(it => (
-                              <option key={it._id} value={it._id}>
-                                {it.name} - {formatCurrency(it.rate || it.price || 0)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">Quantity</label>
-                          <input 
-                            className="input-enhanced" 
-                            type="number" 
-                            min="1"
-                            value={line.quantity} 
-                            onChange={(e) => updateLine(idx, 'quantity', parseInt(e.target.value || 1))} 
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="form-grid-modern mt-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">Price</label>
-                          <input 
-                            className="input-enhanced" 
-                            type="number" 
-                            min="0"
-                            step="0.01"
-                            value={line.price} 
-                            onChange={(e) => updateLine(idx, 'price', parseFloat(e.target.value || 0))} 
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">Tax %</label>
-                          <select
-                            className="select-modern"
-                            value={line.taxSlab}
-                            onChange={(e) => updateLine(idx, 'taxSlab', parseFloat(e.target.value))}
-                          >
-                            <option value={0}>0%</option>
-                            <option value={5}>5%</option>
-                            <option value={12}>12%</option>
-                            <option value={18}>18%</option>
-                            <option value={28}>28%</option>
-                          </select>
-                        </div>
-                        
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <span className="block text-sm font-semibold text-slate-700 mb-2">Line Total</span>
-                            <span className="text-2xl font-bold text-emerald-600">
-                              {formatCurrency((line.price || 0) * (line.quantity || 1))}
-                            </span>
-                          </div>
-                          
-                          <button 
-                            className="btn-enhanced btn-danger" 
-                            onClick={() => removeLine(idx)}
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Export Options */}
-              {exportInfo.isExport && (
-                <div className="mt-8 form-section-modern bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
-                  <h3 className="text-lg font-semibold text-blue-800 mb-4">Export Details</h3>
-                  <div className="form-grid-modern">
-                    <select
-                      value={exportInfo.exportType}
-                      onChange={(e) => setExportInfo(prev => ({ ...prev, exportType: e.target.value }))}
-                      className="select-modern"
-                    >
-                      <option value="">Export Type</option>
-                      <option value="EXPORT">Overseas Export</option>
-                      <option value="SEZ">SEZ</option>
-                    </select>
-                    
-                    <input
-                      type="text"
-                      placeholder="Port Code"
-                      value={exportInfo.portCode}
-                      onChange={(e) => setExportInfo(prev => ({ ...prev, portCode: e.target.value }))}
-                      className="input-enhanced"
-                    />
-                  </div>
-                  
-                  <label className="flex items-center mt-4">
-                    <input
-                      type="checkbox"
-                      checked={exportInfo.withTax}
-                      onChange={(e) => setExportInfo(prev => ({ ...prev, withTax: e.target.checked }))}
-                      className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3"
-                    />
-                    <span className="text-sm font-medium text-blue-700">With Tax (WPAY)</span>
-                  </label>
-                </div>
-              )}
             </div>
+
+            <POSItemList
+              saleItems={saleItems}
+              items={items}
+              updateLine={updateLine}
+              removeLine={removeLine}
+              addEmpty={addEmpty}
+            />
+
+            {/* Export Options */}
+            {exportInfo.isExport && (
+              <div className="mt-8 form-section-modern bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
+                <h3 className="text-lg font-semibold text-blue-800 mb-4">Export Details</h3>
+                <div className="form-grid-modern">
+                  <select
+                    value={exportInfo.exportType}
+                    onChange={(e) => setExportInfo(prev => ({ ...prev, exportType: e.target.value }))}
+                    className="select-modern"
+                  >
+                    <option value="">Export Type</option>
+                    <option value="EXPORT">Overseas Export</option>
+                    <option value="SEZ">SEZ</option>
+                  </select>
+                  
+                  <input
+                    type="text"
+                    placeholder="Port Code"
+                    value={exportInfo.portCode}
+                    onChange={(e) => setExportInfo(prev => ({ ...prev, portCode: e.target.value }))}
+                    className="input-enhanced"
+                  />
+                </div>
+                
+                <label className="flex items-center mt-4">
+                  <input
+                    type="checkbox"
+                    checked={exportInfo.withTax}
+                    onChange={(e) => setExportInfo(prev => ({ ...prev, withTax: e.target.checked }))}
+                    className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3"
+                  />
+                  <span className="text-sm font-medium text-blue-700">With Tax (WPAY)</span>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Billing Summary */}
           <div className="lg:col-span-1">
-            <div className="card-glass responsive-padding sticky top-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-8">Billing Summary</h2>
-              
-              {/* Totals */}
-              <div className="space-y-4 mb-8">
-                <div className="flex justify-between text-slate-600">
-                  <span>Subtotal:</span>
-                  <span className="font-semibold">{formatCurrency(subtotal)}</span>
-                </div>
-                
-                <div className="flex justify-between text-slate-600">
-                  <span>Discount:</span>
-                  <span className="font-semibold text-red-600">-{formatCurrency(discount)}</span>
-                </div>
-                
-                <div className="flex justify-between text-slate-600">
-                  <span>Tax:</span>
-                  <span className="font-semibold">{formatCurrency(totalTax)}</span>
-                </div>
-                
-                <div className="border-t pt-4">
-                  <div className="flex justify-between">
-                    <span className="text-lg font-bold text-slate-900">Grand Total:</span>
-                    <span className="text-2xl font-bold text-emerald-600">{formatCurrency(grandTotal)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Discount Input */}
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Discount (₹)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={discount}
-                  onChange={(e) => setDiscount(parseFloat(e.target.value || 0))}
-                  className="input-enhanced"
-                  placeholder="Enter discount amount"
-                />
-              </div>
-
-              {/* Payment */}
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Paid Amount (₹)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={paidAmount}
-                  onChange={(e) => setPaidAmount(parseFloat(e.target.value || 0))}
-                  className="input-enhanced"
-                  placeholder="Enter paid amount"
-                />
-                
-                {change > 0 && (
-                  <div className="mt-3 success-state-modern">
-                    <div className="flex justify-between">
-                      <span>Change:</span>
-                      <span className="font-bold">{formatCurrency(change)}</span>
-                    </div>
-                  </div>
-                )}
-                
-                {Number(paidAmount || 0) < Number(grandTotal || 0) && grandTotal > 0 && (
-                  <div className="mt-3 error-state-modern">
-                    <p className="text-sm">POS requires full payment - no credit allowed</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Export Toggle */}
-              <div className="mb-8">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={exportInfo.isExport}
-                    onChange={(e) => setExportInfo(prev => ({ 
-                      ...prev, 
-                      isExport: e.target.checked,
-                      exportType: e.target.checked ? prev.exportType : '',
-                      withTax: e.target.checked ? prev.withTax : false
-                    }))}
-                    className="h-5 w-5 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded mr-3"
-                  />
-                  <span className="text-sm font-semibold text-slate-700">Export Invoice</span>
-                </label>
-              </div>
-
-              {/* Action Button */}
-              <button
-                onClick={handleSavePOS}
-                disabled={loading || saleItems.length === 0 || Number(paidAmount || 0) < Number(grandTotal || 0)}
-                className="w-full btn-enhanced btn-success text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <div className="flex items-center justify-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Processing...
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center">
-                    <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    Save & Print
-                  </div>
-                )}
-              </button>
-            </div>
+            <POSBillingSummary
+              subtotal={subtotal}
+              totalTax={totalTax}
+              grandTotal={grandTotal}
+              discount={discount}
+              setDiscount={setDiscount}
+              paidAmount={paidAmount}
+              setPaidAmount={setPaidAmount}
+              change={change}
+              exportInfo={exportInfo}
+              setExportInfo={setExportInfo}
+              onSave={handleSavePOS}
+              loading={loading}
+              saleItems={saleItems}
+            />
           </div>
         </div>
       </div>
