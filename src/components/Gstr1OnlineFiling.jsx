@@ -206,7 +206,7 @@ const Gstr1OnlineFiling = ({ data }) => {
         />
       </div>
 
-      {docSummary && docSummary.summary && <DocumentSummary data={{ documents: docSummary.summary.documentList || [] }} />}
+      {docSummary && <DocumentSummary data={{ documents: docSummary.documents || [] }} />}
 
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 className="text-lg font-semibold text-blue-800">GSTR-1 Online Filing Guide</h3>
@@ -322,9 +322,9 @@ const Gstr1OnlineFiling = ({ data }) => {
         </div>
       </div>
 
-      {data.b2b && data.b2b.length > 0 && <B2BTable data={data.b2b} />}
-      {data.b2cl && data.b2cl.length > 0 && <B2CLTable data={data.b2cl} />}
-      {data.b2cs && data.b2cs.length > 0 && <B2CSTable data={data.b2cs} />}
+      {gstr1.b2b && gstr1.b2b.length > 0 && <B2BTable data={gstr1.b2b} />}
+      {gstr1.b2cl && gstr1.b2cl.length > 0 && <B2CLTable data={gstr1.b2cl} />}
+      {gstr1.b2cs && gstr1.b2cs.length > 0 && <B2CSTable data={gstr1.b2cs} />}
       {/* Add tables for other sections like Exports, CDNR etc. as needed */}
     </div>
   );
