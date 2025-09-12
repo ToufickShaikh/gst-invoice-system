@@ -206,7 +206,7 @@ const Gstr1OnlineFiling = ({ data }) => {
         />
       </div>
 
-      {docSummary && <DocumentSummary data={docSummary} />}
+      {docSummary && docSummary.summary && <DocumentSummary data={{ documents: docSummary.summary.documentList || [] }} />}
 
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 className="text-lg font-semibold text-blue-800">GSTR-1 Online Filing Guide</h3>

@@ -10,7 +10,8 @@ router.get('/returns/document-summary', async (req, res) => {
         console.log(`[Doc Summary] Processing period: ${start.toISOString()} to ${end.toISOString()}`);
 
         const invoices = await Invoice.find({
-            invoiceDate: { $gte: start, $lte: end }
+            invoiceDate: { $gte: start, $lte: end },
+            status: { $ne: 'CANCELLED' }
         }).populate('customer', 'firmName gstin state').lean();
         
         console.log(`[Doc Summary] Found ${invoices.length} invoices`);

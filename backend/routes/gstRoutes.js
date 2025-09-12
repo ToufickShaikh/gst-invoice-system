@@ -265,7 +265,10 @@ router.get('/returns/gstr3b', async (req, res) => {
     const { start, end } = parsePeriod(req);
     console.log(`[GSTR-3B] Processing period: ${start.toISOString()} to ${end.toISOString()}`);
     
-    const invoices = await Invoice.find({ invoiceDate: { $gte: start, $lte: end } }).lean();
+    const invoices = await Invoice.find({
+      invoiceDate: { $gte: start, $lte: end },
+      status: { $ne: 'CANCELLED' }
+    }).populate('customer', 'state').lean();
     console.log(`[GSTR-3B] Found ${invoices.length} invoices`);
 
     let taxable = 0, igst = 0, cgst = 0, sgst = 0;
