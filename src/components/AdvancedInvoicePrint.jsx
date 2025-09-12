@@ -24,37 +24,9 @@ const AdvancedInvoicePrint = ({ invoice, onClose, isVisible = false }) => {
   const [paymentQr, setPaymentQr] = useState('');
 
   useEffect(() => {
-    async function loadInvoiceData() {
-      try {
-        if (!isVisible || !invoice) return;
-        
-        // If we received a single invoice object with items
-        if (invoice.items) {
-          setInvoiceData(invoice);
-          return;
-        }
-        
-        // If we received an invoice ID
-        if (invoice._id) {
-          const response = await invoicesAPI.get(invoice._id);
-          setInvoiceData(response);
-          return;
-        }
-
-        // If we received an invoice from the list
-        if (invoice.data && Array.isArray(invoice.data) && invoice.data.length > 0) {
-          const selectedInvoice = invoice.data[0];
-          if (selectedInvoice._id) {
-            const response = await invoicesAPI.get(selectedInvoice._id);
-            setInvoiceData(response);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load invoice data:', error);
-        toast.error('Failed to load invoice details');
-      }
+    if (isVisible && invoice) {
+      setInvoiceData(invoice);
     }
-    loadInvoiceData();
   }, [isVisible, invoice]);
 
   useEffect(() => {

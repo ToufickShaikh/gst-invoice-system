@@ -129,9 +129,13 @@ const InvoiceManagement = () => {
 
   const handlePrintInvoice = async (invoice) => {
     try {
-  const response = await invoicesAPI.get(invoice._id);
-      setCurrentInvoice(response); // API returns invoice object directly
-      setShowPrintModal(true);
+      const fullInvoice = await invoicesAPI.get(invoice._id);
+      if (fullInvoice) {
+        setCurrentInvoice(fullInvoice);
+        setShowPrintModal(true);
+      } else {
+        toast.error('Could not load invoice details.');
+      }
     } catch (error) {
       console.error('Error fetching invoice details:', error);
       toast.error('Failed to load invoice details');
