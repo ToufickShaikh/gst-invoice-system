@@ -175,11 +175,13 @@ const SummaryCard = ({ title, value, subtitle }) => (
   </div>
 );
 
-const Gstr1OnlineFiling = ({ data }) => {
-  if (!data?.gstr1) return <div className="text-sm text-gray-600">No GSTR-1 data loaded.</div>;
+const Gstr1OnlineFiling = ({ gstr1Data, docSummaryData, period }) => {
+  if (!gstr1Data || !gstr1Data.gstr1 || !gstr1Data.summary) {
+    return <div className="text-sm text-gray-600">No GSTR-1 data loaded.</div>;
+  }
 
-  const { gstr1, summary, docSummary, period } = data;
-  
+  const { gstr1, summary } = gstr1Data;
+
   return (
     <div className="space-y-6">
       {/* Summary Stats */}
@@ -206,7 +208,7 @@ const Gstr1OnlineFiling = ({ data }) => {
         />
       </div>
 
-      {docSummary && <DocumentSummary data={{ documents: docSummary.documents || [] }} />}
+      {docSummaryData && <DocumentSummary data={docSummaryData} />}
 
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 className="text-lg font-semibold text-blue-800">GSTR-1 Online Filing Guide</h3>
