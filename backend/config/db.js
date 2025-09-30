@@ -6,10 +6,10 @@ dotenv.config();
 
 const connectDB = async () => {
     try {
-        // Try both environment variable names and fallback to localhost
-        const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/gst-invoice';
+        // Use local MongoDB only
+        const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/gst_invoice_system';
         console.log('Attempting to connect to MongoDB...');
-        console.log('Using URI:', mongoUri.includes('mongodb+srv') ? 'MongoDB Atlas' : 'Local MongoDB');
+        console.log('Using URI: Local MongoDB');
 
         await mongoose.connect(mongoUri);
         console.log('✅ MongoDB Connected successfully');

@@ -5,27 +5,27 @@ import EnhancedBillingForm from '../components/EnhancedBillingForm';
 
 const Billing = () => {
   const navigate = useNavigate();
-  const [billingMode, setBillingMode] = useState('advanced'); // 'advanced' or 'simple'
+  const [billingMode, setBillingMode] = useState('advanced');
 
   return (
     <Layout>
-      <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-        {/* Enhanced Header */}
-        <div className="mb-6">
-          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+      <div className="responsive-padding">
+        {/* Modern Header */}
+        <div className="page-header">
+          <div className="flex flex-col space-y-6 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+            <div className="slide-in">
+              <h1 className="page-title">
                 Create Invoice
               </h1>
-              <p className="text-gray-600 mt-1">
+              <p className="page-subtitle">
                 Professional invoice creation with GST compliance
               </p>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-4 scale-in">
               <button
                 onClick={() => navigate('/pos')}
-                className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-md"
+                className="btn-enhanced bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200"
                 title="Quick POS billing for retail sales"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,7 +36,7 @@ const Billing = () => {
               
               <button
                 onClick={() => navigate('/invoices')}
-                className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="btn-enhanced btn-secondary"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -47,25 +47,21 @@ const Billing = () => {
           </div>
 
           {/* Mode Toggle */}
-          <div className="mt-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-1 inline-flex">
+          <div className="mt-8 fade-in">
+            <div className="nav-tabs-modern">
               <button
                 onClick={() => setBillingMode('advanced')}
-                className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
-                  billingMode === 'advanced'
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                className={`nav-tab-modern ${
+                  billingMode === 'advanced' ? 'nav-tab-active' : 'nav-tab-inactive'
                 }`}
               >
-                <span className="flex items-center">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                  </svg>
-                  Advanced Mode
-                </span>
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                </svg>
+                Advanced Mode
               </button>
             </div>
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-slate-600 mt-4 responsive-text">
               {billingMode === 'advanced' 
                 ? 'Full-featured invoice creation with all GST options, export settings, and advanced controls'
                 : 'Simplified billing for quick invoice creation'

@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const itemSchema = new mongoose.Schema({
+    tenantId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Tenant', 
+        required: true,
+        index: true 
+    },
     name: { type: String, required: true },
     hsnCode: { type: String, required: true },
     rate: { type: Number, required: true }, // Changed from price to rate for consistency

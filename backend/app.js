@@ -33,8 +33,10 @@ const cashDrawerRoutes = require('./routes/cashDrawerRoutes');
 const enterpriseRoutes = require('./routes/enterpriseRoutes');
 // New modular invoice v2 routes
 const invoiceV2Routes = require('./routes/invoiceRoutes.v2');
-// Auth routes (stubs returning 410 Gone)
+// Auth routes (multi-tenant login)
 const authRoutes = require('./routes/authRoutes');
+// Super admin routes
+const superAdminRoutes = require('./routes/superAdminRoutes');
 
 const app = express();
 const logger = require('./utils/logger');
@@ -53,10 +55,7 @@ if (process.env.NODE_ENV === 'production') {
 const defaultOrigins = [
     'http://localhost:3000',
     'http://localhost:5173',
-    'http://localhost:4173',
-    'https://shaikhcarpets.vercel.app',
-    'http://185.52.53.253',
-    'https://185.52.53.253'
+    'http://localhost:4173'
 ];
 const extraOrigins = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
@@ -69,8 +68,6 @@ app.use(cors({
         // Allow non-browser requests (no Origin header)
         if (!origin) return callback(null, true);
         if (allowedOrigins.has(origin)) return callback(null, true);
-        // Also allow any request from the server IP for internal proxy requests
-        if (origin && origin.includes('185.52.53.253')) return callback(null, true);
         return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -144,8 +141,11 @@ if (process.env.NODE_ENV === 'development') {
 
 // Auth endpoints removed (JWT auth eliminated by request).
 
-// Keep auth routes mounted so callers receive a clear 410 Gone instead of 404.
+// Auth routes for multi-tenant login
 app.use('/api/auth', authRoutes);
+
+// Super admin routes
+app.use('/api/admin', superAdminRoutes);
 
 // Protected API routes with caching
 app.use('/api/customers', 

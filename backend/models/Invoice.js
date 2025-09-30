@@ -1,7 +1,13 @@
 const mongoose = require('mongoose');
 
 const invoiceSchema = new mongoose.Schema({
-    invoiceNumber: { type: String, required: true, unique: true },
+    invoiceNumber: { type: String, required: true },
+    tenantId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Tenant', 
+        required: true,
+        index: true 
+    },
     customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
     items: [
         {
@@ -42,6 +48,9 @@ const invoiceSchema = new mongoose.Schema({
         portCode: { type: String, default: '' },
     }
 });
+
+// Compound index for unique invoice number per tenant
+invoiceSchema.index({ invoiceNumber: 1, tenantId: 1 }, { unique: true });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 module.exports = Invoice;
